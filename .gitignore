@@ -1,0 +1,21 @@
+# ambiente
+.env
+.venv/
+
+# dados gerados (exceto prompts do agente)
+data/raw/
+data/chunks/
+data/parsed/
+
+# jupyter
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+
+# sistema
+.DS_Store
+Thumbs.db
