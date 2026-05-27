@@ -14,6 +14,9 @@ O projeto realiza:
 - Recuperação semântica de contexto
 - Geração de respostas com Gemini
 
+<br>
+<img width="1553" height="659" alt="image" src="https://github.com/user-attachments/assets/2b8f92a7-3f96-4b37-ba33-d96bf26c0f07" />
+
 ---
 
 # Tecnologias utilizadas
