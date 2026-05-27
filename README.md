@@ -21,7 +21,7 @@ O projeto realiza:
 
 # Tecnologias utilizadas
 
-- Python 3.11+
+- Python 3.12+
 - Flask
 - LangChain
 - Qdrant
@@ -104,7 +104,7 @@ cd ifrs-canoas-rag
 Windows:
 
 ```bash
-py -3.11 -m venv .venv
+py -3.12 -m venv .venv
 .venv\Scripts\activate
 ```
 
