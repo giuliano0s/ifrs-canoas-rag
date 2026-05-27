@@ -14,11 +14,14 @@ O projeto realiza:
 - Recuperação semântica de contexto
 - Geração de respostas com Gemini
 
+<br>
+<img width="1553" height="659" alt="image" src="https://github.com/user-attachments/assets/2b8f92a7-3f96-4b37-ba33-d96bf26c0f07" />
+
 ---
 
 # Tecnologias utilizadas
 
-- Python 3.11+
+- Python 3.12+
 - Flask
 - LangChain
 - Qdrant
@@ -101,7 +104,7 @@ cd ifrs-canoas-rag
 Windows:
 
 ```bash
-py -3.11 -m venv .venv
+py -3.12 -m venv .venv
 .venv\Scripts\activate
 ```
 
@@ -144,13 +147,19 @@ Crie um cluster no Qdrant Cloud e configure as credenciais no arquivo `.env`.
 
 # Pipeline de ingestão
 
-Execute os scripts ou notebooks responsáveis por:
+Execute o script ou os notebooks responsáveis por:
 
 1. Crawling
 2. Parsing
 3. Chunking
 4. Embeddings
 5. Indexação no Qdrant
+
+O script de pipeline está na pasta:
+
+```txt
+pipelines/
+```
 
 Os notebooks estão na pasta:
 
