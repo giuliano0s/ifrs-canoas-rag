@@ -147,13 +147,19 @@ Crie um cluster no Qdrant Cloud e configure as credenciais no arquivo `.env`.
 
 # Pipeline de ingestão
 
-Execute os scripts ou notebooks responsáveis por:
+Execute o script ou os notebooks responsáveis por:
 
 1. Crawling
 2. Parsing
 3. Chunking
 4. Embeddings
 5. Indexação no Qdrant
+
+O script de pipeline está na pasta:
+
+```txt
+pipelines/
+```
 
 Os notebooks estão na pasta:
 
