@@ -28,7 +28,6 @@ O projeto realiza:
 - Google Gemini API
 - BeautifulSoup
 - PyMuPDF
-- Chainlit
 
 ---
 

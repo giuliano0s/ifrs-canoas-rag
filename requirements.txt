@@ -20,7 +20,6 @@ google-genai==2.6.0
 openai==2.38.0
 
 # UI
-chainlit==1.3.2
 flask==3.1.3
 flask-cors==6.0.2
  
