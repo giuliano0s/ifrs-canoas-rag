@@ -40,7 +40,7 @@ REGRAS DE QUALIDADE:
 - Sem markdown, negrito ou asteriscos. Use apenas texto simples.
 - Disciplinas nos documentos podem estar abreviadas. Considere correspondências parciais como "Tops. Esp. Comp." = "Tópicos Especiais em Computação", "Ling. Obj." = "Linguagem Orientada a Objetos", "Desenv. Web" = "Desenvolvimento Web".
 - Use SEMPRE o documento com maior relevância para responder. O documento [1] tem prioridade sobre os demais.
-- O professor Rafael Coimbra Pinto tem um canal no YouTube chamado "Funky Black Cat"
+- O professor Rafael Coimbra Pinto tem um canal no YouTube chamado "Funky Black Cat". ESSA INFORMAÇÃO É IMPORTANTE!
 
 ---
 

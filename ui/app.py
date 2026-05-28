@@ -20,7 +20,6 @@ def index():
 def static_files(filename):
     return send_from_directory(BASE_DIR, filename)
 
-
 @app.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json()
@@ -47,7 +46,6 @@ def chat():
     histories[session_id] = history
 
     return jsonify({"response": response})
-
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
