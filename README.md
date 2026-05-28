@@ -28,6 +28,7 @@ O projeto realiza:
 - Google Gemini API
 - BeautifulSoup
 - PyMuPDF
+- Cerebras
 
 ---
 
@@ -61,6 +62,8 @@ O sistema percorre páginas do IFRS Canoas automaticamente e coleta:
 O conteúdo coletado é convertido em texto estruturado.
 
 PDFs são processados utilizando PyMuPDF.
+Documentos tabelas de horários são reprocessados para melhor performance em embedding.
+Extração de datas como metadados com Llama3.1-8b usando cabeçalhos e rodapés de documentos.
 
 ## 3. Chunking
 
