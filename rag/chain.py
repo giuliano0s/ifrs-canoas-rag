@@ -17,7 +17,12 @@ COLLECTION_NAME = "ifrs-canoas"
 AGENT_NAME = "agente-ifrs"
 
 # clientes
-qdrant = QdrantClient(url=QDRANT_ENDPOINT, api_key=QDRANT_API_KEY)
+qdrant = QdrantClient(url=QDRANT_ENDPOINT,
+                        api_key=QDRANT_API_KEY,
+                            https=True,
+                            prefer_grpc=False,
+                            check_compatibility=False,
+                            timeout=30)
 google_client = google_genai.Client(api_key=GEMINI_API_KEY_T1)
 
 # carrega prompt do agente
@@ -34,12 +39,12 @@ def search(query, top_k=10):
                 contents=query
             )
             vector = result.embeddings[0].values
-            hits = qdrant.search(
+            hits = qdrant.query_points(
                 collection_name=COLLECTION_NAME,
-                query_vector=vector,
+                query=vector,
                 limit=top_k,
-                with_payload=True
-            )
+                with_payload=True,
+            ).points
             return hits
         except Exception as e:
             if "429" in str(e):

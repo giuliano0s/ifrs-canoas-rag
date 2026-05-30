@@ -12,7 +12,7 @@ langchain-community==0.3.7
 langchain-google-genai==2.0.4
  
 # Vector DB
-qdrant-client==1.11.3
+qdrant-client==1.18.0
 langchain-qdrant==0.2.0
  
 # AI
