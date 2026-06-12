@@ -15,6 +15,8 @@ QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 GEMINI_API_KEY_T1 = os.getenv("GEMINI_API_KEY_T1")
 COLLECTION_NAME = "ifrs-canoas"
 AGENT_NAME = "agente-ifrs"
+ALPHA = 0.7 # score personalizado
+MIN_YEAR = 2020
 
 # clientes
 qdrant = QdrantClient(url=QDRANT_ENDPOINT,
@@ -81,7 +83,27 @@ def build_context(hits, min_score=0.60):
     return context, filtered, sources
 
 
-def ask(query, history=None, top_k=15):
+def rerank_by_date(hits):
+    max_year = datetime.now().year
+
+    def date_score(hit):
+        raw = hit.payload.get("published_at")
+        if not raw:
+            return 0.5
+        try:
+            year = int(raw)
+            return (year - MIN_YEAR) / (max_year - MIN_YEAR)
+        except (ValueError, TypeError):
+            return 0.5
+
+    return sorted(
+        hits,
+        key=lambda h: ALPHA * h.score + (1 - ALPHA) * date_score(h),
+        reverse=True
+    )
+
+
+def ask(query, history=None, top_k=10):
     if history is None:
         history = []
 
@@ -104,6 +126,7 @@ def ask(query, history=None, top_k=15):
 
     # search no qdrant
     hits = search(search_query, top_k=top_k)
+    hits = rerank_by_date(hits) 
     context, filtered, sources = build_context(hits)
 
     print(f"Chunks encontrados: {len(filtered)}")
