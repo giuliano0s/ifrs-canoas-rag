@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from qdrant_client import QdrantClient
+from upstash_vector import Index
 from google import genai as google_genai
 import time
 from datetime import datetime
@@ -10,21 +10,15 @@ data_atual = datetime.now().strftime("%d/%m/%Y")
 load_dotenv()
 
 # configurações
-QDRANT_ENDPOINT = os.getenv("QDRANT_ENDPOINT")
-QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
+UPSTASH_ENDPOINT = os.getenv("UPSTASH_ENDPOINT")
+UPSTASH_API_KEY = os.getenv("UPSTASH_API_KEY")
 GEMINI_API_KEY_T1 = os.getenv("GEMINI_API_KEY_T1")
-COLLECTION_NAME = "ifrs-canoas"
 AGENT_NAME = "agente-ifrs"
 ALPHA = 0.7 # score personalizado
 MIN_YEAR = 2020
 
 # clientes
-qdrant = QdrantClient(url=QDRANT_ENDPOINT,
-                        api_key=QDRANT_API_KEY,
-                            https=True,
-                            prefer_grpc=False,
-                            check_compatibility=False,
-                            timeout=30)
+index = Index(url=UPSTASH_ENDPOINT, token=UPSTASH_API_KEY)
 google_client = google_genai.Client(api_key=GEMINI_API_KEY_T1)
 
 # carrega prompt do agente
@@ -33,7 +27,7 @@ with open(_prompt_path, "r", encoding="utf-8") as f:
     agent_prompt = f.read()
 
 
-def search(query, top_k=10):
+def search(query, top_k):
     for attempt in range(3):
         try:
             result = google_client.models.embed_content(
@@ -41,12 +35,11 @@ def search(query, top_k=10):
                 contents=query
             )
             vector = result.embeddings[0].values
-            hits = qdrant.query_points(
-                collection_name=COLLECTION_NAME,
-                query=vector,
-                limit=top_k,
-                with_payload=True,
-            ).points
+            hits = index.query(
+                vector=vector,
+                top_k=top_k,
+                include_metadata=True,
+            )
             return hits
         except Exception as e:
             if "429" in str(e):
@@ -67,7 +60,7 @@ def build_context(hits, min_score=0.60):
     counter = 1
 
     for h in filtered:
-        url = h.payload["source_url"]
+        url = h.metadata["source_url"]
 
         # deduplica URLs no índice de fontes
         if url not in seen_urls:
@@ -76,9 +69,9 @@ def build_context(hits, min_score=0.60):
             counter += 1
 
         source_num = seen_urls[url]
-        published_at = h.payload.get("published_at") or "data desconhecida"
+        published_at = h.metadata.get("published_at") or "data desconhecida"
         context += f"[{source_num}] Fonte: {url} | Data: {published_at}\n"
-        context += h.payload["text"] + "\n\n"
+        context += h.metadata["text"] + "\n\n"
 
     return context, filtered, sources
 
@@ -87,7 +80,7 @@ def rerank_by_date(hits):
     max_year = datetime.now().year
 
     def date_score(hit):
-        raw = hit.payload.get("published_at")
+        raw = hit.metadata.get("published_at")
         if not raw:
             return 0.5
         try:
@@ -103,7 +96,7 @@ def rerank_by_date(hits):
     )
 
 
-def ask(query, history=None, top_k=10):
+def ask(query, history=None, top_k=15):
     if history is None:
         history = []
 
@@ -124,14 +117,14 @@ def ask(query, history=None, top_k=10):
     else:
         search_query = query
 
-    # search no qdrant
+    # busca vetorial
     hits = search(search_query, top_k=top_k)
     hits = rerank_by_date(hits) 
     context, filtered, sources = build_context(hits)
 
     print(f"Chunks encontrados: {len(filtered)}")
 
-    # se nao achou chunks, fallback para pesquisa na internet
+    # se não achou chunks, fallback para pesquisa na internet
     if not filtered:
         response = google_client.models.generate_content(
             model="gemini-2.5-flash",

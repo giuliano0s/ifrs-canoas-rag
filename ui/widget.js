@@ -1,4 +1,7 @@
 (function () {
+  // endpoint relativo, mesma origem do front no vercel
+  const CHAT_URL = "/chat";
+
   // injeta estilos
   const style = document.createElement("style");
   style.textContent = `
@@ -31,8 +34,8 @@
       position: fixed;
       bottom: 100px;
       right: 28px;
-      width: 370px;
-      height: 520px;
+      width: min(370px, calc(100vw - 32px));
+      height: min(520px, calc(100vh - 130px));
       background: #fff;
       border-radius: 16px;
       box-shadow: 0 8px 40px rgba(0,0,0,0.18);
@@ -187,6 +190,9 @@
   const input = win.querySelector("#ifrs-chat-input");
   const sendBtn = win.querySelector("#ifrs-chat-send");
 
+  // historico apenas em memoria, comeca vazio a cada carregamento
+  let history = [];
+
   function addMessage(text, role) {
     const div = document.createElement("div");
     div.className = `ifrs-msg ${role}`;
@@ -235,15 +241,27 @@
     const typing = addMessage("Digitando...", "bot typing");
 
     try {
-      const res = await fetch("http://127.0.0.1:5000/chat", {
+      const res = await fetch(CHAT_URL, {
           method: "POST",
-          credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query })
+          body: JSON.stringify({ query, history })
       });
-      const data = await res.json();
       typing.remove();
+
+      // resposta do rate limiter
+      if (res.status === 429) {
+        addMessage("Muitas perguntas em pouco tempo. Aguarde um instante e tente novamente.", "bot");
+        sendBtn.disabled = false;
+        input.focus();
+        return;
+      }
+
+      const data = await res.json();
       addMessage(data.response, "bot");
+
+      // acumula contexto da conversa ativa, descartado ao recarregar
+      history.push({ role: "user", content: query });
+      history.push({ role: "assistant", content: data.response });
     } catch (e) {
       typing.remove();
       addMessage("Erro ao conectar com o assistente.", "bot");

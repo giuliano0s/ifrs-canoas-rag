@@ -29,8 +29,7 @@ from dotenv import load_dotenv
 from google import genai as google_genai
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from openai import OpenAI
-from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, PointStruct, VectorParams
+from upstash_vector import Index
 from urllib.parse import urljoin
 
 load_dotenv()
@@ -48,7 +47,6 @@ REINGEST = False
 # configurações gerais
 BASE_URL        = "https://ifrs.edu.br/canoas/"
 DRIVE_DOWNLOAD  = "https://drive.google.com/uc?export=download&id="
-COLLECTION_NAME = "ifrs-canoas"
 CHUNK_SIZE      = 4000
 MIN_CHARS       = 150 # minimo de caracteres que um PDF "não-scan" possui
 SAVE_INTERVAL   = 50
@@ -98,9 +96,9 @@ cerebras_client = OpenAI(
 
 google_client = google_genai.Client(api_key=os.getenv("GEMINI_API_KEY_T1"))
 
-qdrant = QdrantClient(
-    url=os.getenv("QDRANT_ENDPOINT"),
-    api_key=os.getenv("QDRANT_API_KEY")
+index = Index(
+    url=os.getenv("UPSTASH_ENDPOINT"),
+    token=os.getenv("UPSTASH_WRITE_API_KEY")
 )
 
 # ── funções do crawler ─────────────────────────────────────────────────────────
@@ -582,17 +580,13 @@ def run_chunker(pages_parsed, pdfs_parsed):
 
 def get_existing_urls():
     existing = set()
-    offset   = None
+    cursor   = ""
     while True:
-        result, offset = qdrant.scroll(
-            collection_name=COLLECTION_NAME,
-            with_payload=["source_url"],
-            limit=1000,
-            offset=offset
-        )
-        for point in result:
-            existing.add(point.payload["source_url"])
-        if offset is None:
+        res = index.range(cursor=cursor, limit=1000, include_metadata=True)
+        for v in res.vectors:
+            existing.add(v.metadata["source_url"])
+        cursor = res.next_cursor
+        if cursor == "":
             break
     return existing
 
@@ -618,12 +612,12 @@ def ingest_chunks(chunks, batch_size=100, start_id=0):
                 else:
                     raise e
 
-        points = []
+        vectors = []
         for j, (chunk, embedding) in enumerate(zip(batch, result.embeddings)):
-            points.append(PointStruct(
-                id=start_id + i + j,
-                vector=embedding.values,
-                payload={
+            vectors.append((
+                str(start_id + i + j),
+                embedding.values,
+                {
                     "text":         chunk["text"],
                     "source_url":   chunk["source_url"],
                     "title":        chunk["title"],
@@ -632,32 +626,23 @@ def ingest_chunks(chunks, batch_size=100, start_id=0):
                 }
             ))
 
-        qdrant.upsert(collection_name=COLLECTION_NAME, points=points)
+        index.upsert(vectors=vectors)
         print(f"Inseridos {min(i + batch_size, total)}/{total} chunks")
 
 def run_ingest(chunks):
     print("\n" + "="*60)
-    print("FASE 5 — INGESTÃO NO QDRANT")
+    print("FASE 5 — INGESTÃO NO UPSTASH")
     print("="*60)
 
     if REINGEST:
-        qdrant.delete_collection(COLLECTION_NAME)
-        qdrant.create_collection(
-            collection_name=COLLECTION_NAME,
-            vectors_config=VectorParams(size=3072, distance=Distance.COSINE)
-        )
-        print("Collection recriada do zero.")
+        index.reset()
+        print("Index zerado.")
         start_id   = 0
         new_chunks = chunks
     else:
-        if not qdrant.collection_exists(COLLECTION_NAME):
-            qdrant.create_collection(
-                collection_name=COLLECTION_NAME,
-                vectors_config=VectorParams(size=3072, distance=Distance.COSINE)
-            )
         existing_urls = get_existing_urls()
         new_chunks    = [c for c in chunks if c["source_url"] not in existing_urls]
-        start_id      = qdrant.count(collection_name=COLLECTION_NAME).count
+        start_id      = index.info().vector_count
         print(f"Chunks novos a inserir: {len(new_chunks)}")
 
     ingest_chunks(new_chunks, start_id=start_id)

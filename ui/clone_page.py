@@ -1,25 +1,15 @@
-import requests
 from pathlib import Path
+from ui.app import build_page
 
-URL = "https://ifrs.edu.br/canoas/"
 OUTPUT = Path("ui/index.html")
 
 def clone_page():
-    """"
-    Clona a página HTML do IFRS Canoas e salva localmente.
     """
-    response = requests.get(URL, headers={
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    })
-    response.raise_for_status()
-    
-    html = response.text.replace(
-    "</body>",
-    '<script src="widget.js"></script></body>'
-    )
-    
-    # salva o HTML original
-    OUTPUT.mkdir(parents=True, exist_ok=True) if OUTPUT.is_dir() else OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    Gera o index.html de fallback com a faixa de aviso e o widget injetados.
+    Usa a mesma montagem da pagina servida ao vivo pelo app.
+    """
+    html = build_page()
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(html, encoding="utf-8")
     print(f"Página salva em {OUTPUT}")
 

@@ -10,7 +10,7 @@ O projeto realiza:
 - Extração de conteúdo HTML e PDF
 - Processamento e divisão de texto em chunks
 - Geração de embeddings
-- Indexação vetorial no Qdrant
+- Indexação vetorial no Upstash
 - Recuperação semântica de contexto
 - Geração de respostas com Gemini
 
@@ -24,7 +24,7 @@ O projeto realiza:
 - Python 3.12+
 - Flask
 - LangChain
-- Qdrant
+- Upstash Vector
 - Google Gemini API
 - BeautifulSoup
 - PyMuPDF
@@ -79,7 +79,7 @@ Os chunks são transformados em vetores utilizando modelos da API Gemini.
 
 ## 5. Banco vetorial
 
-Os embeddings são armazenados no Qdrant para busca vetorial.
+Os embeddings são armazenados no Upstash Vector para busca vetorial.
 
 ## 6. Geração de respostas
 
@@ -132,18 +132,23 @@ Crie um arquivo `.env` na raiz do projeto.
 Exemplo:
 
 ```env
-GOOGLE_API_KEY=sua_chave
-QDRANT_URL=https://SEU_CLUSTER.qdrant.io
-QDRANT_API_KEY=sua_chave
+GEMINI_API_KEY_T1=sua_chave
+UPSTASH_ENDPOINT=https://SEU_INDEX.upstash.io
+UPSTASH_API_KEY=token_read_only
+UPSTASH_WRITE_API_KEY=token_read_write
+UPSTASH_REDIS_ENDPOINT=https://SEU_REDIS.upstash.io
+UPSTASH_REDIS_API_KEY=token_redis
 ```
 
 ---
 
-# Qdrant Cloud
+# Upstash Vector
 
-O projeto utiliza exclusivamente Qdrant Cloud como banco vetorial.
+O projeto utiliza exclusivamente Upstash Vector como banco vetorial.
 
-Crie um cluster no Qdrant Cloud e configure as credenciais no arquivo `.env`.
+Crie um index no Upstash com 3072 dimensões e função de similaridade cosine, e configure as credenciais no arquivo `.env`.
+
+A busca em produção usa o token read-only (`UPSTASH_API_KEY`). A ingestão usa o token de escrita (`UPSTASH_WRITE_API_KEY`), que fica apenas no ambiente local e nao e cadastrado no Vercel.
 
 ---
 
@@ -155,7 +160,7 @@ Execute o script ou os notebooks responsáveis por:
 2. Parsing
 3. Chunking
 4. Embeddings
-5. Indexação no Qdrant
+5. Indexação no Upstash
 
 O script de pipeline está na pasta:
 
@@ -194,7 +199,7 @@ Usuário
    ↓
 Pergunta
    ↓
-Busca vetorial no Qdrant
+Busca vetorial no Upstash
    ↓
 Recuperação de chunks relevantes
    ↓
