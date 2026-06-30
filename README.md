@@ -13,6 +13,8 @@ O projeto realiza:
 - Indexação vetorial no Upstash
 - Recuperação semântica de contexto
 - Geração de respostas com Gemini
+- Proteção contra abuso com rate limit por IP
+- Backend stateless pronto para deploy serverless no Vercel
 
 <br>
 <img width="1553" height="659" alt="image" src="https://github.com/user-attachments/assets/2b8f92a7-3f96-4b37-ba33-d96bf26c0f07" />
@@ -25,10 +27,12 @@ O projeto realiza:
 - Flask
 - LangChain
 - Upstash Vector
+- Upstash Redis
 - Google Gemini API
 - BeautifulSoup
 - PyMuPDF
 - Cerebras
+- Vercel
 
 ---
 
@@ -85,10 +89,21 @@ Os embeddings são armazenados no Upstash Vector para busca vetorial.
 
 Quando o usuário faz uma pergunta:
 
-1. O sistema busca os chunks mais relevantes
-2. Monta um contexto
-3. Envia o contexto ao modelo Gemini
-4. Retorna uma resposta baseada nos documentos recuperados
+1. O rate limit por IP é verificado antes de qualquer chamada à LLM
+2. O sistema busca os chunks mais relevantes
+3. Monta um contexto
+4. Envia o contexto ao modelo Gemini
+5. Retorna uma resposta baseada nos documentos recuperados
+
+Se nenhum chunk atinge o score mínimo, há um fallback de busca na internet via Gemini, priorizando fontes do IFRS.
+
+## 7. Rate limit e sessão
+
+O backend é stateless: não guarda histórico nem sessão. O histórico da conversa vive no cliente e é enviado em cada requisição, o que torna o serviço compatível com o ambiente serverless do Vercel.
+
+O rate limit usa Upstash Redis (20 requisições por minuto por IP) para proteger contra abuso de chamadas à LLM.
+
+A página servida ao usuário é um clone ao vivo do site do IFRS, montado a cada requisição (com cache em memória), e exibe uma faixa de aviso informando que é um ambiente de teste não oficial.
 
 ---
 
@@ -178,17 +193,37 @@ notebooks/
 
 # Executando a interface
 
-## Flask
+Rode como módulo a partir da raiz do projeto (os imports dependem dos pacotes `rag.` e `ui.`):
 
 ```bash
-python ui/app.py
+python -m ui.app
 ```
 
-A aplicação ficará disponível em:
+A porta padrão é 5000. Para usar outra (útil se a 5000 estiver ocupada), defina `PORT`:
 
-```txt
-http://localhost:5000
+```bash
+# Windows (PowerShell)
+$env:PORT=5050; python -m ui.app
 ```
+
+A aplicação ficará disponível em `http://localhost:<porta>`.
+
+---
+
+# Deploy (Vercel)
+
+O projeto é servido como uma função serverless no Vercel. O entrypoint está em `api/index.py` e o `vercel.json` define o tempo máximo de execução da função.
+
+Cadastre no painel do Vercel as variáveis de ambiente, usando o token read-only do Upstash Vector em `UPSTASH_API_KEY`:
+
+- `UPSTASH_API_KEY` (read-only)
+- `UPSTASH_ENDPOINT`
+- `UPSTASH_REDIS_API_KEY`
+- `UPSTASH_REDIS_ENDPOINT`
+- `GEMINI_API_KEY_T1`
+- `CEREBRAS_API_KEY`
+
+Não cadastre `UPSTASH_WRITE_API_KEY` no Vercel. Ela é usada apenas na ingestão local.
 
 ---
 
@@ -197,7 +232,9 @@ http://localhost:5000
 ```txt
 Usuário
    ↓
-Pergunta
+Pergunta (com histórico do cliente)
+   ↓
+Rate limit por IP (Upstash Redis)
    ↓
 Busca vetorial no Upstash
    ↓
@@ -205,12 +242,10 @@ Recuperação de chunks relevantes
    ↓
 Construção do contexto
    ↓
-Gemini gera resposta
+Gemini gera resposta (ou fallback de internet)
    ↓
 Resposta final
 ```
-
----
 
 ---
 

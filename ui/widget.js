@@ -193,6 +193,32 @@
   // historico apenas em memoria, comeca vazio a cada carregamento
   let history = [];
 
+  // transforma URLs do texto em links clicaveis, preservando o resto como texto
+  function linkify(text) {
+    const frag = document.createDocumentFragment();
+    const urlRegex = /(https?:\/\/[^\s)\]]+)/g;
+    let last = 0;
+    let match;
+    while ((match = urlRegex.exec(text)) !== null) {
+      if (match.index > last) {
+        frag.appendChild(document.createTextNode(text.slice(last, match.index)));
+      }
+      const a = document.createElement("a");
+      a.href = match[0];
+      a.textContent = match[0];
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.style.color = "#007B3A";
+      a.style.wordBreak = "break-all";
+      frag.appendChild(a);
+      last = urlRegex.lastIndex;
+    }
+    if (last < text.length) {
+      frag.appendChild(document.createTextNode(text.slice(last)));
+    }
+    return frag;
+  }
+
   function addMessage(text, role) {
     const div = document.createElement("div");
     div.className = `ifrs-msg ${role}`;
@@ -215,7 +241,7 @@
         const fontes = document.createElement("div");
         fontes.style.marginTop = "6px";
         fontes.style.lineHeight = "1.8";
-        fontes.textContent = "Fontes:" + parts[1];
+        fontes.appendChild(linkify("Fontes:" + parts[1]));
 
         details.appendChild(summary);
         details.appendChild(fontes);
