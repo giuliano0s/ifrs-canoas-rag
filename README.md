@@ -31,7 +31,6 @@ O projeto realiza:
 - Google Gemini API
 - BeautifulSoup
 - PyMuPDF
-- Cerebras
 - Vercel
 
 ---
@@ -67,7 +66,7 @@ O conteúdo coletado é convertido em texto estruturado.
 
 PDFs são processados utilizando PyMuPDF.
 Documentos tabelas de horários são reprocessados para melhor performance em embedding.
-Extração de datas como metadados com Llama3.1-8b usando cabeçalhos e rodapés de documentos.
+Extração de datas como metadados com gemini-2.5-flash-lite usando cabeçalhos e rodapés de documentos.
 
 ## 3. Chunking
 
@@ -221,7 +220,6 @@ Cadastre no painel do Vercel as variáveis de ambiente, usando o token read-only
 - `UPSTASH_REDIS_API_KEY`
 - `UPSTASH_REDIS_ENDPOINT`
 - `GEMINI_API_KEY_T1`
-- `CEREBRAS_API_KEY`
 
 Não cadastre `UPSTASH_WRITE_API_KEY` no Vercel. Ela é usada apenas na ingestão local.
 

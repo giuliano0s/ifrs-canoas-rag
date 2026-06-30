@@ -38,7 +38,7 @@ Gerar o `index.html` de fallback com a faixa de aviso e o widget ja injetados:
 Duas metades independentes que so se encontram na base vetorial Upstash:
 
 **1. Ingestao (offline, roda na maquina do dev)** — `pipelines/ingest_pipeline.py`
-Pipeline sequencial de 5 fases: crawler varre `ifrs.edu.br/canoas`, parser HTML e parser PDF extraem texto (PDFs de horario passam por LLM para estruturar; datas de publicacao inferidas via Cerebras/Gemini), chunker fatia em pedacos, ingest embeda com Gemini e faz upsert no Upstash. Os notebooks `01_crawler` a `05_rag` sao a versao exploratoria das mesmas fases; o `.py` e a versao de producao consolidada. Os dados intermediarios (`data/raw/`, `data/parsed/`, `data/chunks/`) estao no `.gitignore` e nao trafegam pelo Git — so o Upstash (nuvem) e compartilhado entre maquinas.
+Pipeline sequencial de 5 fases: crawler varre `ifrs.edu.br/canoas`, parser HTML e parser PDF extraem texto (PDFs de horario passam por gemini-2.5-flash-lite para estruturar; datas de publicacao inferidas pelo mesmo modelo), chunker fatia em pedacos, ingest embeda com Gemini e faz upsert no Upstash. Os notebooks `01_crawler` a `05_rag` sao a versao exploratoria das mesmas fases; o `.py` e a versao de producao consolidada. Os dados intermediarios (`data/raw/`, `data/parsed/`, `data/chunks/`) estao no `.gitignore` e nao trafegam pelo Git — so o Upstash (nuvem) e compartilhado entre maquinas.
 
 **2. Servico de chat (online, Vercel)** — `ui/app.py` + `rag/chain.py` + `rag/gatekeeper.py`
 Flask stateless. O fluxo de uma pergunta: `gatekeeper` checa rate limit por IP no Redis, `chain.ask()` embeda a query, busca no Upstash, reordena por data (`rerank_by_date`), monta contexto e chama o Gemini. Se nada passa o `min_score`, cai num fallback de busca na internet via Gemini google_search.
@@ -65,7 +65,7 @@ O Redis (`UPSTASH_REDIS_*`) usa o token padrao com escrita, pois o rate limiter 
 
 ## Deploy (Vercel)
 
-Entrypoint em `api/index.py` (reexpoe `from ui.app import app`); o preset Flask do Vercel resolve o app sozinho. `vercel.json` define `maxDuration: 60` para a funcao (folga para a chamada LLM e o fallback de internet). Cadastrar no painel do Vercel as variaveis: `UPSTASH_API_KEY` (read-only), `UPSTASH_ENDPOINT`, `UPSTASH_REDIS_API_KEY`, `UPSTASH_REDIS_ENDPOINT`, `GEMINI_API_KEY_T1`, `CEREBRAS_API_KEY`. NAO cadastrar `UPSTASH_WRITE_API_KEY`.
+Entrypoint em `api/index.py` (reexpoe `from ui.app import app`); o preset Flask do Vercel resolve o app sozinho. `vercel.json` define `maxDuration: 60` para a funcao (folga para a chamada LLM e o fallback de internet). Cadastrar no painel do Vercel as variaveis: `UPSTASH_API_KEY` (read-only), `UPSTASH_ENDPOINT`, `UPSTASH_REDIS_API_KEY`, `UPSTASH_REDIS_ENDPOINT`, `GEMINI_API_KEY_T1`. NAO cadastrar `UPSTASH_WRITE_API_KEY`.
 
 ## Proximos passos
 

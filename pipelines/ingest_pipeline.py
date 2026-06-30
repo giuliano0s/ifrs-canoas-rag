@@ -28,7 +28,6 @@ from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from google import genai as google_genai
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from openai import OpenAI
 from upstash_vector import Index
 from urllib.parse import urljoin
 
@@ -89,11 +88,6 @@ CHUNKS_PATH       = CHUNKS_DIR / "chunks.json"
 WHITELIST_PATH    = INFO_DIR / "whitelist.txt"
 
 # clientes de API
-cerebras_client = OpenAI(
-    api_key=os.getenv("CEREBRAS_API_KEY"),
-    base_url="https://api.cerebras.ai/v1"
-)
-
 google_client = google_genai.Client(api_key=os.getenv("GEMINI_API_KEY_T1"))
 
 index = Index(
@@ -246,17 +240,15 @@ def extract_date_from_url(url):
 
 def extract_date_from_text(text):
     truncated = text[:MAX_CHARS_INICIO] + "\n...\n" + text[-MAX_CHARS_FIM:]
+    prompt = f"Qual é o ano de publicação deste documento? Responda APENAS com o ano no formato YYYY. Se não encontrar, responda exatamente: None\n\n{truncated}"
     for attempt in range(3):
         try:
-            response = cerebras_client.chat.completions.create(
-                model="llama3.1-8b",
-                messages=[{
-                    "role": "user",
-                    "content": f"Qual é o ano de publicação deste documento? Responda APENAS com o ano no formato YYYY. Se não encontrar, responda exatamente: None\n\n{truncated}"
-                }],
-                max_tokens=20
+            response = google_client.models.generate_content(
+                model="gemini-2.5-flash-lite",
+                contents=prompt,
+                config={"temperature": 0.0}
             )
-            result = response.choices[0].message.content.strip()
+            result = (response.text or "").strip()
             return None if "None" in result.lower() else result
         except Exception as e:
             wait = 60 * (attempt + 1)
@@ -275,8 +267,8 @@ def get_published_at(doc, max_retries=10):
         try:
             date = extract_date_from_text(text)
             if date:
-                return date, "groq"
-            return None, "groq_sem_data"
+                return date, "llm"
+            return None, "llm_sem_data"
         except Exception as e:
             wait = 10 * (attempt + 1)
             print(f"  Tentativa {attempt+1}/{max_retries} falhou. Aguardando {wait}s...")
