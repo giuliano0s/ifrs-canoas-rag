@@ -20,13 +20,13 @@ $env:PORT=5050; .venv\Scripts\python.exe -m ui.app
 ```
 Acesse `http://127.0.0.1:5050`. Rode sempre como modulo (`-m ui.app`) a partir da raiz, nunca `python ui/app.py`, por causa dos imports de pacote (`rag.`, `ui.`).
 
-Popular / atualizar a base vetorial (pipeline completa: crawler, parser HTML, parser PDF, chunker, ingest):
+Popular / atualizar a base vetorial (pipeline completa: crawler, parser HTML, parser PDF, chunker, ingest, snapshot):
 ```powershell
 .venv\Scripts\python.exe pipelines\ingest_pipeline.py
 ```
-Flags de controle no topo do arquivo: `RECRAWL`, `REPARSE`, `REINGEST` (todas `False` = modo incremental).
+Flags de controle no topo do arquivo: `RECRAWL`, `REPARSE`, `REINGEST` (cada `False` = incremental na sua fase). Hoje `RECRAWL` fica `True` de proposito: no incremental o crawler pula paginas pai ja indexadas e nao acha subpaginas novas. `ANOS_VALIDOS` aceita override via env (CSV, ex: `ANOS_VALIDOS=2026`; default 2025-2026).
 
-Gerar o `index.html` de fallback com a faixa de aviso e o widget ja injetados:
+Gerar o `index.html` que o app serve (snapshot com a faixa de aviso e o widget ja injetados); tambem roda no fim da pipeline de ingestao:
 ```powershell
 .venv\Scripts\python.exe -m ui.clone_page
 ```
@@ -71,10 +71,11 @@ Entrypoint em `api/index.py` (reexpoe `from ui.app import app`); o preset Flask 
 
 Em aberto, nesta ordem de prioridade:
 1. Bateria de testes automatizados (retrieval, respostas, edge cases). Pre-requisito para o job periodico.
-2. Mais anos na base: expandir `ANOS_VALIDOS` (hoje 2025-2026) para incluir 2023-2024, com filtros de relevancia.
+2. Mais anos na base: incluir 2023-2024 (rodar a ingestao com `ANOS_VALIDOS` via env ou ajustar o default, hoje 2025-2026), com filtros de relevancia.
 3. Crawler no dominio de ingresso: cobrir `ingresso.ifrs.edu.br` (processo seletivo) liberando o dominio no `is_valid_page`; se for filtrar por ano la, ensinar o regex a ler o formato `/AAAA-S/` (ano-semestre, ex: `/2026-2/`).
 4. Recrawl funcional e eficiente: reestruturar o crawler para re-escanear apenas paginas indice/listagem (scan) em vez de re-baixar o site inteiro como o `RECRAWL=True` faz hoje, achando subpaginas novas sem o custo do recrawl total. Inclui limpeza e otimizacao do fluxo.
 5. Reexecucao periodica: job agendado da pipeline de ingestao, apos a bateria de testes validar.
 6. Reduzir latencia (se necessario): cache de embeddings frequentes, modelo menor para triagem.
-7. Validar com gestores do Campus Canoas.
-8. Expandir para multiplos campi (possibilidade remota): namespaces ou metadata `campus` no Upstash, pipeline parametrizada.
+7. Retrieval condicional por tool: um agente investigativo entende a pergunta antes de montar a query pro Upstash (interpreta a intencao, decide se e quando buscar via tool calling), em vez de sempre embedar a query crua. Ganha precisao e evita busca desnecessaria.
+8. Validar com gestores do Campus Canoas.
+9. Expandir para multiplos campi (possibilidade remota): namespaces ou metadata `campus` no Upstash, pipeline parametrizada.
