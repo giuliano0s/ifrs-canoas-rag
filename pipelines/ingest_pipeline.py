@@ -1,6 +1,6 @@
 """
 Pipeline de ingestão do IFRS RAG.
-Executa sequencialmente: crawler > parser HTML > parser PDF > chunker > ingest.
+Executa sequencialmente: crawler > parser HTML > parser PDF > chunker > ingest > snapshot.
 
 Flags de controle:
   RECRAWL   = True > recomeça o crawler do zero
@@ -15,6 +15,7 @@ Pipeline desenvolvida originalmente em ../notebooks
 import json
 import os
 import re
+import sys
 import time
 import tempfile
 from collections import deque
@@ -31,15 +32,20 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from upstash_vector import Index
 from urllib.parse import urljoin
 
+# permite importar pacotes do projeto ao rodar como script
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from ui.clone_page import clone_page
+
 load_dotenv()
 
 # ── variáveis globais ──────────────────────────────────────────────────────────
 
-# range de anos coletados pelo crawler (URLs com anos fora desse range são ignoradas)
-ANOS_VALIDOS = range(2025, 2027)
+# anos válidos do crawler; override opcional via env ANOS_VALIDOS (CSV, ex: "2026" ou "2025,2026")
+_anos_env    = os.getenv("ANOS_VALIDOS")
+ANOS_VALIDOS = {int(a) for a in _anos_env.split(",") if a.strip()} if _anos_env else set(range(2025, 2027))
 
 # flags de controle de execução
-RECRAWL  = False
+RECRAWL  = True
 REPARSE  = False
 REINGEST = False
 
@@ -645,13 +651,22 @@ def run_ingest(chunks):
 if __name__ == "__main__":
     inicio = datetime.now()
     print(f"Pipeline iniciado em {inicio.strftime('%d/%m/%Y %H:%M:%S')}")
-    print(f"Anos válidos: {list(ANOS_VALIDOS)}")
+    print(f"Anos válidos: {sorted(ANOS_VALIDOS)}")
 
     pages_found, pdfs_found = run_crawler()
     pages_parsed            = run_html_parser(pages_found)
     pdfs_parsed             = run_pdf_parser(pdfs_found)
     chunks                  = run_chunker(pages_parsed, pdfs_parsed)
     run_ingest(chunks)
+
+    # regenera o snapshot estatico da pagina servido pelo app
+    print("\n" + "="*60)
+    print("FASE 6 — SNAPSHOT DA PÁGINA")
+    print("="*60)
+    try:
+        clone_page()
+    except Exception as e:
+        print(f"Falha ao gerar snapshot (ingestao ja concluida): {e}")
 
     fim = datetime.now()
     print(f"\nPipeline concluído em {fim.strftime('%d/%m/%Y %H:%M:%S')}")

@@ -38,7 +38,7 @@ Gerar o `index.html` de fallback com a faixa de aviso e o widget ja injetados:
 Duas metades independentes que so se encontram na base vetorial Upstash:
 
 **1. Ingestao (offline, roda na maquina do dev)** — `pipelines/ingest_pipeline.py`
-Pipeline sequencial de 5 fases: crawler varre `ifrs.edu.br/canoas`, parser HTML e parser PDF extraem texto (PDFs de horario passam por gemini-2.5-flash-lite para estruturar; datas de publicacao inferidas pelo mesmo modelo), chunker fatia em pedacos, ingest embeda com Gemini e faz upsert no Upstash. Os notebooks `01_crawler` a `05_rag` sao a versao exploratoria das mesmas fases; o `.py` e a versao de producao consolidada. Os dados intermediarios (`data/raw/`, `data/parsed/`, `data/chunks/`) estao no `.gitignore` e nao trafegam pelo Git — so o Upstash (nuvem) e compartilhado entre maquinas.
+Pipeline sequencial de 6 fases: crawler varre `ifrs.edu.br/canoas`, parser HTML e parser PDF extraem texto (PDFs de horario passam por gemini-2.5-flash-lite para estruturar; datas de publicacao inferidas pelo mesmo modelo), chunker fatia em pedacos, ingest embeda com Gemini e faz upsert no Upstash, e o snapshot regenera o `ui/index.html` (via `clone_page`) que o app serve estatico. Os notebooks `01_crawler` a `05_rag` sao a versao exploratoria das mesmas fases; o `.py` e a versao de producao consolidada. Os dados intermediarios (`data/raw/`, `data/parsed/`, `data/chunks/`) estao no `.gitignore` e nao trafegam pelo Git — so o Upstash (nuvem) e compartilhado entre maquinas.
 
 **2. Servico de chat (online, Vercel)** — `ui/app.py` + `rag/chain.py` + `rag/gatekeeper.py`
 Flask stateless. O fluxo de uma pergunta: `gatekeeper` checa rate limit por IP no Redis, `chain.ask()` embeda a query, busca no Upstash, reordena por data (`rerank_by_date`), monta contexto e chama o Gemini. Se nada passa o `min_score`, cai num fallback de busca na internet via Gemini google_search.
@@ -47,9 +47,9 @@ Flask stateless. O fluxo de uma pergunta: `gatekeeper` checa rate limit por IP n
 
 O servidor NAO guarda historico de conversa, sessao, nem cookie. O historico vive no cliente (`ui/widget.js`, variavel em memoria) e e enviado inteiro no corpo de cada `POST /chat`. O servidor sanitiza (`sanitize_history`, teto de `MAX_HISTORY_MESSAGES`) e repassa ao `ask`. Isso e o que torna o app compativel com o serverless do Vercel (instancias efemeras que nao compartilham memoria). Ao recarregar a pagina o historico zera de proposito (sem `localStorage`), para contexto antigo nao poluir uma nova conversa. O contexto multi-turno funciona durante a sessao ativa porque o array em memoria acumula e vai junto em cada chamada.
 
-### Pagina servida dinamicamente
+### Pagina servida estaticamente
 
-A rota `/` busca o HTML do IFRS ao vivo, injeta a faixa de aviso (`ALERT_BANNER`, ambiente nao oficial) e o `widget.js`, e cacheia em memoria por `PAGE_TTL` (cache lazy: revalida na primeira visita apos expirar, sem timer/sleep). Fallback: cache anterior ou `ui/index.html` salvo. Nunca escreve em disco em runtime (filesystem read-only do Vercel).
+A rota `/` serve o `ui/index.html` ja pronto (via `send_from_directory`); o app nao busca o IFRS ao vivo nem cacheia em runtime (filesystem read-only do Vercel). O snapshot e montado offline por `ui/clone_page.py` (`build_page`: busca o HTML do IFRS, injeta a faixa de aviso `ALERT_BANNER` de ambiente nao oficial e o `widget.js`) e regenerado na fase final da pipeline de ingestao, depois commitado. Assim a pagina so muda quando a base muda, e nenhum usuario paga o custo do fetch ao vivo.
 
 ### Separacao de chaves Upstash
 
@@ -72,7 +72,9 @@ Entrypoint em `api/index.py` (reexpoe `from ui.app import app`); o preset Flask 
 Em aberto, nesta ordem de prioridade:
 1. Bateria de testes automatizados (retrieval, respostas, edge cases). Pre-requisito para o job periodico.
 2. Mais anos na base: expandir `ANOS_VALIDOS` (hoje 2025-2026) para incluir 2023-2024, com filtros de relevancia.
-3. Reexecucao periodica: job agendado da pipeline de ingestao, apos a bateria de testes validar.
-4. Reduzir latencia (se necessario): cache de embeddings frequentes, modelo menor para triagem.
-5. Validar com gestores do Campus Canoas.
-6. Expandir para multiplos campi (possibilidade remota): namespaces ou metadata `campus` no Upstash, pipeline parametrizada.
+3. Crawler no dominio de ingresso: cobrir `ingresso.ifrs.edu.br` (processo seletivo) liberando o dominio no `is_valid_page`; se for filtrar por ano la, ensinar o regex a ler o formato `/AAAA-S/` (ano-semestre, ex: `/2026-2/`).
+4. Recrawl funcional e eficiente: reestruturar o crawler para re-escanear apenas paginas indice/listagem (scan) em vez de re-baixar o site inteiro como o `RECRAWL=True` faz hoje, achando subpaginas novas sem o custo do recrawl total. Inclui limpeza e otimizacao do fluxo.
+5. Reexecucao periodica: job agendado da pipeline de ingestao, apos a bateria de testes validar.
+6. Reduzir latencia (se necessario): cache de embeddings frequentes, modelo menor para triagem.
+7. Validar com gestores do Campus Canoas.
+8. Expandir para multiplos campi (possibilidade remota): namespaces ou metadata `campus` no Upstash, pipeline parametrizada.
