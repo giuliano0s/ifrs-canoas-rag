@@ -71,11 +71,10 @@ Entrypoint em `api/index.py` (reexpoe `from ui.app import app`); o preset Flask 
 
 Em aberto, nesta ordem de prioridade:
 1. Bateria de testes automatizados (retrieval, respostas, edge cases). Pre-requisito para o job periodico.
-2. Mais anos na base: incluir 2023-2024 (rodar a ingestao com `ANOS_VALIDOS` via env ou ajustar o default, hoje 2025-2026), com filtros de relevancia.
-3. Crawler no dominio de ingresso: cobrir `ingresso.ifrs.edu.br` (processo seletivo) liberando o dominio no `is_valid_page`; se for filtrar por ano la, ensinar o regex a ler o formato `/AAAA-S/` (ano-semestre, ex: `/2026-2/`).
-4. Recrawl funcional e eficiente: reestruturar o crawler para re-escanear apenas paginas indice/listagem (scan) em vez de re-baixar o site inteiro como o `RECRAWL=True` faz hoje, achando subpaginas novas sem o custo do recrawl total. Inclui limpeza e otimizacao do fluxo.
-5. Reexecucao periodica: job agendado da pipeline de ingestao, apos a bateria de testes validar.
-6. Reduzir latencia (se necessario): cache de embeddings frequentes, modelo menor para triagem.
-7. Retrieval condicional por tool: um agente investigativo entende a pergunta antes de montar a query pro Upstash (interpreta a intencao, decide se e quando buscar via tool calling), em vez de sempre embedar a query crua. Ganha precisao e evita busca desnecessaria.
-8. Validar com gestores do Campus Canoas.
-9. Expandir para multiplos campi (possibilidade remota): namespaces ou metadata `campus` no Upstash, pipeline parametrizada.
+2. Crawler no dominio de ingresso: cobrir `ingresso.ifrs.edu.br` (processo seletivo) liberando o dominio no `is_valid_page`; se for filtrar por ano la, ensinar o regex a ler o formato `/AAAA-S/` (ano-semestre, ex: `/2026-2/`).
+3. Recrawl funcional e eficiente: reestruturar o crawler para re-escanear apenas paginas indice/listagem (scan) em vez de re-baixar o site inteiro como o `RECRAWL=True` faz hoje, achando subpaginas novas sem o custo do recrawl total. Inclui limpeza e otimizacao do fluxo.
+4. Reexecucao periodica: job agendado da pipeline de ingestao, apos a bateria de testes validar.
+5. Reduzir latencia (se necessario): cache de embeddings frequentes, modelo menor para triagem.
+6. Retrieval condicional por tool: um agente investigativo entende a pergunta antes de montar a query pro Upstash (interpreta a intencao, decide se e quando buscar via tool calling), em vez de sempre embedar a query crua. Ganha precisao e evita busca desnecessaria.
+7. Validar com gestores do Campus Canoas.
+8. Expandir para multiplos campi (possibilidade remota): namespaces ou metadata `campus` no Upstash, pipeline parametrizada.
