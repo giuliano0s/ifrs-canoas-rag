@@ -294,9 +294,22 @@ def extract_date_from_text(text):
     return None
 
 def get_published_at(doc, max_retries=10):
+    # cadeia de fallback: url propria, url pai, llm no texto do pai, llm no texto proprio, senao None
     date = extract_date_from_url(doc["source_url"])
     if date:
         return date, "url"
+
+    parent = doc.get("parent", "")
+    if parent:
+        date = extract_date_from_url(parent)
+        if date:
+            return date, "url_pai"
+        parent_page = parse_html_page(parent, HEADERS)
+        if parent_page and parent_page.get("text"):
+            date = extract_date_from_text(parent_page["text"])
+            if date:
+                return date, "llm_pai"
+
     text = doc.get("text", "")
     if not text:
         return None, None
