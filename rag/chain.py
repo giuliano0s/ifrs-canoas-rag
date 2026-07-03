@@ -1,7 +1,9 @@
 import os
+import sys
 from dotenv import load_dotenv
 from upstash_vector import Index
 from google import genai as google_genai
+from google.genai import types
 import time
 from datetime import datetime
 
@@ -16,6 +18,10 @@ GEMINI_API_KEY_T1 = os.getenv("GEMINI_API_KEY_T1")
 AGENT_NAME = "agente-ifrs"
 ALPHA = 0.7 # score personalizado
 MIN_YEAR = 2020
+MIN_SCORE = 0.60 # score minimo do upstash para um chunk entrar no contexto
+FETCH_K = 30 # chunks coletados do upstash por similaridade (pool do rerank)
+CONTEXT_K = 15 # chunks que de fato vao ao contexto do modelo, apos o rerank
+MODEL = "gemini-2.5-flash"
 
 # clientes
 index = Index(url=UPSTASH_ENDPOINT, token=UPSTASH_API_KEY)
@@ -25,6 +31,35 @@ google_client = google_genai.Client(api_key=GEMINI_API_KEY_T1)
 _prompt_path = os.path.join(os.path.dirname(__file__), f"../data/info/{AGENT_NAME}.txt")
 with open(_prompt_path, "r", encoding="utf-8") as f:
     agent_prompt = f.read()
+
+
+def _safe(s):
+    # protege os prints de log contra caracteres fora do encoding do console (evita crash no Windows)
+    enc = sys.stdout.encoding or "utf-8"
+    return str(s).encode(enc, errors="replace").decode(enc)
+
+
+# ferramenta de busca exposta ao modelo; ele decide quando e com qual query chamar
+buscar_documentos_tool = types.Tool(function_declarations=[
+    types.FunctionDeclaration(
+        name="buscar_documentos",
+        description=(
+            "Busca na base de documentos do IFRS Campus Canoas (paginas e PDFs do site). "
+            "Passe uma query especifica, no vocabulario da instituicao, com o discriminador "
+            "certo (curso, tipo de prova, etc)."
+        ),
+        parameters=types.Schema(
+            type="OBJECT",
+            properties={
+                "query": types.Schema(
+                    type="STRING",
+                    description="Consulta refinada para a busca vetorial, no vocabulario dos documentos do campus.",
+                )
+            },
+            required=["query"],
+        ),
+    )
+])
 
 
 def search(query, top_k):
@@ -51,8 +86,8 @@ def search(query, top_k):
     return []
 
 
-def build_context(hits, min_score=0.60):
-    filtered = [h for h in hits if h.score >= min_score]
+def build_context(hits, min_score=MIN_SCORE, top_n=CONTEXT_K):
+    filtered = [h for h in hits if h.score >= min_score][:top_n]
 
     context = ""
     sources = {}
@@ -76,88 +111,132 @@ def build_context(hits, min_score=0.60):
     return context, filtered, sources
 
 
-def rerank_by_date(hits):
+def _date_score(hit):
     max_year = datetime.now().year
+    raw = hit.metadata.get("published_at")
+    if not raw:
+        return 0.5
+    try:
+        year = int(raw)
+        return (year - MIN_YEAR) / (max_year - MIN_YEAR)
+    except (ValueError, TypeError):
+        return 0.5
 
-    def date_score(hit):
-        raw = hit.metadata.get("published_at")
-        if not raw:
-            return 0.5
-        try:
-            year = int(raw)
-            return (year - MIN_YEAR) / (max_year - MIN_YEAR)
-        except (ValueError, TypeError):
-            return 0.5
 
+def rerank_by_date(hits):
     return sorted(
         hits,
-        key=lambda h: ALPHA * h.score + (1 - ALPHA) * date_score(h),
+        key=lambda h: ALPHA * h.score + (1 - ALPHA) * _date_score(h),
         reverse=True
     )
 
 
-def ask(query, history=None, top_k=15):
-    if history is None:
-        history = []
-
-    # monta histórico antes de qualquer caminho
-    history_text = ""
-    for msg in history:
-        role = "Estudante" if msg["role"] == "user" else "Assistente"
-        history_text += f"{role}: {msg['content']}\n"
-
-    # search e construção de contexto, usa apenas as últimas 2 perguntas para o search
-    recent_questions = [msg for msg in history if msg["role"] == "user"][-2:]
-    recent_history_text = ""
-    for msg in recent_questions:
-        recent_history_text += f"Estudante: {msg['content']}\n"
-
-    if recent_history_text:
-        search_query = f"Data atual: {data_atual}\n{recent_history_text}\nPergunta atual: {query}" if recent_history_text else f"Data atual: {data_atual}\n{query}"
-    else:
-        search_query = query
-
-    # busca vetorial
-    hits = search(search_query, top_k=top_k)
-    hits = rerank_by_date(hits) 
+def _executar_busca(search_query):
+    # coleta um pool grande por similaridade, reordena por data e corta para o contexto
+    hits = search(search_query, top_k=FETCH_K)
+    hits = rerank_by_date(hits)
     context, filtered, sources = build_context(hits)
 
-    print(f"Chunks encontrados: {len(filtered)}")
+    # log de depuracao: pool coletado, reordenado, e quais chunks entraram no contexto final
+    filtered_ids = {h.id for h in filtered}
+    print("\n" + "="*80)
+    print(_safe(f"[RETRIEVAL] query formulada para o Upstash: {search_query}"))
+    print(f"[RETRIEVAL] coletados={len(hits)} | no contexto={len(filtered)} (min_score={MIN_SCORE}, teto={CONTEXT_K})")
+    for h in hits:
+        m = h.metadata
+        rerank_score = ALPHA * h.score + (1 - ALPHA) * _date_score(h)
+        if h.id in filtered_ids:
+            marca = "CONTEXTO "
+        elif h.score < MIN_SCORE:
+            marca = "score<min"
+        else:
+            marca = "cortado  "
+        trecho = (m.get("text") or "").replace("\n", " ")[:100]
+        print(_safe(f"  [{marca}] score={h.score:.3f} rerank={rerank_score:.3f} data={m.get('published_at')} tipo={m.get('type')}"))
+        print(_safe(f"            titulo={m.get('title')}"))
+        print(_safe(f"            url={m.get('source_url')}"))
+        print(_safe(f"            texto={trecho}"))
+    print("="*80 + "\n")
 
-    # se não achou chunks, fallback para pesquisa na internet
     if not filtered:
-        response = google_client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=f"Você é um assistente do IFRS Campus Canoas.\n\nHistórico:\n{history_text}\n\nResponda a seguinte pergunta buscando na internet, priorizando fontes do IFRS: {query}",
-            config={"tools": [{"google_search": {}}], "temperature": 0.7},
-        )
-
-        result = response.text
-
-        try:
-            chunks = response.candidates[0].grounding_metadata.grounding_chunks
-            for c in chunks:
-                if c.web:
-                    result += "\n\n*Esta resposta foi obtida por busca na internet, pois não encontrei o conteúdo na base de documentos do campus.*"
-                    break
-        except Exception:
-            pass
-
-        return result
-
-    # se achou, gera a query
+        return None
     sources_text = "\n".join([f"[{i}] {url}" for i, url in sources.items()])
-    prompt = agent_prompt.format(
-        context=context,
-        query=query,
-        sources=sources_text,
-        history=history_text,
-        data_atual=data_atual
+    return f"{context}\nFONTES:\n{sources_text}"
+
+
+def _history_text(history):
+    # serializa o histórico para os prompts em texto (fallback)
+    text = ""
+    for msg in history:
+        role = "Estudante" if msg["role"] == "user" else "Assistente"
+        text += f"{role}: {msg['content']}\n"
+    return text
+
+
+def _fallback_internet(query, history_text):
+    # base sem resultado: responde buscando na internet, priorizando o ifrs
+    response = google_client.models.generate_content(
+        model=MODEL,
+        contents=f"Você é um assistente do IFRS Campus Canoas.\n\nHistórico:\n{history_text}\n\nResponda a seguinte pergunta buscando na internet, priorizando fontes do IFRS: {query}",
+        config={"tools": [{"google_search": {}}], "temperature": 0.7},
     )
 
-    response = google_client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt,
-        config={"temperature": 0.7}
+    result = response.text
+    try:
+        chunks = response.candidates[0].grounding_metadata.grounding_chunks
+        for c in chunks:
+            if c.web:
+                result += "\n\n*Esta resposta foi obtida por busca na internet, pois não encontrei o conteúdo na base de documentos do campus.*"
+                break
+    except Exception:
+        pass
+    return result
+
+
+def ask(query, history=None, max_steps=3):
+    history = history or []
+
+    # monta a conversa como turnos (historico + pergunta atual) para o tool calling
+    contents = []
+    for msg in history:
+        role = "user" if msg["role"] == "user" else "model"
+        contents.append(types.Content(role=role, parts=[types.Part(text=msg["content"])]))
+    contents.append(types.Content(role="user", parts=[types.Part(text=query)]))
+
+    # config com o prompt do agente como system_instruction e a ferramenta de busca
+    config = types.GenerateContentConfig(
+        system_instruction=agent_prompt.format(data_atual=data_atual),
+        tools=[buscar_documentos_tool],
+        temperature=0.7,
+        automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )
-    return response.text
+
+    # loop de investigacao: o modelo pergunta, busca ou responde ate produzir texto
+    for _ in range(max_steps):
+        response = google_client.models.generate_content(model=MODEL, contents=contents, config=config)
+        cand = response.candidates[0].content
+
+        fc = None
+        for part in (cand.parts or []):
+            if getattr(part, "function_call", None):
+                fc = part.function_call
+                break
+
+        # sem chamada de ferramenta: e uma pergunta de clarificacao ou resposta final
+        if not fc:
+            return (response.text or "").strip()
+
+        # o modelo pediu busca: executa e devolve o contexto, ou cai no fallback se vazio
+        search_query = (fc.args or {}).get("query", query)
+        context = _executar_busca(search_query)
+        if context is None:
+            return _fallback_internet(query, _history_text(history))
+
+        contents.append(cand)
+        contents.append(types.Content(role="user", parts=[
+            types.Part.from_function_response(name=fc.name, response={"documentos": context})
+        ]))
+
+    # esgotou os passos: forca uma resposta final em texto
+    response = google_client.models.generate_content(model=MODEL, contents=contents, config=config)
+    return (response.text or "").strip()

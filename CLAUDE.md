@@ -41,7 +41,7 @@ Duas metades independentes que so se encontram na base vetorial Upstash:
 Pipeline sequencial de 6 fases: crawler varre `ifrs.edu.br/canoas`, parser HTML e parser PDF extraem texto (PDFs de horario passam por gemini-2.5-flash-lite para estruturar; datas de publicacao inferidas pelo mesmo modelo), chunker fatia em pedacos, ingest embeda com Gemini e faz upsert no Upstash, e o snapshot regenera o `ui/index.html` (via `clone_page`) que o app serve estatico. Os notebooks `01_crawler` a `05_rag` sao a versao exploratoria das mesmas fases; o `.py` e a versao de producao consolidada. Os dados intermediarios (`data/raw/`, `data/parsed/`, `data/chunks/`) estao no `.gitignore` e nao trafegam pelo Git — so o Upstash (nuvem) e compartilhado entre maquinas.
 
 **2. Servico de chat (online, Vercel)** — `ui/app.py` + `rag/chain.py` + `rag/gatekeeper.py`
-Flask stateless. O fluxo de uma pergunta: `gatekeeper` checa rate limit por IP no Redis, `chain.ask()` embeda a query, busca no Upstash, reordena por data (`rerank_by_date`), monta contexto e chama o Gemini. Se nada passa o `min_score`, cai num fallback de busca na internet via Gemini google_search.
+Flask stateless. O fluxo de uma pergunta: `gatekeeper` checa rate limit por IP no Redis e `chain.ask()` roda um agente com tool calling (Gemini `gemini-2.5-flash`). O modelo investiga a pergunta e decide entre chamar a ferramenta `buscar_documentos` (formulando uma query refinada, ja corrigindo premissas como reitor->diretor) ou pedir esclarecimento ao estudante quando falta um discriminador (curso, tipo de prova). A ferramenta embeda a query e coleta um pool amplo do Upstash (`FETCH_K=30`) por similaridade, reordena por data (`rerank_by_date`) e corta os `CONTEXT_K=15` melhores para o contexto (over-fetch: o rerank escolhe de um pool maior sem inflar os tokens do LLM). O modelo entao responde citando as fontes e explicitando o escopo (ex: "a prova de RECUPERACAO do curso X"). Se a busca nao retorna nada, cai no fallback de internet via `google_search`.
 
 ### Servidor sem estado (decisao central)
 
@@ -75,6 +75,6 @@ Em aberto, nesta ordem de prioridade:
 3. Recrawl funcional e eficiente: reestruturar o crawler para re-escanear apenas paginas indice/listagem (scan) em vez de re-baixar o site inteiro como o `RECRAWL=True` faz hoje, achando subpaginas novas sem o custo do recrawl total. Inclui limpeza e otimizacao do fluxo.
 4. Reexecucao periodica: job agendado da pipeline de ingestao, apos a bateria de testes validar.
 5. Reduzir latencia (se necessario): cache de embeddings frequentes, modelo menor para triagem.
-6. Retrieval condicional por tool: um agente investigativo entende a pergunta antes de montar a query pro Upstash (interpreta a intencao, decide se e quando buscar via tool calling), em vez de sempre embedar a query crua. Ganha precisao e evita busca desnecessaria.
+6. Glossario de conceitos auditavel: camada minima e curada de correcoes que nem o modelo sabe nem a base explicita (idiossincrasias locais do campus), consultada pelo agente. Cresce de forma reativa, a partir de casos em que ele erra. O retrieval por tool com investigacao e clarificacao ja esta implementado no `chain.ask`.
 7. Validar com gestores do Campus Canoas.
 8. Expandir para multiplos campi (possibilidade remota): namespaces ou metadata `campus` no Upstash, pipeline parametrizada.
