@@ -120,18 +120,18 @@ def is_gsheet_link(url):
     return "docs.google.com/spreadsheets" in url
 
 def gsheet_csv_url(url):
-    # converte um link de planilha na variante de exportacao CSV, preservando o gid da aba;
-    # trata tanto o formato publicado (/d/e/.../pubhtml) quanto o normal (/d/ID/edit)
+    # converte um link de planilha na variante de exportacao CSV, preservando o gid da aba se houver;
+    # sem gid, omite o parametro (forcar gid=0 quebra planilhas cuja aba padrao tem outro id)
     gid_match = re.search(r"gid=(\d+)", url)
-    gid = gid_match.group(1) if gid_match else "0"
+    gid_param = f"&gid={gid_match.group(1)}" if gid_match else ""
 
     pub_match = re.search(r"(https://docs\.google\.com/spreadsheets/d/e/[^/]+)", url)
     if pub_match:
-        return f"{pub_match.group(1)}/pub?gid={gid}&single=true&output=csv"
+        return f"{pub_match.group(1)}/pub?single=true&output=csv{gid_param}"
 
     normal_match = re.search(r"(https://docs\.google\.com/spreadsheets/d/[^/]+)", url)
     if normal_match:
-        return f"{normal_match.group(1)}/export?format=csv&gid={gid}"
+        return f"{normal_match.group(1)}/export?format=csv{gid_param}"
 
     return url
 
