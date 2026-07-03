@@ -562,6 +562,13 @@ def parse_pdf(pdf_info, headers):
         return None
 
     is_scanned = len(text.strip()) < MIN_CHARS
+    resultado = {
+        "source_url": url,
+        "title":      title,
+        "is_scanned": is_scanned,
+        "size_kb":    pdf_info["size_kb"],
+        "parent":     pdf_info.get("parent", "")
+    }
 
     if not is_scanned and is_schedule_pdf(title):
         print(f"  Estruturando horário...")
@@ -571,15 +578,14 @@ def parse_pdf(pdf_info, headers):
         print(f"  Estruturando calendário...")
         text = structure_calendar_text(calendar_text)
         print(text)
+        # o ano de vigencia do calendario vem do conteudo (URL tem so o mes de publicacao)
+        ano = extract_date_from_text(text)
+        if ano:
+            resultado["published_at"] = ano
+            resultado["date_source"]  = "conteudo_calendario"
 
-    return {
-        "source_url": url,
-        "title":      title,
-        "text":       text.strip() if not is_scanned else "",
-        "is_scanned": is_scanned,
-        "size_kb":    pdf_info["size_kb"],
-        "parent":     pdf_info.get("parent", "")
-    }
+    resultado["text"] = text.strip() if not is_scanned else ""
+    return resultado
 
 def run_pdf_parser(pdfs_found):
     print("\n" + "="*60)
