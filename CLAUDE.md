@@ -72,9 +72,10 @@ Entrypoint em `api/index.py` (reexpoe `from ui.app import app`); o preset Flask 
 Em aberto, nesta ordem de prioridade:
 1. Bateria de testes automatizados (retrieval, respostas, edge cases). Pre-requisito para o job periodico.
 2. Crawler no dominio de ingresso: cobrir `ingresso.ifrs.edu.br` (processo seletivo) liberando o dominio no `is_valid_page`; se for filtrar por ano la, ensinar o regex a ler o formato `/AAAA-S/` (ano-semestre, ex: `/2026-2/`).
-3. Recrawl funcional e eficiente: reestruturar o crawler para re-escanear apenas paginas indice/listagem (scan) em vez de re-baixar o site inteiro como o `RECRAWL=True` faz hoje, achando subpaginas novas sem o custo do recrawl total. Inclui limpeza e otimizacao do fluxo.
-4. Reexecucao periodica: job agendado da pipeline de ingestao, apos a bateria de testes validar.
-5. Reduzir latencia (se necessario): cache de embeddings frequentes, modelo menor para triagem.
-6. Glossario de conceitos auditavel: camada minima e curada de correcoes que nem o modelo sabe nem a base explicita (idiossincrasias locais do campus), consultada pelo agente. Cresce de forma reativa, a partir de casos em que ele erra. O retrieval por tool com investigacao e clarificacao ja esta implementado no `chain.ask`.
-7. Validar com gestores do Campus Canoas.
-8. Expandir para multiplos campi (possibilidade remota): namespaces ou metadata `campus` no Upstash, pipeline parametrizada.
+3. Ingerir o Instagram do Gremio/campus: fonte de informacao atual que hoje escapa ao pipeline (ex: data real da festa julina, so anunciada la, diverge do calendario). Fonte hostil: exige login, tem anti-scraping, e muitos anuncios sao cards de imagem (precisariam de OCR/LLM multimodal). Opcoes a decidir: API oficial (Graph API, exige conta Business + app Meta + token, estavel e legitima, pega legendas) vs scraping + multimodal (mais poderoso para imagens, mas fragil e na zona cinzenta dos termos).
+5. Recrawl funcional e eficiente: reestruturar o crawler para re-escanear apenas paginas indice/listagem (scan) em vez de re-baixar o site inteiro como o `RECRAWL=True` faz hoje, achando subpaginas novas sem o custo do recrawl total. Inclui limpeza e otimizacao do fluxo.
+6. Reexecucao periodica: job agendado da pipeline de ingestao, apos a bateria de testes validar.
+7. Reduzir latencia (se necessario): cache de embeddings frequentes, modelo menor para triagem.
+8. Glossario de conceitos auditavel: camada minima e curada de correcoes que nem o modelo sabe nem a base explicita (idiossincrasias locais do campus), consultada pelo agente. Cresce de forma reativa, a partir de casos em que ele erra. O retrieval por tool com investigacao e clarificacao ja esta implementado no `chain.ask`.
+9. Validar com gestores do Campus Canoas.
+10. Expandir para multiplos campi (possibilidade remota): namespaces ou metadata `campus` no Upstash, pipeline parametrizada.
