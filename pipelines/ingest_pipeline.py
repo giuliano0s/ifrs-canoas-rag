@@ -577,7 +577,6 @@ def parse_pdf(pdf_info, headers):
     elif not is_scanned and eh_calendario:
         print(f"  Estruturando calendário...")
         text = structure_calendar_text(calendar_text)
-        print(text)
         # o ano de vigencia do calendario vem do conteudo (URL tem so o mes de publicacao)
         ano = extract_date_from_text(text)
         if ano:
