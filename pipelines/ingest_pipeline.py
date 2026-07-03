@@ -250,7 +250,7 @@ def run_crawler():
             elif is_drive_link(full_url):
                 download_url = build_download_url(full_url)
                 if download_url not in queued:
-                    pdfs_found.append({"url": download_url, "size_kb": 0})
+                    pdfs_found.append({"url": download_url, "size_kb": 0, "parent": url})
                     queued.add(download_url)
                     novos += 1
             elif is_pdf_by_extension(full_url):
@@ -293,37 +293,35 @@ def extract_date_from_text(text):
             time.sleep(wait)
     return None
 
-def get_published_at(doc, max_retries=10):
-    # cadeia de fallback: url propria, url pai, llm no texto do pai, llm no texto proprio, senao None
+def get_published_at(doc, max_retries=10, parent_dates=None):
+    # datacao do proprio documento primeiro: url propria, depois llm no texto proprio
     date = extract_date_from_url(doc["source_url"])
     if date:
         return date, "url"
 
+    text = doc.get("text", "")
+    if text:
+        for attempt in range(max_retries):
+            try:
+                date = extract_date_from_text(text)
+                break
+            except Exception as e:
+                wait = 10 * (attempt + 1)
+                print(f"  Tentativa {attempt+1}/{max_retries} falhou. Aguardando {wait}s...")
+                time.sleep(wait)
+        else:
+            raise Exception(f"Rate limit persistente após {max_retries} tentativas: {doc['source_url']}")
+        if date:
+            return date, "llm"
+
+    # ultimo recurso: herda a data da pagina pai (lookup no que ja foi datado, sem fetch)
     parent = doc.get("parent", "")
     if parent:
-        date = extract_date_from_url(parent)
+        date = extract_date_from_url(parent) or (parent_dates or {}).get(parent)
         if date:
-            return date, "url_pai"
-        parent_page = parse_html_page(parent, HEADERS)
-        if parent_page and parent_page.get("text"):
-            date = extract_date_from_text(parent_page["text"])
-            if date:
-                return date, "llm_pai"
+            return date, "pai"
 
-    text = doc.get("text", "")
-    if not text:
-        return None, None
-    for attempt in range(max_retries):
-        try:
-            date = extract_date_from_text(text)
-            if date:
-                return date, "llm"
-            return None, "llm_sem_data"
-        except Exception as e:
-            wait = 10 * (attempt + 1)
-            print(f"  Tentativa {attempt+1}/{max_retries} falhou. Aguardando {wait}s...")
-            time.sleep(wait)
-    raise Exception(f"Rate limit persistente após {max_retries} tentativas: {doc['source_url']}")
+    return None, "sem_data"
 
 # ── funções do parser HTML ─────────────────────────────────────────────────────
 
@@ -502,7 +500,8 @@ def parse_pdf(pdf_info, headers):
         "title":      title,
         "text":       text.strip() if not is_scanned else "",
         "is_scanned": is_scanned,
-        "size_kb":    pdf_info["size_kb"]
+        "size_kb":    pdf_info["size_kb"],
+        "parent":     pdf_info.get("parent", "")
     }
 
 def run_pdf_parser(pdfs_found):
@@ -549,8 +548,15 @@ def run_pdf_parser(pdfs_found):
     sem_data_pdf = [p for p in pdfs_parsed if "published_at" not in p and not p.get("is_scanned")]
     print(f"PDFs sem data: {len(sem_data_pdf)} de {len(pdfs_parsed)}")
 
+    # indice de datas das paginas ja parseadas, para PDFs orfaos herdarem do pai sem novo fetch
+    parent_dates = {}
+    if PAGES_PARSED_PATH.exists():
+        for p in json.loads(PAGES_PARSED_PATH.read_text(encoding="utf-8")):
+            if p.get("published_at"):
+                parent_dates[p["source_url"]] = p["published_at"]
+
     for i, doc in enumerate(sem_data_pdf):
-        date, source = get_published_at(doc)
+        date, source = get_published_at(doc, parent_dates=parent_dates)
         doc["published_at"] = date
         doc["date_source"]  = source
         print(f"[{i+1}/{len(sem_data_pdf)}] {source or 'sem data'} — {date or 'N/A'}")
