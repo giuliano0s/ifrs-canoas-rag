@@ -658,25 +658,32 @@ def download_sheet_csv(url):
         return None
 
 def structure_sheet_text(csv_text):
-    prompt = f"""Este e o conteudo CSV de uma planilha do IFRS Campus Canoas. Converta cada linha de dados em frases simples e completas, uma por linha, sem texto adicional.
-                Comece com o titulo/assunto da planilha e o ano, se houver.
-                Nao repita cabecalhos. Ignore linhas vazias. Preserve nomes, salas, e-mails, dias e horarios exatamente como estao.
+    prompt = f"""Voce converte planilhas do IFRS Campus Canoas (CSV) em frases simples, uma por linha. Preserve nomes, salas, e-mails, dias e horarios exatamente como no CSV. Comece com o titulo/assunto, se houver.
 
-                Exemplo de saida:
-                Horarios de atendimento ao aluno.
-                Aline Noimann atende na terca das 15h as 17h e na quarta das 15h as 16h, sala F113, email aline.noimann@canoas.ifrs.edu.br.
+REGRAS:
+- Baseie-se ESTRITAMENTE nas linhas do CSV. Nunca invente dados.
+- Os dados do EXEMPLO abaixo sao ficticios e servem so para mostrar o formato. NUNCA os inclua na saida.
+- Se o CSV so tiver cabecalhos, virgulas ou nada, responda exatamente: VAZIO
 
-                CSV:
-                {csv_text}"""
+EXEMPLO (ficticio, apenas formato):
+CSV de exemplo:
+Docente,Sala,Segunda
+ZZZ Exemplo,X000,10h as 11h
+Saida de exemplo:
+ZZZ Exemplo atende na segunda das 10h as 11h, sala X000.
+
+AGORA CONVERTA ESTE CSV:
+{csv_text}"""
     for attempt in range(3):
         try:
             response = google_client.models.generate_content(
                 model="gemini-2.5-flash-lite",
                 contents=prompt,
-                config={"temperature": 0.3}
+                config={"temperature": 0.2}
             )
-            content = response.text
-            return content.strip() if content else None
+            content = (response.text or "").strip()
+            # sem dados reais na planilha, o modelo responde VAZIO
+            return None if content == "VAZIO" or not content else content
         except Exception as e:
             wait = 30 * (attempt + 1)
             print(f"  ERRO estruturação planilha (tentativa {attempt+1}/3): {e}")
@@ -719,10 +726,10 @@ def run_sheets_parser(sheets_found):
         print(f"[{i+1}/{len(sheets_found)}] {url}")
         csv_text = download_sheet_csv(url)
         if not csv_text:
-            print(f"  FALHA: download da planilha retornou vazio"); SHEETS_FALHAS.append(url); continue
+            print(f"  FALHA: download bloqueado ou vazio (provavelmente privada)"); SHEETS_FALHAS.append((url, "download")); continue
         text = structure_sheet_text(csv_text)
         if not text:
-            print(f"  FALHA: estruturacao da planilha retornou vazio"); SHEETS_FALHAS.append(url); continue
+            print(f"  IGNORADA: planilha sem dados uteis"); SHEETS_FALHAS.append((url, "sem_dados")); continue
         results.append({
             "source_url":   url,
             "title":        "",
@@ -895,11 +902,11 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Falha ao gerar snapshot (ingestao ja concluida): {e}")
 
-    # DEBUG: residuo de planilhas que falharam no parse
+    # DEBUG: residuo de planilhas nao ingeridas, com o motivo
     if SHEETS_FALHAS:
-        print(f"\n[RESIDUO] {len(SHEETS_FALHAS)} planilha(s) falharam:")
-        for u in SHEETS_FALHAS:
-            print(f"  {u}")
+        print(f"\n[RESIDUO] {len(SHEETS_FALHAS)} planilha(s) nao ingeridas:")
+        for url, motivo in SHEETS_FALHAS:
+            print(f"  [{motivo}] {url}")
 
     fim = datetime.now()
     print(f"\nPipeline concluído em {fim.strftime('%d/%m/%Y %H:%M:%S')}")
