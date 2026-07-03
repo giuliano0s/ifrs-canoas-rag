@@ -174,7 +174,7 @@ def run_crawler():
         pages_found  = json.loads(PAGES_PATH.read_text(encoding="utf-8"))  if PAGES_PATH.exists()  else []
         pdfs_found   = json.loads(PDFS_PATH.read_text(encoding="utf-8"))   if PDFS_PATH.exists()   else []
         sheets_found = json.loads(SHEETS_PATH.read_text(encoding="utf-8")) if SHEETS_PATH.exists() else []
-        already_known = set(pages_found) | {p["url"] for p in pdfs_found} | set(sheets_found)
+        already_known = set(pages_found) | {p["url"] for p in pdfs_found} | {s["url"] for s in sheets_found}
         visited = already_known.copy()
         queued  = already_known.copy()
         queue   = deque([BASE_URL])
@@ -244,7 +244,7 @@ def run_crawler():
                 novos += 1
             elif is_gsheet_link(full_url):
                 if full_url not in queued:
-                    sheets_found.append(full_url)
+                    sheets_found.append({"url": full_url, "parent": url})
                     queued.add(full_url)
                     novos += 1
             elif is_drive_link(full_url):
@@ -587,6 +587,19 @@ def structure_sheet_text(csv_text):
             time.sleep(wait)
     return None
 
+def resolve_sheet_date(url, parent, csv_text):
+    # cadeia de fallback: url da planilha, url pai, llm no texto do pai, llm no csv, senao None
+    date = extract_date_from_url(url) or extract_date_from_url(parent)
+    if date:
+        return date
+    if parent:
+        parent_page = parse_html_page(parent, HEADERS)
+        if parent_page and parent_page.get("text"):
+            date = extract_date_from_text(parent_page["text"])
+            if date:
+                return date
+    return extract_date_from_text(csv_text)
+
 def run_sheets_parser(sheets_found):
     print("\n" + "="*60)
     print("FASE 3.5 — PARSER PLANILHAS")
@@ -602,7 +615,9 @@ def run_sheets_parser(sheets_found):
         results = []
         already_parsed = set()
 
-    for i, url in enumerate(sheets_found):
+    for i, item in enumerate(sheets_found):
+        url    = item["url"]
+        parent = item.get("parent", "")
         if url in already_parsed:
             continue
         print(f"[{i+1}/{len(sheets_found)}] {url}")
@@ -616,7 +631,7 @@ def run_sheets_parser(sheets_found):
             "source_url":   url,
             "title":        "",
             "text":         text,
-            "published_at": extract_date_from_url(url) or str(datetime.now().year),
+            "published_at": resolve_sheet_date(url, parent, csv_text),
         })
 
     SHEETS_PARSED_PATH.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
