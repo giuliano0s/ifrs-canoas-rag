@@ -44,10 +44,15 @@ load_dotenv()
 _anos_env    = os.getenv("ANOS_VALIDOS")
 ANOS_VALIDOS = {int(a) for a in _anos_env.split(",") if a.strip()} if _anos_env else set(range(2025, 2027))
 
-# flags de controle de execução
-RECRAWL  = True
-REPARSE  = False
-REINGEST = False
+def _flag_env(nome, default):
+    # le uma flag booleana da env (CSV "True"/"False"), preservando o default se nao setada
+    valor = os.getenv(nome)
+    return valor.strip().lower() == "true" if valor else default
+
+# flags de controle de execução; override opcional via env (ex: $env:RECRAWL="False")
+RECRAWL  = _flag_env("RECRAWL", True)
+REPARSE  = _flag_env("REPARSE", False)
+REINGEST = _flag_env("REINGEST", False)
 
 # configurações gerais
 BASE_URL        = "https://ifrs.edu.br/canoas/"
@@ -610,7 +615,7 @@ def structure_sheet_text(csv_text):
 
 def resolve_sheet_date(url, parent, csv_text):
     # cadeia de fallback: url da planilha, url pai, llm no texto do pai, llm no csv, senao None
-    date = extract_date_from_url(url) or extract_date_from_url(parent)
+    date = extract_date_from_url(url) or (extract_date_from_url(parent) if parent else None)
     if date:
         return date
     if parent:

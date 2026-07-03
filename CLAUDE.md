@@ -22,9 +22,9 @@ Acesse `http://127.0.0.1:5050`. Rode sempre como modulo (`-m ui.app`) a partir d
 
 Popular / atualizar a base vetorial (pipeline completa: crawler, parser HTML, parser PDF, chunker, ingest, snapshot):
 ```powershell
-.venv\Scripts\python.exe pipelines\ingest_pipeline.py
+$env:RECRAWL="False"; $env:REPARSE="False"; $env:REINGEST="False"; $env:ANOS_VALIDOS="2023,2024,2025,2026"; .venv\Scripts\python.exe pipelines\ingest_pipeline.py
 ```
-Flags de controle no topo do arquivo: `RECRAWL`, `REPARSE`, `REINGEST` (cada `False` = incremental na sua fase). Hoje `RECRAWL` fica `True` de proposito: no incremental o crawler pula paginas pai ja indexadas e nao acha subpaginas novas. `ANOS_VALIDOS` aceita override via env (CSV, ex: `ANOS_VALIDOS=2026`; default 2025-2026).
+Flags de controle no topo do arquivo: `RECRAWL`, `REPARSE`, `REINGEST` (cada `False` = incremental na sua fase; default no codigo hoje e `RECRAWL=True`, os demais `False`). Todas aceitam override via env (string `"True"`/`"False"`). Hoje `RECRAWL` fica `True` de proposito: no incremental o crawler pula paginas pai ja indexadas e nao acha subpaginas novas. `ANOS_VALIDOS` tambem aceita override via env (CSV, ex: `ANOS_VALIDOS=2026`; default 2025-2026).
 
 Gerar o `index.html` que o app serve (snapshot com a faixa de aviso e o widget ja injetados); tambem roda no fim da pipeline de ingestao:
 ```powershell
