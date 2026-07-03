@@ -87,11 +87,15 @@ INFO_DIR          = DATA_DIR / "info"
 
 PAGES_PATH        = RAW_DIR / "pages.json"
 PDFS_PATH         = RAW_DIR / "pdfs.json"
+SHEETS_PATH       = RAW_DIR / "sheets.json"
 PAGES_PARSED_PATH = PARSED_DIR / "pages_parsed.json"
 PDFS_PARSED_PATH  = PARSED_DIR / "pdfs_parsed.json"
+SHEETS_PARSED_PATH = PARSED_DIR / "sheets_parsed.json"
 FORMAT_ERRORS_PATH = PARSED_DIR / "pdfs_format_errors.json"
 CHUNKS_PATH       = CHUNKS_DIR / "chunks.json"
 WHITELIST_PATH    = INFO_DIR / "whitelist.txt"
+
+SHEETS_FALHAS = []  # DEBUG: planilhas que falharam no parse, para relatar residuo no fim
 
 # clientes de API
 google_client = google_genai.Client(api_key=os.getenv("GEMINI_API_KEY_T1"))
@@ -111,6 +115,25 @@ def is_pdf_by_extension(url):
 
 def is_drive_link(url):
     return "drive.google.com/file/d/" in url
+
+def is_gsheet_link(url):
+    return "docs.google.com/spreadsheets" in url
+
+def gsheet_csv_url(url):
+    # converte um link de planilha na variante de exportacao CSV, preservando o gid da aba;
+    # trata tanto o formato publicado (/d/e/.../pubhtml) quanto o normal (/d/ID/edit)
+    gid_match = re.search(r"gid=(\d+)", url)
+    gid = gid_match.group(1) if gid_match else "0"
+
+    pub_match = re.search(r"(https://docs\.google\.com/spreadsheets/d/e/[^/]+)", url)
+    if pub_match:
+        return f"{pub_match.group(1)}/pub?gid={gid}&single=true&output=csv"
+
+    normal_match = re.search(r"(https://docs\.google\.com/spreadsheets/d/[^/]+)", url)
+    if normal_match:
+        return f"{normal_match.group(1)}/export?format=csv&gid={gid}"
+
+    return url
 
 def extract_drive_id(url):
     parts = url.split("/file/d/")
@@ -141,19 +164,21 @@ def run_crawler():
     RAW_DIR.mkdir(parents=True, exist_ok=True)
 
     if RECRAWL:
-        pages_found = []
-        pdfs_found  = []
-        visited     = set()
-        queue       = deque([BASE_URL])
-        queued      = set([BASE_URL])
+        pages_found  = []
+        pdfs_found   = []
+        sheets_found = []
+        visited      = set()
+        queue        = deque([BASE_URL])
+        queued       = set([BASE_URL])
     else:
-        pages_found = json.loads(PAGES_PATH.read_text(encoding="utf-8")) if PAGES_PATH.exists() else []
-        pdfs_found  = json.loads(PDFS_PATH.read_text(encoding="utf-8"))  if PDFS_PATH.exists()  else []
-        already_known = set(pages_found) | {p["url"] for p in pdfs_found}
+        pages_found  = json.loads(PAGES_PATH.read_text(encoding="utf-8"))  if PAGES_PATH.exists()  else []
+        pdfs_found   = json.loads(PDFS_PATH.read_text(encoding="utf-8"))   if PDFS_PATH.exists()   else []
+        sheets_found = json.loads(SHEETS_PATH.read_text(encoding="utf-8")) if SHEETS_PATH.exists() else []
+        already_known = set(pages_found) | {p["url"] for p in pdfs_found} | set(sheets_found)
         visited = already_known.copy()
         queued  = already_known.copy()
         queue   = deque([BASE_URL])
-        print(f"Dados existentes: {len(pages_found)} páginas, {len(pdfs_found)} PDFs")
+        print(f"Dados existentes: {len(pages_found)} páginas, {len(pdfs_found)} PDFs, {len(sheets_found)} planilhas")
         print(f"URLs já conhecidas ignoradas: {len(already_known)}")
 
     # carrega whitelist
@@ -217,6 +242,11 @@ def run_crawler():
                 queue.append(full_url)
                 queued.add(full_url)
                 novos += 1
+            elif is_gsheet_link(full_url):
+                if full_url not in queued:
+                    sheets_found.append(full_url)
+                    queued.add(full_url)
+                    novos += 1
             elif is_drive_link(full_url):
                 download_url = build_download_url(full_url)
                 if download_url not in queued:
@@ -232,11 +262,12 @@ def run_crawler():
         time.sleep(0.3)
 
     # salva
-    PAGES_PATH.write_text(json.dumps(pages_found, ensure_ascii=False, indent=2), encoding="utf-8")
-    PDFS_PATH.write_text(json.dumps(pdfs_found,   ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"\nSalvo: {len(pages_found)} páginas e {len(pdfs_found)} PDFs")
+    PAGES_PATH.write_text(json.dumps(pages_found,   ensure_ascii=False, indent=2), encoding="utf-8")
+    PDFS_PATH.write_text(json.dumps(pdfs_found,     ensure_ascii=False, indent=2), encoding="utf-8")
+    SHEETS_PATH.write_text(json.dumps(sheets_found, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"\nSalvo: {len(pages_found)} páginas, {len(pdfs_found)} PDFs e {len(sheets_found)} planilhas")
 
-    return pages_found, pdfs_found
+    return pages_found, pdfs_found, sheets_found
 
 # ── funções de extração de data ────────────────────────────────────────────────
 
@@ -518,6 +549,80 @@ def run_pdf_parser(pdfs_found):
     print("Enriquecimento de PDFs concluído.")
     return pdfs_parsed
 
+# ── funções do parser de planilhas (Google Sheets publicados) ───────────────────
+
+def download_sheet_csv(url):
+    try:
+        response = requests.get(gsheet_csv_url(url), timeout=30, headers=HEADERS)
+        response.raise_for_status()
+        response.encoding = "utf-8"
+        return response.text
+    except Exception as e:
+        print(f"  ERRO download planilha: {e}")
+        return None
+
+def structure_sheet_text(csv_text):
+    prompt = f"""Este e o conteudo CSV de uma planilha do IFRS Campus Canoas. Converta cada linha de dados em frases simples e completas, uma por linha, sem texto adicional.
+                Comece com o titulo/assunto da planilha e o ano, se houver.
+                Nao repita cabecalhos. Ignore linhas vazias. Preserve nomes, salas, e-mails, dias e horarios exatamente como estao.
+
+                Exemplo de saida:
+                Horarios de atendimento ao aluno.
+                Aline Noimann atende na terca das 15h as 17h e na quarta das 15h as 16h, sala F113, email aline.noimann@canoas.ifrs.edu.br.
+
+                CSV:
+                {csv_text}"""
+    for attempt in range(3):
+        try:
+            response = google_client.models.generate_content(
+                model="gemini-2.5-flash-lite",
+                contents=prompt,
+                config={"temperature": 0.3}
+            )
+            content = response.text
+            return content.strip() if content else None
+        except Exception as e:
+            wait = 30 * (attempt + 1)
+            print(f"  ERRO estruturação planilha (tentativa {attempt+1}/3): {e}")
+            time.sleep(wait)
+    return None
+
+def run_sheets_parser(sheets_found):
+    print("\n" + "="*60)
+    print("FASE 3.5 — PARSER PLANILHAS")
+    print("="*60)
+
+    PARSED_DIR.mkdir(parents=True, exist_ok=True)
+
+    if not REPARSE and SHEETS_PARSED_PATH.exists():
+        results = json.loads(SHEETS_PARSED_PATH.read_text(encoding="utf-8"))
+        already_parsed = {r["source_url"] for r in results}
+        print(f"Já parseadas: {len(results)} planilhas")
+    else:
+        results = []
+        already_parsed = set()
+
+    for i, url in enumerate(sheets_found):
+        if url in already_parsed:
+            continue
+        print(f"[{i+1}/{len(sheets_found)}] {url}")
+        csv_text = download_sheet_csv(url)
+        if not csv_text:
+            print(f"  FALHA: download da planilha retornou vazio"); SHEETS_FALHAS.append(url); continue
+        text = structure_sheet_text(csv_text)
+        if not text:
+            print(f"  FALHA: estruturacao da planilha retornou vazio"); SHEETS_FALHAS.append(url); continue
+        results.append({
+            "source_url":   url,
+            "title":        "",
+            "text":         text,
+            "published_at": extract_date_from_url(url) or str(datetime.now().year),
+        })
+
+    SHEETS_PARSED_PATH.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"\nParsed: {len(results)} planilhas")
+    return results
+
 # ── funções do chunker ─────────────────────────────────────────────────────────
 
 splitter = RecursiveCharacterTextSplitter(
@@ -539,7 +644,7 @@ def to_drive_view_url(url):
             return f"https://drive.google.com/file/d/{match.group(1)}/view"
     return url
 
-def run_chunker(pages_parsed, pdfs_parsed):
+def run_chunker(pages_parsed, pdfs_parsed, sheets_parsed):
     print("\n" + "="*60)
     print("FASE 4 — CHUNKER")
     print("="*60)
@@ -568,6 +673,16 @@ def run_chunker(pages_parsed, pdfs_parsed):
             "published_at": pdf.get("published_at")
         }
         chunks.extend(chunk_document(pdf["text"], metadata))
+
+    # processa planilhas (Google Sheets estruturados em frases)
+    for sheet in sheets_parsed:
+        metadata = {
+            "source_url":   sheet["source_url"],
+            "title":        sheet["title"],
+            "type":         "sheet",
+            "published_at": sheet.get("published_at")
+        }
+        chunks.extend(chunk_document(sheet["text"], metadata))
 
     CHUNKS_PATH.write_text(json.dumps(chunks, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Total de chunks: {len(chunks)}")
@@ -653,10 +768,11 @@ if __name__ == "__main__":
     print(f"Pipeline iniciado em {inicio.strftime('%d/%m/%Y %H:%M:%S')}")
     print(f"Anos válidos: {sorted(ANOS_VALIDOS)}")
 
-    pages_found, pdfs_found = run_crawler()
+    pages_found, pdfs_found, sheets_found = run_crawler()
     pages_parsed            = run_html_parser(pages_found)
     pdfs_parsed             = run_pdf_parser(pdfs_found)
-    chunks                  = run_chunker(pages_parsed, pdfs_parsed)
+    sheets_parsed           = run_sheets_parser(sheets_found)
+    chunks                  = run_chunker(pages_parsed, pdfs_parsed, sheets_parsed)
     run_ingest(chunks)
 
     # regenera o snapshot estatico da pagina servido pelo app
@@ -667,6 +783,12 @@ if __name__ == "__main__":
         clone_page()
     except Exception as e:
         print(f"Falha ao gerar snapshot (ingestao ja concluida): {e}")
+
+    # DEBUG: residuo de planilhas que falharam no parse
+    if SHEETS_FALHAS:
+        print(f"\n[RESIDUO] {len(SHEETS_FALHAS)} planilha(s) falharam:")
+        for u in SHEETS_FALHAS:
+            print(f"  {u}")
 
     fim = datetime.now()
     print(f"\nPipeline concluído em {fim.strftime('%d/%m/%Y %H:%M:%S')}")
