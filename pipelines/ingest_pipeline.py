@@ -443,6 +443,69 @@ def download_pdf_bytes(url, headers):
 def is_schedule_pdf(title):
     return "Horários_" in title or "Horarios_" in title
 
+def is_calendar_pdf(url, text):
+    # detecta o calendario academico pela URL ou pelo cabecalho do conteudo
+    return "calendario" in url.lower() or "CALENDÁRIO ACADÊMICO" in text[:200].upper() or "CALENDARIO ACADEMICO" in text[:200].upper()
+
+_MESES = ("JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO",
+          "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO")
+
+def extract_calendar_text(doc):
+    # le os blocos por posicao (top-down, esquerda-direita) e prefixa CADA linha de
+    # observacao com o mes/ano da secao corrente, corrigindo a ordem embaralhada do PDF;
+    # descarta a grade de dias (linhas so com numeros/dias da semana)
+    dias_semana = {"dom", "seg", "ter", "qua", "qui", "sex", "sáb", "sab"}
+    saida = []
+    secao_atual = None
+    for page in doc:
+        blocks = sorted(page.get_text("blocks"), key=lambda b: (round(b[1]), round(b[0])))
+        for b in blocks:
+            bloco = b[4].strip()
+            if not bloco:
+                continue
+            cabecalho = next((m for m in _MESES if bloco.upper().startswith(m)), None)
+            if cabecalho:
+                secao_atual = " ".join(bloco.replace("|", " ").split())  # ex: "JUNHO 2026"
+                continue
+            for linha in bloco.splitlines():
+                linha = linha.strip()
+                # ignora ruido da grade: vazio, so numeros, ou dia da semana
+                if not linha or linha.replace(" ", "").isdigit() or linha.lower() in dias_semana:
+                    continue
+                saida.append(f"({secao_atual}) {linha}" if secao_atual else linha)
+    return "\n".join(saida)
+
+def structure_calendar_text(text):
+    prompt = f"""Este e o texto de um calendario academico do IFRS Campus Canoas, extraido de PDF (grades de dias misturadas com observacoes por mes).
+                Extraia CADA evento datado em uma frase simples, uma por linha, sem texto adicional.
+                Cada linha do calendario no formato "DIA - Nome do evento" (ou "DIA a DIA - Nome") pertence ao mes da secao em que aparece. Componha a data completa com dia, mes e ano.
+                Comece com o ano do calendario.
+
+                Formato de saida, um por linha:
+                Ano do calendario: 2026
+                Festa Junina do Campus Canoas: 27 de julho de 2026 (sabado letivo).
+                Recesso: 02 a 31 de janeiro de 2026.
+
+                Nao inclua a grade de dias, so os eventos das observacoes. Nao escreva nada alem das frases.
+
+                {text}"""
+    for attempt in range(3):
+        try:
+            response = google_client.models.generate_content(
+                model="gemini-2.5-flash-lite",
+                contents=prompt,
+                config={"temperature": 0.3}
+            )
+            content = response.text
+            if content is None:
+                return text
+            return content.strip()
+        except Exception as e:
+            wait = 30 * (attempt + 1)
+            print(f"  ERRO estruturação calendário (tentativa {attempt+1}/3): {e}")
+            time.sleep(wait)
+    return text
+
 def structure_schedule_text(text):
     prompt = f"""Extraia as informações de professor e disciplina deste horário em frases simples. Adicione o ano primeiro
                 Siga EXATAMENTE este formato, uma frase por linha, sem texto adicional:
@@ -490,6 +553,9 @@ def parse_pdf(pdf_info, headers):
         text  = ""
         for page in doc:
             text += page.get_text()
+        # calendario: reextrai por blocos posicionais para amarrar evento ao mes correto
+        eh_calendario = is_calendar_pdf(url, text)
+        calendar_text = extract_calendar_text(doc) if eh_calendario else None
         doc.close()
     except Exception as e:
         print(f"  ERRO parse: {e}")
@@ -500,6 +566,10 @@ def parse_pdf(pdf_info, headers):
     if not is_scanned and is_schedule_pdf(title):
         print(f"  Estruturando horário...")
         text = structure_schedule_text(text)
+        print(text)
+    elif not is_scanned and eh_calendario:
+        print(f"  Estruturando calendário...")
+        text = structure_calendar_text(calendar_text)
         print(text)
 
     return {
