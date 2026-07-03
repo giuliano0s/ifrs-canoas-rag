@@ -286,7 +286,9 @@ def extract_date_from_text(text):
                 config={"temperature": 0.0}
             )
             result = (response.text or "").strip()
-            return None if "None" in result.lower() else result
+            # saneia a saida: aceita so um ano plausivel (2000-2035), senao None
+            match = re.search(r"\b(20[0-3]\d)\b", result)
+            return match.group(1) if match else None
         except Exception as e:
             wait = 60 * (attempt + 1)
             print(f"  Rate limit, aguardando {wait}s... ({e})")
