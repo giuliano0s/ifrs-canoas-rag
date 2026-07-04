@@ -70,12 +70,22 @@ Entrypoint em `api/index.py` (reexpoe `from ui.app import app`); o preset Flask 
 ## Proximos passos
 
 Em aberto, nesta ordem de prioridade:
-1. Bateria de testes automatizados (retrieval, respostas, edge cases). Pre-requisito para o job periodico.
+1. Bateria de testes automatizados (retrieval, respostas, edge cases). Pre-requisito para o job periodico. Desenho em 4 camadas na secao abaixo.
 2. Crawler no dominio de ingresso: cobrir `ingresso.ifrs.edu.br` (processo seletivo) liberando o dominio no `is_valid_page`; se for filtrar por ano la, ensinar o regex a ler o formato `/AAAA-S/` (ano-semestre, ex: `/2026-2/`).
 3. Ingerir o Instagram do Gremio/campus: fonte de informacao atual que hoje escapa ao pipeline (ex: data real da festa julina, so anunciada la, diverge do calendario). Fonte hostil: exige login, tem anti-scraping, e muitos anuncios sao cards de imagem (precisariam de OCR/LLM multimodal). Opcoes a decidir: API oficial (Graph API, exige conta Business + app Meta + token, estavel e legitima, pega legendas) vs scraping + multimodal (mais poderoso para imagens, mas fragil e na zona cinzenta dos termos).
 5. Recrawl funcional e eficiente: reestruturar o crawler para re-escanear apenas paginas indice/listagem (scan) em vez de re-baixar o site inteiro como o `RECRAWL=True` faz hoje, achando subpaginas novas sem o custo do recrawl total. Inclui limpeza e otimizacao do fluxo.
 6. Reexecucao periodica: job agendado da pipeline de ingestao, apos a bateria de testes validar.
 7. Reduzir latencia (se necessario): cache de embeddings frequentes, modelo menor para triagem.
-8. Glossario de conceitos auditavel: camada minima e curada de correcoes que nem o modelo sabe nem a base explicita (idiossincrasias locais do campus), consultada pelo agente. Cresce de forma reativa, a partir de casos em que ele erra. O retrieval por tool com investigacao e clarificacao ja esta implementado no `chain.ask`.
-9. Validar com gestores do Campus Canoas.
-10. Expandir para multiplos campi (possibilidade remota): namespaces ou metadata `campus` no Upstash, pipeline parametrizada.
+8. Validar com gestores do Campus Canoas.
+9. Expandir para multiplos campi (possibilidade remota): namespaces ou metadata `campus` no Upstash, pipeline parametrizada.
+
+### Bateria de testes (desenho em 4 camadas)
+
+Detalhamento do item 1. O sistema e um RAG agentico (o modelo decide buscar/perguntar/refinar), entao avaliar so a resposta final e enganoso: parte das falhas reais e de decisao ou de retrieval, nao de geracao. Segue o estado da arte de 2026 (RAGAS/DeepEval, LLM-as-a-judge, avaliacao de trajetoria de agente). Ordem sugerida: comecar por Camada 0 + 1 (barato e pega a maioria das falhas), evoluir depois.
+
+- Camada 0 (golden set): conjunto curado de perguntas + comportamento/resposta esperados, validado a mao. Comeca dos casos reais de falha ja documentados (reitor->diretor, "que prova?", diretor 2024-2028, festa junina, horario do Igor) e cresce com geracao sintetica revisada. E o regression suite: toda mudanca roda contra ele.
+- Camada 1 (retrieval): rotular as URLs corretas de cada pergunta (o log `[RETRIEVAL]` ajuda) e medir Hit@k, Recall@k, MRR sobre o pool `FETCH_K=30` e sobre o `CONTEXT_K=15` final. A diferenca isola se o rerank enterra doc bom.
+- Camada 2 (trajetoria agentica): avaliar a decisao, nao so a resposta. Escolheu a acao certa (buscar/perguntar/responder)? A query formulada era boa (corrigiu premissa? incluiu ano)?
+- Camada 3 (geracao, LLM-as-a-judge): faithfulness e answer relevancy (sem gabarito), answer correctness (com gabarito), mais rubricas nossas (explicitou escopo? citou fontes? ressalvou dado antigo?). Juiz validado contra rotulos humanos em PT-BR antes de escalar.
+
+Stack sugerido: DeepEval como espinha (pytest-native, vira CI/regressao e cobre RAG + agente), RAGAS opcional para as metricas RAG canonicas, tracing (Phoenix/TruLens) so em producao. Juiz: Gemini.
