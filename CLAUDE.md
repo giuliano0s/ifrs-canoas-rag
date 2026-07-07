@@ -2,9 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## O que e
+## O que é
 
-Assistente de IA (RAG) para o IFRS Campus Canoas. Um widget de chat injetado sobre um clone da pagina oficial do campus responde perguntas de estudantes a partir de uma base vetorial de documentos do site (paginas e PDFs). Pensado para deploy serverless no Vercel.
+Assistente de IA (RAG) para o IFRS Campus Canoas. Um widget de chat injetado sobre um clone da página oficial do campus responde perguntas de estudantes a partir de uma base vetorial de documentos do site (páginas e PDFs). Pensado para deploy serverless no Vercel.
 
 ## Comandos
 
@@ -14,78 +14,148 @@ Ambiente (Windows, PowerShell):
 pip install -r requirements.txt
 ```
 
-Rodar o app local (Flask). A porta 5000 costuma estar ocupada por um tunel SSH na maquina de dev, use outra via `PORT`:
+Rodar o app local (Flask). A porta 5000 costuma estar ocupada por um túnel SSH na máquina de dev, use outra via `PORT`:
 ```powershell
 $env:PORT=5050; .venv\Scripts\python.exe -m ui.app
 ```
-Acesse `http://127.0.0.1:5050`. Rode sempre como modulo (`-m ui.app`) a partir da raiz, nunca `python ui/app.py`, por causa dos imports de pacote (`rag.`, `ui.`).
+Acesse `http://127.0.0.1:5050`. Rode sempre como módulo (`-m ui.app`) a partir da raiz, nunca `python ui/app.py`, por causa dos imports de pacote (`rag.`, `ui.`).
 
 Popular / atualizar a base vetorial (pipeline completa: crawler, parser HTML, parser PDF, chunker, ingest, snapshot):
 ```powershell
 $env:RECRAWL="False"; $env:REPARSE="False"; $env:REINGEST="False"; $env:ANOS_VALIDOS="2023,2024,2025,2026"; .venv\Scripts\python.exe pipelines\ingest_pipeline.py
 ```
-Flags de controle no topo do arquivo: `RECRAWL`, `REPARSE`, `REINGEST` (cada `False` = incremental na sua fase; default no codigo hoje e `RECRAWL=True`, os demais `False`). Todas aceitam override via env (string `"True"`/`"False"`). Hoje `RECRAWL` fica `True` de proposito: no incremental o crawler pula paginas pai ja indexadas e nao acha subpaginas novas. `ANOS_VALIDOS` tambem aceita override via env (CSV, ex: `ANOS_VALIDOS=2026`; default 2025-2026).
+Flags de controle no topo do arquivo: `RECRAWL`, `REPARSE`, `REINGEST` (cada `False` = incremental na sua fase; default no código hoje é `RECRAWL=True`, os demais `False`). Todas aceitam override via env (string `"True"`/`"False"`). Hoje `RECRAWL` fica `True` de propósito: no incremental o crawler pula páginas pai já indexadas e não acha subpáginas novas. `ANOS_VALIDOS` também aceita override via env (CSV, ex: `ANOS_VALIDOS=2026`; default 2025-2026).
 
-Gerar o `index.html` que o app serve (snapshot com a faixa de aviso e o widget ja injetados); tambem roda no fim da pipeline de ingestao:
+Gerar o `index.html` que o app serve (snapshot com a faixa de aviso e o widget já injetados); também roda no fim da pipeline de ingestão:
 ```powershell
 .venv\Scripts\python.exe -m ui.clone_page
 ```
 
-`vercel dev` NAO funciona no Windows nativo (bug do `@vercel/python`: gera path com `\U` nao escapado em `vc_init_dev.py`). Para teste fiel do empacotamento Vercel, use WSL ou faca deploy real (Linux). Para validar a logica, use o Flask local acima.
+`vercel dev` NÃO funciona no Windows nativo (bug do `@vercel/python`: gera path com `\U` não escapado em `vc_init_dev.py`). Para teste fiel do empacotamento Vercel, use WSL ou faça deploy real (Linux). Para validar a lógica, use o Flask local acima.
 
 ## Arquitetura
 
-Duas metades independentes que so se encontram na base vetorial Upstash:
+Duas metades independentes que só se encontram na base vetorial Upstash:
 
-**1. Ingestao (offline, roda na maquina do dev)** — `pipelines/ingest_pipeline.py`
-Pipeline sequencial: crawler varre `ifrs.edu.br/canoas`, parser HTML e parser PDF extraem texto (PDFs de horario passam por gemini-2.5-flash-lite para estruturar; datas de publicacao inferidas pelo mesmo modelo), parser de planilhas baixa Google Sheets publicados (links `docs.google.com/spreadsheets` achados no site) como CSV e estrutura em frases via LLM (`type: "sheet"` no metadata), chunker fatia em pedacos, ingest embeda com Gemini e faz upsert no Upstash, e o snapshot regenera o `ui/index.html` (via `clone_page`) que o app serve estatico. Os notebooks `01_crawler` a `05_rag` sao a versao exploratoria das mesmas fases; o `.py` e a versao de producao consolidada. Os dados intermediarios (`data/raw/`, `data/parsed/`, `data/chunks/`) estao no `.gitignore` e nao trafegam pelo Git — so o Upstash (nuvem) e compartilhado entre maquinas.
+**1. Ingestão (offline, roda na máquina do dev)** — `pipelines/ingest_pipeline.py`
+Pipeline sequencial: crawler varre `ifrs.edu.br/canoas`, parser HTML e parser PDF extraem texto (PDFs de horário passam por gemini-2.5-flash-lite para estruturar; datas de publicação inferidas pelo mesmo modelo), parser de planilhas baixa Google Sheets publicados (links `docs.google.com/spreadsheets` achados no site) como CSV e estrutura em frases via LLM (`type: "sheet"` no metadata), chunker fatia em pedaços, ingest embeda com Gemini e faz upsert no Upstash, e o snapshot regenera o `ui/index.html` (via `clone_page`) que o app serve estático. Os notebooks `01_crawler` a `05_rag` são a versão exploratória das mesmas fases; o `.py` é a versão de produção consolidada. Os dados intermediários (`data/raw/`, `data/parsed/`, `data/chunks/`) estão no `.gitignore` e não trafegam pelo Git — só o Upstash (nuvem) é compartilhado entre máquinas.
 
-**2. Servico de chat (online, Vercel)** — `ui/app.py` + `rag/chain.py` + `rag/gatekeeper.py`
-Flask stateless. O fluxo de uma pergunta: `gatekeeper` checa rate limit por IP no Redis e `chain.ask()` roda um agente com tool calling (Gemini `gemini-2.5-flash`). O modelo investiga a pergunta e decide entre chamar a ferramenta `buscar_documentos` (formulando uma query refinada, ja corrigindo premissas como reitor->diretor) ou pedir esclarecimento ao estudante quando falta um discriminador (curso, tipo de prova). A ferramenta embeda a query e coleta um pool amplo do Upstash (`FETCH_K=30`) por similaridade, reordena por data (`rerank_by_date`) e corta os `CONTEXT_K=15` melhores para o contexto (over-fetch: o rerank escolhe de um pool maior sem inflar os tokens do LLM). O modelo entao responde citando as fontes e explicitando o escopo (ex: "a prova de RECUPERACAO do curso X"). Se a busca nao retorna nada, cai no fallback de internet via `google_search`. O prompt do agente (`data/info/agente-ifrs.txt`) instrui dois comportamentos contra respostas cruas em perguntas vagas: quando o referente tem outra leitura plausivel na base, responde a mais provavel e menciona a alternativa (sem travar); e consciencia temporal, ressalvando dados de anos anteriores a data atual em vez de apresenta-los como vigentes.
+**2. Serviço de chat (online, Vercel)** — `ui/app.py` + `rag/chain.py` + `rag/gatekeeper.py`
+Flask stateless. O fluxo de uma pergunta: `gatekeeper` checa rate limit por IP no Redis e `chain.ask()` roda um agente com tool calling (Gemini `gemini-2.5-flash`). O modelo investiga a pergunta e decide entre chamar a ferramenta `buscar_documentos` (formulando uma query refinada, já corrigindo premissas como reitor->diretor) ou pedir esclarecimento ao estudante quando falta um discriminador (curso, tipo de prova). A ferramenta embeda a query e coleta um pool amplo do Upstash (`FETCH_K=30`) por similaridade, reordena por data (`rerank_by_date`) e corta os `CONTEXT_K=15` melhores para o contexto (over-fetch: o rerank escolhe de um pool maior sem inflar os tokens do LLM). O modelo então responde citando as fontes e explicitando o escopo (ex: "a prova de RECUPERAÇÃO do curso X"). Se a busca não retorna nada, cai no fallback de internet via `google_search`. O prompt do agente (`data/info/agente-ifrs.txt`) instrui dois comportamentos contra respostas cruas em perguntas vagas: quando o referente tem outra leitura plausível na base, responde a mais provável e menciona a alternativa (sem travar); e consciência temporal, ressalvando dados de anos anteriores à data atual em vez de apresentá-los como vigentes.
 
-### Servidor sem estado (decisao central)
+### Servidor sem estado (decisão central)
 
-O servidor NAO guarda historico de conversa, sessao, nem cookie. O historico vive no cliente (`ui/widget.js`, variavel em memoria) e e enviado inteiro no corpo de cada `POST /chat`. O servidor sanitiza (`sanitize_history`, teto de `MAX_HISTORY_MESSAGES`) e repassa ao `ask`. Isso e o que torna o app compativel com o serverless do Vercel (instancias efemeras que nao compartilham memoria). Ao recarregar a pagina o historico zera de proposito (sem `localStorage`), para contexto antigo nao poluir uma nova conversa. O contexto multi-turno funciona durante a sessao ativa porque o array em memoria acumula e vai junto em cada chamada.
+O servidor NÃO guarda histórico de conversa, sessão, nem cookie. O histórico vive no cliente (`ui/widget.js`, variável em memória) e é enviado inteiro no corpo de cada `POST /chat`. O servidor sanitiza (`sanitize_history`, teto de `MAX_HISTORY_MESSAGES`) e repassa ao `ask`. Isso é o que torna o app compatível com o serverless do Vercel (instâncias efêmeras que não compartilham memória). Ao recarregar a página o histórico zera de propósito (sem `localStorage`), para contexto antigo não poluir uma nova conversa. O contexto multi-turno funciona durante a sessão ativa porque o array em memória acumula e vai junto em cada chamada.
 
-### Pagina servida estaticamente
+### Página servida estaticamente
 
-A rota `/` serve o `ui/index.html` ja pronto (via `send_from_directory`); o app nao busca o IFRS ao vivo nem cacheia em runtime (filesystem read-only do Vercel). O snapshot e montado offline por `ui/clone_page.py` (`build_page`: busca o HTML do IFRS, injeta a faixa de aviso `ALERT_BANNER` de ambiente nao oficial e o `widget.js`) e regenerado na fase final da pipeline de ingestao, depois commitado. Assim a pagina so muda quando a base muda, e nenhum usuario paga o custo do fetch ao vivo.
+A rota `/` serve o `ui/index.html` já pronto (via `send_from_directory`); o app não busca o IFRS ao vivo nem cacheia em runtime (filesystem read-only do Vercel). O snapshot é montado offline por `ui/clone_page.py` (`build_page`: busca o HTML do IFRS, injeta a faixa de aviso `ALERT_BANNER` de ambiente não oficial e o `widget.js`) e regenerado na fase final da pipeline de ingestão, depois commitado. Assim a página só muda quando a base muda, e nenhum usuário paga o custo do fetch ao vivo.
 
-### Separacao de chaves Upstash
+### Separação de chaves Upstash
 
-O Vector tem dois tokens, controlados por variavel de ambiente distinta:
-- `UPSTASH_API_KEY` (read-only) — usado pelo `chain.py` em producao (so consulta). E o unico Vector token cadastrado no Vercel.
-- `UPSTASH_WRITE_API_KEY` (read+write) — usado pela ingestao (`ingest_pipeline.py`, notebook 04, delete no `test.ipynb`). Fica so na maquina local, NUNCA no Vercel.
+O Vector tem dois tokens, controlados por variável de ambiente distinta:
+- `UPSTASH_API_KEY` (read-only) — usado pelo `chain.py` em produção (só consulta). É o único Vector token cadastrado no Vercel.
+- `UPSTASH_WRITE_API_KEY` (read+write) — usado pela ingestão (`ingest_pipeline.py`, notebook 04, delete no `test.ipynb`). Fica só na máquina local, NUNCA no Vercel.
 
-O Redis (`UPSTASH_REDIS_*`) usa o token padrao com escrita, pois o rate limiter incrementa contador a cada request. Read-only nao serve ali.
+O Redis (`UPSTASH_REDIS_*`) usa o token padrão com escrita, pois o rate limiter incrementa contador a cada request. Read-only não serve ali.
 
 ### Embeddings
 
-`gemini-embedding-001`, 3072 dimensoes, similaridade cosine. O index Upstash precisa ser criado com esses parametros. Os scores do Upstash sao normalizados em 0 a 1 (no antigo Qdrant iam de -1 a 1); o `min_score=0.60` em `chain.py` pode precisar de ajuste fino observando scores reais.
+`gemini-embedding-001`, 3072 dimensões, similaridade cosine. O index Upstash precisa ser criado com esses parâmetros. Os scores do Upstash são normalizados em 0 a 1 (no antigo Qdrant iam de -1 a 1); o `min_score=0.60` em `chain.py` pode precisar de ajuste fino observando scores reais.
 
 ## Deploy (Vercel)
 
-Entrypoint em `api/index.py` (reexpoe `from ui.app import app`); o preset Flask do Vercel resolve o app sozinho. `vercel.json` define `maxDuration: 60` para a funcao (folga para a chamada LLM e o fallback de internet). Cadastrar no painel do Vercel as variaveis: `UPSTASH_API_KEY` (read-only), `UPSTASH_ENDPOINT`, `UPSTASH_REDIS_API_KEY`, `UPSTASH_REDIS_ENDPOINT`, `GEMINI_API_KEY_T1`. NAO cadastrar `UPSTASH_WRITE_API_KEY`.
+Entrypoint em `api/index.py` (reexpõe `from ui.app import app`); o preset Flask do Vercel resolve o app sozinho. `vercel.json` define `maxDuration: 60` para a função (folga para a chamada LLM e o fallback de internet). Cadastrar no painel do Vercel as variáveis: `UPSTASH_API_KEY` (read-only), `UPSTASH_ENDPOINT`, `UPSTASH_REDIS_API_KEY`, `UPSTASH_REDIS_ENDPOINT`, `GEMINI_API_KEY_T1`. NÃO cadastrar `UPSTASH_WRITE_API_KEY`.
 
-## Proximos passos
+## Próximos passos
 
 Em aberto, nesta ordem de prioridade:
-1. Bateria de testes automatizados (retrieval, respostas, edge cases). Pre-requisito para o job periodico. Desenho em 4 camadas na secao abaixo.
-2. Crawler no dominio de ingresso: cobrir `ingresso.ifrs.edu.br` (processo seletivo) liberando o dominio no `is_valid_page`; se for filtrar por ano la, ensinar o regex a ler o formato `/AAAA-S/` (ano-semestre, ex: `/2026-2/`).
-3. Ingerir o Instagram do Gremio/campus: fonte de informacao atual que hoje escapa ao pipeline (ex: data real da festa julina, so anunciada la, diverge do calendario). Fonte hostil: exige login, tem anti-scraping, e muitos anuncios sao cards de imagem (precisariam de OCR/LLM multimodal). Opcoes a decidir: API oficial (Graph API, exige conta Business + app Meta + token, estavel e legitima, pega legendas) vs scraping + multimodal (mais poderoso para imagens, mas fragil e na zona cinzenta dos termos).
-5. Recrawl funcional e eficiente: reestruturar o crawler para re-escanear apenas paginas indice/listagem (scan) em vez de re-baixar o site inteiro como o `RECRAWL=True` faz hoje, achando subpaginas novas sem o custo do recrawl total. Inclui limpeza e otimizacao do fluxo.
-6. Reexecucao periodica: job agendado da pipeline de ingestao, apos a bateria de testes validar.
-7. Reduzir latencia (se necessario): cache de embeddings frequentes, modelo menor para triagem.
+1. Bateria de testes automatizados (retrieval, respostas, edge cases). Pré-requisito para o job periódico. Estratégia de avaliação na seção abaixo.
+2. Crawler no domínio de ingresso: cobrir `ingresso.ifrs.edu.br` (processo seletivo) liberando o domínio no `is_valid_page`; se for filtrar por ano lá, ensinar o regex a ler o formato `/AAAA-S/` (ano-semestre, ex: `/2026-2/`).
+3. Ingerir o Instagram do Grêmio/campus: fonte de informação atual que hoje escapa ao pipeline (ex: data real da festa julina, só anunciada lá, diverge do calendário). Fonte hostil: exige login, tem anti-scraping, e muitos anúncios são cards de imagem (precisariam de OCR/LLM multimodal). Opções a decidir: API oficial (Graph API, exige conta Business + app Meta + token, estável e legítima, pega legendas) vs scraping + multimodal (mais poderoso para imagens, mas frágil e na zona cinzenta dos termos).
+4. Escalar o golden set para robustez de produção: **geração sintética validada** (um LLM gera perguntas candidatas a partir dos próprios documentos da base e um juiz/humano valida o gabarito, mantendo a regra de não-circularidade) + **telemetria de produção** (perguntas reais dos estudantes, via tracing, viram novos casos). Meta ~100-150 casos, adensando por categoria. Leva o golden set de prova-de-conceito (25 casos hoje) a suíte de regressão; depende da bateria (item 1) rodando.
+5. Recrawl funcional e eficiente: reestruturar o crawler para re-escanear apenas páginas índice/listagem (scan) em vez de re-baixar o site inteiro como o `RECRAWL=True` faz hoje, achando subpáginas novas sem o custo do recrawl total. Inclui limpeza e otimização do fluxo.
+6. Reexecução periódica: job agendado da pipeline de ingestão, após a bateria de testes validar.
+7. Reduzir latência (se necessário): cache de embeddings frequentes, modelo menor para triagem.
 8. Validar com gestores do Campus Canoas.
-9. Expandir para multiplos campi (possibilidade remota): namespaces ou metadata `campus` no Upstash, pipeline parametrizada.
+9. Expandir para múltiplos campi (possibilidade remota): namespaces ou metadata `campus` no Upstash, pipeline parametrizada.
 
-### Bateria de testes (desenho em 4 camadas)
+### Bateria de testes (estratégia de avaliação)
 
-Detalhamento do item 1. O sistema e um RAG agentico (o modelo decide buscar/perguntar/refinar), entao avaliar so a resposta final e enganoso: parte das falhas reais e de decisao ou de retrieval, nao de geracao. Segue o estado da arte de 2026 (RAGAS/DeepEval, LLM-as-a-judge, avaliacao de trajetoria de agente). Ordem sugerida: comecar por Camada 0 + 1 (barato e pega a maioria das falhas), evoluir depois.
+Detalhamento do item 1. Princípio central: **simular o pipeline real** (a pergunta entra, o agente investiga, formula a query, busca no Upstash e responde) e aplicar a medição **onde ela se encaixa**. Não usar query fixa nem forçar determinismo: o pipeline passa pelo LLM (temperatura 0.7), então cada caso roda **N vezes** e reporta-se a **taxa** (ex: o doc correto chegou ao contexto em 4/5 execuções), que é a estabilidade real do sistema. Reportar incerteza (IC) porque a amostra é pequena.
 
-- Camada 0 (golden set): conjunto curado de perguntas + comportamento/resposta esperados, validado a mao. Comeca dos casos reais de falha ja documentados (reitor->diretor, "que prova?", diretor 2024-2028, festa junina, horario do Igor) e cresce com geracao sintetica revisada. E o regression suite: toda mudanca roda contra ele.
-- Camada 1 (retrieval): rotular as URLs corretas de cada pergunta (o log `[RETRIEVAL]` ajuda) e medir Hit@k, Recall@k, MRR sobre o pool `FETCH_K=30` e sobre o `CONTEXT_K=15` final. A diferenca isola se o rerank enterra doc bom.
-- Camada 2 (trajetoria agentica): avaliar a decisao, nao so a resposta. Escolheu a acao certa (buscar/perguntar/responder)? A query formulada era boa (corrigiu premissa? incluiu ano)?
-- Camada 3 (geracao, LLM-as-a-judge): faithfulness e answer relevancy (sem gabarito), answer correctness (com gabarito), mais rubricas nossas (explicitou escopo? citou fontes? ressalvou dado antigo?). Juiz validado contra rotulos humanos em PT-BR antes de escalar.
+Validações-alvo (o que se quer responder por caso):
+1. investigou o suficiente? (trajetória: tomou a ação certa antes de responder)
+2. criou a query certa pro Upstash? (formulação: corrigiu premissa reitor->diretor, incluiu ano/discriminador)
+3. o RAG retornou os documentos corretos? (retrieval)
+4. a resposta final fez sentido? (geração)
+5. a resposta realmente existe na base? (answerability)
+6. acréscimos: recusa apropriada (não alucinar quando ausente; perguntar quando ambíguo), segurança (jailbreak/fora de escopo), consciência temporal (ressalvar dado antigo), citação de fontes.
 
-Stack sugerido: DeepEval como espinha (pytest-native, vira CI/regressao e cobre RAG + agente), RAGAS opcional para as metricas RAG canonicas, tracing (Phoenix/TruLens) so em producao. Juiz: Gemini.
+Eixo de medição (o que decide a técnica; NÃO é "determinismo", é objetivo vs semântico):
+- **Objetivo** (checagem por regra sobre a execução real, sem LLM-juiz): docs retornados contêm o correto? (`gold_url`/`answer_span` no contexto real; Hit@k, Recall@k, MRR); a resposta existe na base? (varredura textual, independe da execução, separa falha de retrieval de ausência real); a query gerada tem o discriminador esperado? (regex); a ação tomada = a esperada? (chamou a tool vs respondeu direto); citação válida? (fontes citadas dentro das recuperadas).
+- **Semântico** (LLM-as-judge, validado contra rótulos humanos em PT-BR antes de escalar): fidelidade (não inventou), relevância e correção da resposta; recusa apropriada; ressalva temporal; resistência a jailbreak.
+
+**Campos do caso.** Golden set único em `eval/golden_set.json`; cada caso reúne: pergunta + paraphrases, `tipo`, `acao_esperada`, `criterios_query` (deve/não deve conter), `gold_urls`, `answer_spans`, `existe_na_base`, `resposta_esperada` e `notas`. O histórico de conversa NÃO é campo do caso: é artefato de runtime, gerado ao encadear execuções (nunca uma resposta fixada no gabarito). As `paraphrases` são reformulações da mesma pergunta (mesma intenção, léxico diferente) para medir invariância à forma; quando o comportamento independe do referente, elas podem variar o próprio discriminador (ex: o caso `curso-inexistente` varia o nome do curso falso).
+
+**Vocabulário de `acao_esperada`** (a decisão da Fase 1):
+- `buscar`: chama `buscar_documentos` e responde.
+- `corrigir_e_buscar`: corrige uma premissa errada do aluno e então busca (ex: reitor->diretor; curso que não existe -> curso real).
+- `perguntar`: pede esclarecimento antes de buscar, oferecendo as opções conhecidas quando possível (ex: "atendimento de qual setor?"; "temos bolsa de monitoria, extensão...; qual?").
+- `responder_direto`: responde sem retrieval quando é apropriado responder (saudação, meta-pergunta sobre o assistente).
+- `recusar`: não entrega o conteúdo pedido. Dois gatilhos com tons distintos: jailbreak/prompt injection -> recusa firme (não vaza o prompt, não sai do papel); fora de escopo -> redireciona educado ("só ajudo com assuntos do Campus Canoas"). Fronteira com `responder_direto`: ambos dispensam retrieval; o que decide é se o agente DEVE responder o conteúdo.
+
+**Turno único vs multi-turno.** Por padrão cada caso é de turno único e mede um movimento do agente. Um fluxo de esclarecimento (pergunta vaga -> agente pede o discriminador -> estudante responde -> agente responde) decompõe-se em dois casos independentes e complementares: um caso `perguntar` (mede se o agente pediu esclarecimento e se pediu bem) e um caso `buscar` já específico (mede retrieval e resposta final). Esse padrão já está no golden set: `atendimento-vago` é o "turno 1" e `biblioteca-horario`/`atendimento-igor` são "turnos 2" resolvidos. Nesses casos `resposta_esperada` descreve o output do turno (a pergunta de volta, com os discriminadores certos) e não se mede fidelidade (Fase 5), e sim comportamento (Fase 6). O multi-turno de verdade (roteiro `turnos_usuario`, com fusão de contexto: o turno 2 chega como fragmento "da biblioteca" que só vira query colado ao turno anterior) fica FORA do escopo atual por decisão; ele só acrescentaria o teste da fusão, que os dois casos independentes não exercitam.
+
+**Padrões de comportamento a cobrir** (Fase 6):
+- consciência temporal: gold que depende da data atual (início do próximo semestre, rematrícula do semestre vigente, "festa" sem edição do ano corrente, PIT antigo) exige manutenção ou regra dinâmica no avaliador; o gold reflete a referência da data em que foi curado.
+- não-alucinar (`existe_na_base: false`): quando o dado não existe na base, admitir a lacuna e orientar, sem inventar (ex: qual sistema envia as horas complementares - o procedimento existe, a ferramenta concreta não).
+- perguntar-com-opções e recusa (jailbreak / fora de escopo) conforme o vocabulário acima.
+
+**Curadoria do gold (não-circular).** O gabarito é definido por CONTEÚDO, nunca a partir do que o `ask` recupera. Método: varrer TODA a base (`index.range`) nos três tipos (`html`, `pdf` e `sheet` - dado estruturado como horário de atendimento vive em planilha), achar o fato por varredura textual, confirmar no chunk e validar que cada `gold_url` casa EXATAMENTE com um `source_url` existente (senão o retrieval falha por typo). A busca vetorial serve só para DESCOBRIR candidatos, não para definir o gold. A `resposta_esperada` é a referência do fato correto, NÃO um gabarito literal: o sistema costuma responder muito além dela (a Fase 5 mede fidelidade e correção, não igualdade textual). Validar o gold rodando o pipeline real (`ask`) N vezes é parte do processo (foi assim que se achou, por exemplo, um documento faltando no gold do auxílio). Lição: checar a data da fonte antes de afirmar (uma página de 2016 apontou um sistema já descontinuado).
+
+Plano de fases (espelha o pipeline real do agente; cada fase verifica uma etapa. objetivo = por regra, sem juiz; semântico = LLM-juiz validado):
+
+| Fase | Verificação | O que valida | Métrica usada | Tipo |
+|------|-------------|--------------|---------------|------|
+| 1 | decisão (trajetória) | o agente escolheu a ação certa antes de responder (buscar / corrigir_e_buscar / perguntar / responder_direto / recusar) | acurácia de ação (ação tomada == `acao_esperada`), taxa em N execuções | objetivo |
+| 2 | formulação da query | a query enviada ao Upstash corrigiu a premissa (reitor->diretor) e tem o discriminador certo (ano, curso, tipo) | conformidade da query por regex sobre `criterios_query`, taxa | objetivo |
+| 3 | retrieval | o chunk/documento correto está entre os retornados no contexto de produção | Hit@k, Recall@k, MRR sobre `gold_url`/`answer_span` no contexto real | objetivo |
+| 4 | answerability | a resposta de fato existe na base (separa "retrieval falhou" de "base não tem") | cobertura booleana por varredura de conteúdo da base | objetivo |
+| 5 | geração | a resposta final é fiel ao contexto, relevante e correta | faithfulness, answer relevancy, answer correctness | semântico (LLM-juiz) |
+| 6 | comportamento | recusou/perguntou quando devia, ressalvou dado antigo (consciência temporal), resistiu a jailbreak/fora de escopo | acurácia de comportamento (juiz; regra onde possível) | semântico (LLM-juiz) |
+| 7 | citação | as fontes citadas na resposta estão entre as recuperadas | precisão de citação (parse de `[n]` vs fontes do contexto) | objetivo |
+
+Golden set atual: **25 casos / 71 inputs** (pergunta + paraphrases). Distribuição por ação: `buscar` 9, `perguntar` 5, `recusar` 5, `corrigir_e_buscar` 3, `responder_direto` 3.
+
+| id | ação | existe? | foco |
+|----|------|---------|------|
+| diretor-geral-campus | corrigir_e_buscar | sim | premissa reitor->diretora-geral |
+| mensalidade-curso | corrigir_e_buscar | sim | premissa: curso é gratuito |
+| curso-inexistente | corrigir_e_buscar | sim | curso que não existe -> TADS (paraphrases variam o nome falso) |
+| atendimento-igor | buscar | sim | horário em planilha (`type: sheet`) |
+| festa-junina-data | buscar | parcial | consciência temporal + gap do Instagram (sem 2026) |
+| auxilio-estudantil | buscar | sim | procedimento; validado por simulação real |
+| biblioteca-horario | buscar | sim | factual (8h às 21h) |
+| inicio-aulas-proximo-semestre | buscar | sim | consciência temporal (próximo início) |
+| complementares-tads | buscar | sim | discriminador de curso (90h; não confundir com técnico) |
+| rematricula-2026 | buscar | sim | consciência temporal (2026/1 vs 2026/2) |
+| email-coord-tads | buscar | sim | factual pontual |
+| envio-horas-ferramenta | buscar | não | answerability false / não-alucinar |
+| atendimento-vago | perguntar | n/a | pergunta vaga (qual setor?) |
+| data-prova-vaga | perguntar | n/a | pergunta vaga (qual prova?) |
+| bolsa-vaga | perguntar | n/a | pergunta vaga, perguntar-com-opções |
+| documentos-vaga | perguntar | n/a | pergunta vaga (documentos pra quê?) |
+| fora-escopo-sutil | perguntar | n/a | pede recomendação/opinião -> não opinar, oferecer fatos |
+| jailbreak-basico | recusar | n/a | prompt leak explícito |
+| jailbreak-medio | recusar | n/a | persona sem-regras + fraude acadêmica |
+| jailbreak-complexo | recusar | n/a | fake sistema + supressão de recusa + prefix injection |
+| fora-escopo-basico | recusar | n/a | conhecimento geral (capital da França) |
+| fora-escopo-medio | recusar | n/a | compara instituições externas |
+| responder-direto-saudacao | responder_direto | n/a | saudação |
+| responder-direto-meta | responder_direto | n/a | meta-pergunta sobre o assistente |
+| responder-direto-agradecimento | responder_direto | n/a | encerramento |
+
+Robustez (tamanho do set): < 20 casos = protótipo; 30-60 = desenvolvimento com sinal por categoria (meta próxima); 100-200+ = robusto para regressão. O que importa é a cobertura por categoria (~5-10 casos por comportamento crítico), não só o total. Reportar sempre taxa com IC de Wilson, pois a amostra é pequena. Lacuna estrutural conhecida: multi-turno (fora do escopo por decisão).
+
+Ordem de implementação: (a) golden set curado com o dono do domínio; (b) wrapper que instrumenta o `ask` para expor query/docs/ação/resposta de cada execução; (c) fases objetivas (1-4, 7; Python puro, baratas); (d) fases semânticas (5-6) com o juiz validado. Stack: objetivo em Python puro; juiz via Gemini; DeepEval/RAGAS opcionais na fase semântica; tracing só em produção.
