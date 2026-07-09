@@ -131,14 +131,30 @@ def rerank_by_date(hits):
     )
 
 
-def _executar_busca(search_query):
+def _executar_busca(search_query, trace=None):
     # coleta um pool grande por similaridade, reordena por data e corta para o contexto
     hits = search(search_query, top_k=FETCH_K)
+    rank_sim = {h.id: i for i, h in enumerate(hits)}  # posicao por similaridade, antes do rerank
     hits = rerank_by_date(hits)
     context, filtered, sources = build_context(hits)
 
     # log de depuracao: pool coletado, reordenado, e quais chunks entraram no contexto final
     filtered_ids = {h.id for h in filtered}
+
+    # captura estruturada da busca para o trace (eval/telemetria), quando solicitado
+    if trace is not None:
+        trace.setdefault("buscas", []).append({
+            "query": search_query,
+            "hits": [
+                {"url": h.metadata.get("source_url"), "score": h.score,
+                 "rank_sim": rank_sim.get(h.id), "rank_rerank": i,
+                 "tipo": h.metadata.get("type"), "no_contexto": h.id in filtered_ids}
+                for i, h in enumerate(hits)
+            ],
+            "contexto_urls": [h.metadata.get("source_url") for h in filtered],
+            "chunks_textos": [h.metadata.get("text", "") for h in filtered],
+            "sources": dict(sources),
+        })
     print("\n" + "="*80)
     print(_safe(f"[RETRIEVAL] query formulada para o Upstash: {search_query}"))
     print(f"[RETRIEVAL] coletados={len(hits)} | no contexto={len(filtered)} (min_score={MIN_SCORE}, teto={CONTEXT_K})")
@@ -193,8 +209,12 @@ def _fallback_internet(query, history_text):
     return result
 
 
-def ask(query, history=None, max_steps=3):
+def ask(query, history=None, max_steps=3, trace=None):
     history = history or []
+
+    # inicializa o trace opcional (eval/telemetria); em producao trace=None e nada muda
+    if trace is not None:
+        trace.update({"input": query, "acao": "nao_buscar", "buscas": [], "resposta": None})
 
     # monta a conversa como turnos (historico + pergunta atual) para o tool calling
     contents = []
@@ -224,13 +244,22 @@ def ask(query, history=None, max_steps=3):
 
         # sem chamada de ferramenta: e uma pergunta de clarificacao ou resposta final
         if not fc:
-            return (response.text or "").strip()
+            resposta = (response.text or "").strip()
+            if trace is not None:
+                trace["resposta"] = resposta
+            return resposta
 
         # o modelo pediu busca: executa e devolve o contexto, ou cai no fallback se vazio
+        if trace is not None:
+            trace["acao"] = "buscar"
         search_query = (fc.args or {}).get("query", query)
-        context = _executar_busca(search_query)
+        context = _executar_busca(search_query, trace=trace)
         if context is None:
-            return _fallback_internet(query, _history_text(history))
+            resposta = _fallback_internet(query, _history_text(history))
+            if trace is not None:
+                trace["resposta"] = resposta
+                trace["fallback_internet"] = True
+            return resposta
 
         contents.append(cand)
         contents.append(types.Content(role="user", parts=[
@@ -239,4 +268,7 @@ def ask(query, history=None, max_steps=3):
 
     # esgotou os passos: forca uma resposta final em texto
     response = google_client.models.generate_content(model=MODEL, contents=contents, config=config)
-    return (response.text or "").strip()
+    resposta = (response.text or "").strip()
+    if trace is not None:
+        trace["resposta"] = resposta
+    return resposta

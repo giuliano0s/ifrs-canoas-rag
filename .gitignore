@@ -20,3 +20,9 @@ __pycache__/
 .DS_Store
 Thumbs.db
 .vercel
+
+# avaliacao (eval): config/cache do deepeval e traces brutos
+.deepeval/
+.deepeval-cache.json
+.deepeval_telemetry.txt
+eval/runs/

@@ -442,7 +442,7 @@
         "qual o valor das parcelas do curso?"
       ],
       "tipo": "premissa_errada: o aluno assume que há mensalidade; o ensino no IFRS é público e gratuito",
-      "acao_esperada": "corrigir_e_buscar",
+      "acao_esperada": ["corrigir_e_buscar", "responder_direto"],
       "criterios_query": {
         "deve_conter": [],
         "nao_deve_conter": []
@@ -455,7 +455,7 @@
       "answer_spans": [
         "ofertar gratuitamente cursos de nível superior"
       ],
-      "notas": "Premissa errada segura (fato institucional: IFRS federal e gratuito). Confirmado por conteúdo: a página 'O Campus' afirma que o IFRS oferta gratuitamente cursos de nível superior, especializações e mestrado, além dos técnicos."
+      "notas": "Premissa errada segura (fato institucional: IFRS federal e gratuito). Confirmado por conteúdo: a página 'O Campus' afirma que o IFRS oferta gratuitamente cursos de nível superior, especializações e mestrado, além dos técnicos. Aceita corrigir_e_buscar OU responder_direto: responder direto que é gratuito (fato notório) também está certo; o acerto do fato é medido na Fase 5, não na decisão de ação."
     },
     {
       "id": "curso-inexistente",
@@ -505,7 +505,7 @@
         "tem bolsa disponível pra estudante?"
       ],
       "tipo": "pergunta_vaga_com_opcoes: falta o tipo de bolsa; o agente deve listar os tipos e perguntar qual aprofundar",
-      "acao_esperada": "perguntar",
+      "acao_esperada": ["perguntar", "buscar"],
       "criterios_query": {
         "deve_conter": [],
         "nao_deve_conter": []
@@ -514,7 +514,7 @@
       "resposta_esperada": "Não perguntar no vazio: listar os tipos que o campus oferece (monitoria, extensão, ensino, iniciação científica/pesquisa, além do auxílio estudantil) e perguntar sobre qual o estudante quer se aprofundar.",
       "gold_urls": [],
       "answer_spans": [],
-      "notas": "Perguntar com opções (mesmo padrão do atendimento-vago). Tipos confirmados na base: monitoria, extensão, ensino, iniciação científica, auxílio estudantil. O agente pode buscar antes para embasar as opções; avaliar a Fase 1 como o comportamento de esclarecer-com-opções (buscar-para-listar-e-perguntar conta como correto)."
+      "notas": "Aceita perguntar OU buscar: se o agente listar todas as bolsas (buscar) também serve; o que importa é levar a informação correta (medido na Fase 5). Tipos confirmados na base: monitoria, extensão, ensino, iniciação científica, auxílio estudantil."
     },
     {
       "id": "documentos-vaga",
