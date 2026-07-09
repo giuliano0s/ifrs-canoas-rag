@@ -1,0 +1,22 @@
+# Dev (maquina local): ingestao, avaliacao e notebooks; inclui a producao
+-r requirements.txt
+
+# Crawler
+requests==2.32.3
+beautifulsoup4==4.12.3
+gdown==6.0.0
+
+# PDF parsing
+pymupdf==1.24.9
+
+# LangChain (chunker)
+langchain==0.3.7
+langchain-community==0.3.7
+langchain-google-genai==2.0.4
+
+# Utilitários
+tiktoken==0.8.0
+notebook==7.2.2
+
+# Avaliação
+deepeval==4.0.7

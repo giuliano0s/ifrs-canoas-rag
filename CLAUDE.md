@@ -11,8 +11,9 @@ Assistente de IA (RAG) para o IFRS Campus Canoas. Um widget de chat injetado sob
 Ambiente (Windows, PowerShell):
 ```powershell
 .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
+`requirements.txt` é SÓ a produção (o que a função serverless no Vercel instala; o Vercel resolve com `uv lock`, então dependência de dev ali quebra o deploy). `requirements-dev.txt` inclui a produção e soma ingestão, avaliação e notebooks.
 
 Rodar o app local (Flask). A porta 5000 costuma estar ocupada por um túnel SSH na máquina de dev, use outra via `PORT`:
 ```powershell
