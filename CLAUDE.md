@@ -20,11 +20,11 @@ $env:PORT=5050; .venv\Scripts\python.exe -m ui.app
 ```
 Acesse `http://127.0.0.1:5050`. Rode sempre como módulo (`-m ui.app`) a partir da raiz, nunca `python ui/app.py`, por causa dos imports de pacote (`rag.`, `ui.`).
 
-Popular / atualizar a base vetorial (pipeline completa: crawler, parser HTML, parser PDF, chunker, ingest, snapshot):
+Popular / atualizar a base vetorial (pipeline completa: crawler com detecção de mudança, parsers, chunker, ingest, snapshot):
 ```powershell
-$env:RECRAWL="False"; $env:REPARSE="False"; $env:REINGEST="False"; $env:ANOS_VALIDOS="2023,2024,2025,2026"; .venv\Scripts\python.exe pipelines\ingest_pipeline.py
+$env:ANOS_VALIDOS="2023,2024,2025,2026"; .venv\Scripts\python.exe pipelines\ingest_pipeline.py
 ```
-Flags de controle no topo do arquivo: `RECRAWL`, `REPARSE`, `REINGEST` (cada `False` = incremental na sua fase; default no código hoje é `RECRAWL=True`, os demais `False`). Todas aceitam override via env (string `"True"`/`"False"`). Hoje `RECRAWL` fica `True` de propósito: no incremental o crawler pula páginas pai já indexadas e não acha subpáginas novas. `ANOS_VALIDOS` também aceita override via env (CSV, ex: `ANOS_VALIDOS=2026`; default 2025-2026).
+O modo default é incremental por `source_hash` (ver Arquitetura): o crawler varre o site inteiro, mas só o que é novo ou mudou segue para parse (LLM) e embed. Flags de exceção, com override via env (string `"True"`/`"False"`): `REPARSE=True` ignora os hashes e reprocessa tudo que já existe (replace geral, sem zerar o index); `REINGEST=True` zera o index e reingere do zero. `ANOS_VALIDOS` também aceita override via env (CSV, ex: `ANOS_VALIDOS=2026`; default 2025-2026).
 
 Gerar o `index.html` que o app serve (snapshot com a faixa de aviso e o widget já injetados); também roda no fim da pipeline de ingestão:
 ```powershell
@@ -39,6 +39,8 @@ Duas metades independentes que só se encontram na base vetorial Upstash:
 
 **1. Ingestão (offline, roda na máquina do dev)** — `pipelines/ingest_pipeline.py`
 Pipeline sequencial: crawler varre `ifrs.edu.br/canoas`, parser HTML e parser PDF extraem texto (PDFs de horário passam por gemini-2.5-flash-lite para estruturar; datas de publicação inferidas pelo mesmo modelo), parser de planilhas baixa Google Sheets publicados (links `docs.google.com/spreadsheets` achados no site) como CSV e estrutura em frases via LLM (`type: "sheet"` no metadata), chunker fatia em pedaços, ingest embeda com Gemini e faz upsert no Upstash, e o snapshot regenera o `ui/index.html` (via `clone_page`) que o app serve estático. Os notebooks `01_crawler` a `05_rag` são a versão exploratória das mesmas fases; o `.py` é a versão de produção consolidada. Os dados intermediários (`data/raw/`, `data/parsed/`, `data/chunks/`) estão no `.gitignore` e não trafegam pelo Git — só o Upstash (nuvem) é compartilhado entre máquinas.
+
+Detecção de mudança (`source_hash`, `pipelines/hashing.py`): o crawler carrega do Upstash o estado por URL (`source_hash` + ids dos chunks), baixa cada recurso e hasheia o conteúdo bruto ANTES de qualquer parse (HTML: texto extraído do `main`, estável entre fetches; PDF: bytes; planilha: CSV). Hash igual = inalterada, nem chega ao parser (zero LLM, zero embed); hash diferente ou URL nova = segue no fluxo, e a mudada tem os chunks antigos deletados no ingest (replace). Cada chunk tem id determinístico `url#i` e grava o `source_hash` no metadata, fechando o ciclo para o run seguinte. Hashear o HTML cru não funciona: toda página carrega um nonce anti-bot (`__uzdbm_1`, Radware) que muda a cada request; por isso o hash do HTML é do texto extraído, com a extração fatorada em `extract_page_content` e compartilhada entre crawler e parser. O parser usa `raise_for_status()`, então página com erro HTTP (ex: 451) é pulada sem sobrescrever o conteúdo bom que já está na base.
 
 **2. Serviço de chat (online, Vercel)** — `ui/app.py` + `rag/chain.py` + `rag/gatekeeper.py`
 Flask stateless. O fluxo de uma pergunta: `gatekeeper` checa rate limit por IP no Redis e `chain.ask()` roda um agente com tool calling (Gemini `gemini-2.5-flash`). O modelo investiga a pergunta e decide entre chamar a ferramenta `buscar_documentos` (formulando uma query refinada, já corrigindo premissas como reitor->diretor) ou pedir esclarecimento ao estudante quando falta um discriminador (curso, tipo de prova). A ferramenta embeda a query e coleta um pool amplo do Upstash (`FETCH_K=30`) por similaridade, reordena por data (`rerank_by_date`) e corta os `CONTEXT_K=15` melhores para o contexto (over-fetch: o rerank escolhe de um pool maior sem inflar os tokens do LLM). O modelo então responde citando as fontes e explicitando o escopo (ex: "a prova de RECUPERAÇÃO do curso X"). Se a busca não retorna nada, cai no fallback de internet via `google_search`. O prompt do agente (`data/info/agente-ifrs.txt`) instrui dois comportamentos contra respostas cruas em perguntas vagas: quando o referente tem outra leitura plausível na base, responde a mais provável e menciona a alternativa (sem travar); e consciência temporal, ressalvando dados de anos anteriores à data atual em vez de apresentá-los como vigentes.
@@ -74,11 +76,12 @@ Em aberto, nesta ordem de prioridade:
 2. Crawler no domínio de ingresso: cobrir `ingresso.ifrs.edu.br` (processo seletivo) liberando o domínio no `is_valid_page`; se for filtrar por ano lá, ensinar o regex a ler o formato `/AAAA-S/` (ano-semestre, ex: `/2026-2/`).
 3. Ingerir o Instagram do Grêmio/campus: fonte de informação atual que hoje escapa ao pipeline (ex: data real da festa julina, só anunciada lá, diverge do calendário). Fonte hostil: exige login, tem anti-scraping, e muitos anúncios são cards de imagem (precisariam de OCR/LLM multimodal). Opções a decidir: API oficial (Graph API, exige conta Business + app Meta + token, estável e legítima, pega legendas) vs scraping + multimodal (mais poderoso para imagens, mas frágil e na zona cinzenta dos termos).
 4. Escalar o golden set para robustez de produção: **geração sintética validada** (um LLM gera perguntas candidatas a partir dos próprios documentos da base e um juiz/humano valida o gabarito, mantendo a regra de não-circularidade) + **telemetria de produção** (perguntas reais dos estudantes, via tracing, viram novos casos). Meta ~100-150 casos, adensando por categoria. Leva o golden set de prova-de-conceito (25 casos hoje) a suíte de regressão; depende da bateria (item 1) rodando.
-5. Recrawl funcional e eficiente: reestruturar o crawler para re-escanear apenas páginas índice/listagem (scan) em vez de re-baixar o site inteiro como o `RECRAWL=True` faz hoje, achando subpáginas novas sem o custo do recrawl total. Inclui limpeza e otimização do fluxo.
-6. Reexecução periódica: job agendado da pipeline de ingestão, após a bateria de testes validar.
-7. Reduzir latência (se necessário): cache de embeddings frequentes, modelo menor para triagem.
-8. Validar com gestores do Campus Canoas.
-9. Expandir para múltiplos campi (possibilidade remota): namespaces ou metadata `campus` no Upstash, pipeline parametrizada.
+5. Reexecução periódica: job agendado da pipeline de ingestão, após a bateria de testes validar. A base disso (detecção de mudança por `source_hash`, replace incremental) já está pronta; o run periódico só paga download do site + parse/embed do que mudou.
+6. Reduzir latência (se necessário): cache de embeddings frequentes, modelo menor para triagem.
+7. Validar com gestores do Campus Canoas.
+8. Expandir para múltiplos campi (possibilidade remota): namespaces ou metadata `campus` no Upstash, pipeline parametrizada.
+
+Nota de contexto (jul/2026): as notícias institucionais do site respondem HTTP 451 (restrição de divulgação no período eleitoral). O conteúdo antigo delas segue na base e respondível; ficaram sem `source_hash` (impossível conferir) e serão reprocessadas automaticamente num run quando o bloqueio cair.
 
 ### Bateria de testes (estratégia de avaliação)
 
@@ -104,6 +107,8 @@ Eixo de medição (o que decide a técnica; NÃO é "determinismo", é objetivo 
 - `perguntar`: pede esclarecimento antes de buscar, oferecendo as opções conhecidas quando possível (ex: "atendimento de qual setor?"; "temos bolsa de monitoria, extensão...; qual?").
 - `responder_direto`: responde sem retrieval quando é apropriado responder (saudação, meta-pergunta sobre o assistente).
 - `recusar`: não entrega o conteúdo pedido. Dois gatilhos com tons distintos: jailbreak/prompt injection -> recusa firme (não vaza o prompt, não sai do papel); fora de escopo -> redireciona educado ("só ajudo com assuntos do Campus Canoas"). Fronteira com `responder_direto`: ambos dispensam retrieval; o que decide é se o agente DEVE responder o conteúdo.
+
+`acao_esperada` pode ser uma **lista** quando mais de uma ação é aceitável (ex: `mensalidade-curso` aceita corrigir_e_buscar OU responder_direto - responder direto que é gratuito também serve; `bolsa-vaga` aceita perguntar OU buscar - listar todas as bolsas também serve). A Fase 1 passa se a decisão real (buscar/não-buscar) casar com qualquer uma das aceitas; o acerto do conteúdo em si cabe às fases 5/6.
 
 **Turno único vs multi-turno.** Por padrão cada caso é de turno único e mede um movimento do agente. Um fluxo de esclarecimento (pergunta vaga -> agente pede o discriminador -> estudante responde -> agente responde) decompõe-se em dois casos independentes e complementares: um caso `perguntar` (mede se o agente pediu esclarecimento e se pediu bem) e um caso `buscar` já específico (mede retrieval e resposta final). Esse padrão já está no golden set: `atendimento-vago` é o "turno 1" e `biblioteca-horario`/`atendimento-igor` são "turnos 2" resolvidos. Nesses casos `resposta_esperada` descreve o output do turno (a pergunta de volta, com os discriminadores certos) e não se mede fidelidade (Fase 5), e sim comportamento (Fase 6). O multi-turno de verdade (roteiro `turnos_usuario`, com fusão de contexto: o turno 2 chega como fragmento "da biblioteca" que só vira query colado ao turno anterior) fica FORA do escopo atual por decisão; ele só acrescentaria o teste da fusão, que os dois casos independentes não exercitam.
 

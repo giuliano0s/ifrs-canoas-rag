@@ -2,12 +2,16 @@
 Pipeline de ingestão do IFRS RAG.
 Executa sequencialmente: crawler > parser HTML > parser PDF > chunker > ingest > snapshot.
 
-Flags de controle:
-  RECRAWL   = True > recomeça o crawler do zero
-  REPARSE   = True > reparseia todos os HTMLs e PDFs
-  REINGEST  = True > recria a collection e reingeere tudo
+O crawler sempre varre o site inteiro e detecta mudança pelo source_hash do conteúdo
+bruto baixado (HTML: texto do main; PDF: bytes; planilha: CSV), comparado ao gravado no
+metadata do Upstash. Só o que é novo ou mudou segue para parse (LLM) e ingest (embed);
+página mudada tem os chunks antigos substituídos (replace por id determinístico url#i).
 
-  False em qualquer flag = modo incremental (pula o que já foi feito)
+Flags de controle:
+  REPARSE   = True > ignora os hashes e reprocessa tudo (replace geral, sem zerar o index)
+  REINGEST  = True > zera o index e reingere tudo do zero
+
+  Default (ambas False) = incremental por source_hash.
 
 Pipeline desenvolvida originalmente em ../notebooks
 """
@@ -35,6 +39,8 @@ from urllib.parse import urljoin
 # permite importar pacotes do projeto ao rodar como script
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from ui.clone_page import clone_page
+from pipelines.gerar_cursos_atuais import gerar as gerar_cursos_atuais
+from pipelines.hashing import source_hash
 
 load_dotenv()
 
@@ -49,8 +55,7 @@ def _flag_env(nome, default):
     valor = os.getenv(nome)
     return valor.strip().lower() == "true" if valor else default
 
-# flags de controle de execução; override opcional via env (ex: $env:RECRAWL="False")
-RECRAWL  = _flag_env("RECRAWL", True)
+# flags de controle de execução; override opcional via env (ex: $env:REPARSE="True")
 REPARSE  = _flag_env("REPARSE", False)
 REINGEST = _flag_env("REINGEST", False)
 
@@ -161,51 +166,43 @@ def should_ignore(url):
         return True
     return False
 
-def run_crawler():
+def run_crawler(estado):
     print("\n" + "="*60)
-    print("FASE 1 — CRAWLER")
+    print("FASE 1 — CRAWLER (descobre + detecta mudanca por source_hash)")
     print("="*60)
 
     RAW_DIR.mkdir(parents=True, exist_ok=True)
 
-    if RECRAWL:
-        pages_found  = []
-        pdfs_found   = []
-        sheets_found = []
-        visited      = set()
-        queue        = deque([BASE_URL])
-        queued       = set([BASE_URL])
-    else:
-        pages_found  = json.loads(PAGES_PATH.read_text(encoding="utf-8"))  if PAGES_PATH.exists()  else []
-        pdfs_found   = json.loads(PDFS_PATH.read_text(encoding="utf-8"))   if PDFS_PATH.exists()   else []
-        sheets_found = json.loads(SHEETS_PATH.read_text(encoding="utf-8")) if SHEETS_PATH.exists() else []
-        already_known = set(pages_found) | {p["url"] for p in pdfs_found} | {s["url"] for s in sheets_found}
-        visited = already_known.copy()
-        queued  = already_known.copy()
-        queue   = deque([BASE_URL])
-        print(f"Dados existentes: {len(pages_found)} páginas, {len(pdfs_found)} PDFs, {len(sheets_found)} planilhas")
-        print(f"URLs já conhecidas ignoradas: {len(already_known)}")
+    visited = set()
+    queue   = deque([BASE_URL])
+    queued  = set([BASE_URL])
 
-    # carrega whitelist
+    # whitelist de URLs forcadas
     whitelist = set()
     if WHITELIST_PATH.exists():
         for line in WHITELIST_PATH.read_text(encoding="utf-8").splitlines():
-            url = line.strip()
-            if url and not url.startswith("#"):
-                whitelist.add(url)
-                if url not in queued:
-                    queue.append(url)
-                    queued.add(url)
+            u = line.strip()
+            if u and not u.startswith("#"):
+                whitelist.add(u)
+                if u not in queued:
+                    queue.append(u); queued.add(u)
         print(f"Whitelist: {len(whitelist)} URLs forçadas")
 
-    # loop principal
+    # listas de descoberta (referencia) e conjunto dirty (novo+mudado, ja com o conteudo baixado)
+    pages_all, pdfs_all, sheets_all       = [], [], []
+    pages_dirty, pdfs_dirty, sheets_dirty = [], [], []
+    sheet_cands, drive_cands              = [], []
+    urls_mudadas = set()
+    st_html = {"nova": 0, "mudada": 0, "inalterada": 0}
+    st_pdfd = {"nova": 0, "mudada": 0, "inalterada": 0}
+
+    # BFS: baixa cada URL, segue os links (acha filhos novos) e classifica HTML e PDF direto ali mesmo
     while queue:
         url = queue.popleft()
         if url in visited:
             continue
         visited.add(url)
-        total = len(visited) + len(queue)
-        print(f"[{len(visited)}/{total}] Visitando: {url}")
+        print(f"[{len(visited)}/{len(visited)+len(queue)}] {url}")
 
         try:
             response = requests.get(url, timeout=10, headers=HEADERS)
@@ -217,62 +214,109 @@ def run_crawler():
             print(f"  ERRO: {e}")
             continue
 
-        # registra PDF
+        # PDF direto: o crawler ja tem os bytes -> hasheia e classifica sem baixar de novo
         if is_pdf_by_extension(url) or "application/pdf" in response.headers.get("Content-Type", ""):
-            size_kb = len(response.content) / 1024
-            pdfs_found.append({"url": url, "size_kb": round(size_kb, 2)})
-            print(f"  PDF encontrado: {round(size_kb, 2)} KB")
+            content = response.content
+            pdfs_all.append({"url": url, "parent": ""})
+            sh     = source_hash(content)
+            chave  = to_drive_view_url(url)
+            status = _classificar(chave, sh, estado)
+            st_pdfd[status] += 1
+            if status != "inalterada":
+                pdfs_dirty.append({"url": url, "size_kb": round(len(content)/1024, 2),
+                                   "parent": "", "content": content, "source_hash": sh})
+                if status == "mudada":
+                    urls_mudadas.add(chave)
             continue
 
         if not is_valid_page(url):
             continue
 
-        # registra página HTML (ignora páginas de listagem)
-        is_listing = "/page/" in url or "/category/" in url
-        if not is_listing:
-            pages_found.append(url)
-
         soup = BeautifulSoup(response.text, "html.parser")
+
+        # classifica a pagina HTML pelo texto extraido (ignora listagens, que sao so navegacao)
+        if not ("/page/" in url or "/category/" in url):
+            pages_all.append(url)
+            title, text = extract_page_content(soup)
+            if text is not None:
+                sh     = source_hash(text)
+                status = _classificar(url, sh, estado)
+                st_html[status] += 1
+                if status != "inalterada":
+                    pages_dirty.append({"source_url": url, "title": title, "text": text, "source_hash": sh})
+                    if status == "mudada":
+                        urls_mudadas.add(url)
+
+        # segue os links (sempre, para descobrir filhos novos); coleta planilhas e PDFs do Drive
         novos = 0
         for tag in soup.find_all("a", href=True):
-            href     = tag["href"]
-            full_url = urljoin(url, href).split("#")[0]
-
+            full_url = urljoin(url, tag["href"]).split("#")[0]
             if full_url not in whitelist and should_ignore(full_url):
                 continue
             if full_url in visited or full_url in queued:
                 continue
-
             if is_valid_page(full_url):
-                queue.append(full_url)
-                queued.add(full_url)
-                novos += 1
+                queue.append(full_url); queued.add(full_url); novos += 1
             elif is_gsheet_link(full_url):
-                if full_url not in queued:
-                    sheets_found.append({"url": full_url, "parent": url})
-                    queued.add(full_url)
-                    novos += 1
+                sheet_cands.append({"url": full_url, "parent": url}); queued.add(full_url); novos += 1
             elif is_drive_link(full_url):
                 download_url = build_download_url(full_url)
                 if download_url not in queued:
-                    pdfs_found.append({"url": download_url, "size_kb": 0, "parent": url})
-                    queued.add(download_url)
-                    novos += 1
+                    drive_cands.append({"url": download_url, "parent": url}); queued.add(download_url); novos += 1
             elif is_pdf_by_extension(full_url):
-                queue.append(full_url)
-                queued.add(full_url)
-                novos += 1
-
-        print(f"  {novos} novos links adicionados à fila")
+                queue.append(full_url); queued.add(full_url); novos += 1
+        print(f"  {novos} novos links")
         time.sleep(0.3)
 
-    # salva
-    PAGES_PATH.write_text(json.dumps(pages_found,   ensure_ascii=False, indent=2), encoding="utf-8")
-    PDFS_PATH.write_text(json.dumps(pdfs_found,     ensure_ascii=False, indent=2), encoding="utf-8")
-    SHEETS_PATH.write_text(json.dumps(sheets_found, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"\nSalvo: {len(pages_found)} páginas, {len(pdfs_found)} PDFs e {len(sheets_found)} planilhas")
+    print(f"\nHTML: {st_html['nova']} novas, {st_html['mudada']} mudadas, {st_html['inalterada']} inalteradas")
+    print(f"PDF direto: {st_pdfd['nova']} novas, {st_pdfd['mudada']} mudadas, {st_pdfd['inalterada']} inalteradas")
 
-    return pages_found, pdfs_found, sheets_found
+    # pos-passo: baixa, hasheia e classifica os PDFs do Drive e as planilhas (nao baixados no BFS)
+    print(f"\nClassificando {len(drive_cands)} PDFs do Drive e {len(sheet_cands)} planilhas...")
+    st_pdf = {"nova": 0, "mudada": 0, "inalterada": 0}
+    for cand in drive_cands:
+        url, parent = cand["url"], cand["parent"]
+        pdfs_all.append({"url": url, "parent": parent})
+        content = download_pdf_bytes(url, HEADERS)
+        if content is None:
+            continue
+        sh     = source_hash(content)
+        chave  = to_drive_view_url(url)
+        status = _classificar(chave, sh, estado)
+        st_pdf[status] += 1
+        if status != "inalterada":
+            pdfs_dirty.append({"url": url, "size_kb": round(len(content)/1024, 2),
+                               "parent": parent, "content": content, "source_hash": sh})
+            if status == "mudada":
+                urls_mudadas.add(chave)
+
+    st_sheet = {"nova": 0, "mudada": 0, "inalterada": 0}
+    for cand in sheet_cands:
+        url, parent = cand["url"], cand["parent"]
+        sheets_all.append({"url": url, "parent": parent})
+        csv_text = download_sheet_csv(url)
+        if not csv_text:
+            SHEETS_FALHAS.append((url, "download")); continue
+        sh     = source_hash(csv_text)
+        status = _classificar(url, sh, estado)
+        st_sheet[status] += 1
+        if status != "inalterada":
+            sheets_dirty.append({"url": url, "parent": parent, "csv_text": csv_text, "source_hash": sh})
+            if status == "mudada":
+                urls_mudadas.add(url)
+
+    print(f"PDF Drive: {st_pdf['nova']} novas, {st_pdf['mudada']} mudadas, {st_pdf['inalterada']} inalteradas")
+    print(f"Planilhas: {st_sheet['nova']} novas, {st_sheet['mudada']} mudadas, {st_sheet['inalterada']} inalteradas")
+
+    # referencia/debug: URLs descobertas (sem conteudo, os bytes nao vao pro json)
+    PAGES_PATH.write_text(json.dumps(pages_all,   ensure_ascii=False, indent=2), encoding="utf-8")
+    PDFS_PATH.write_text(json.dumps(pdfs_all,     ensure_ascii=False, indent=2), encoding="utf-8")
+    SHEETS_PATH.write_text(json.dumps(sheets_all, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"\nDescobertas: {len(pages_all)} paginas, {len(pdfs_all)} PDFs, {len(sheets_all)} planilhas")
+    print(f"Dirty (novo+mudado): {len(pages_dirty)} paginas, {len(pdfs_dirty)} PDFs, {len(sheets_dirty)} planilhas")
+    print(f"A substituir (mudadas): {len(urls_mudadas)}")
+
+    return pages_dirty, pdfs_dirty, sheets_dirty, urls_mudadas
 
 # ── funções de extração de data ────────────────────────────────────────────────
 
@@ -332,69 +376,56 @@ def get_published_at(doc, max_retries=10, parent_dates=None):
 
 # ── funções do parser HTML ─────────────────────────────────────────────────────
 
-def parse_html_page(url, headers):
-    try:
-        response = requests.get(url, timeout=10, headers=headers)
-        response.raise_for_status()
-    except Exception as e:
-        print(f"  ERRO: {e}")
-        return None
-
-    soup = BeautifulSoup(response.text, "html.parser")
+def extract_page_content(soup):
+    # titulo + texto principal (main[role=main] sem ruidos). Retorna (title, text|None).
+    # usado pelo crawler (para o source_hash) e pelo parse_html_page, com a MESMA logica.
     title_tag = soup.find("title")
     title     = title_tag.get_text(strip=True) if title_tag else ""
-
     main = soup.find("main", role="main")
     if not main:
-        return None
-
-    # remove ruídos
+        return title, None
     for tag in main.find_all("div", class_="ultimos-posts"):
         tag.decompose()
     for tag in main.find_all("ul", class_="crunchify-social"):
         tag.decompose()
     for tag in main.find_all("a", class_="sr-only"):
         tag.decompose()
+    return title, main.get_text(separator="\n", strip=True)
 
-    text = main.get_text(separator="\n", strip=True)
+def parse_html_page(url, headers):
+    # baixa e extrai UMA pagina (usado pelo resolve_sheet_date para inferir a data do pai)
+    try:
+        response = requests.get(url, timeout=10, headers=headers)
+        response.raise_for_status()
+    except Exception as e:
+        print(f"  ERRO: {e}")
+        return None
+    title, text = extract_page_content(BeautifulSoup(response.text, "html.parser"))
+    if text is None:
+        return None
     return {"source_url": url, "title": title, "text": text}
 
-def run_html_parser(pages_found):
+def _classificar(url, sh, estado):
+    # NOVA (nao existe na base) / MUDADA (source_hash diferente) / INALTERADA (igual).
+    # REPARSE ou REINGEST forcam reparse: tratam o que ja existe como MUDADA (replace).
+    prev = estado.get(url)
+    if prev is None:
+        return "nova"
+    if REPARSE or REINGEST:
+        return "mudada"
+    return "inalterada" if prev.get("source_hash") == sh else "mudada"
+
+def run_html_parser(pages_dirty):
     print("\n" + "="*60)
-    print("FASE 2 — PARSER HTML")
+    print("FASE 2 — PARSER HTML (enriquecimento de data; o texto ja veio do crawler)")
     print("="*60)
 
     PARSED_DIR.mkdir(parents=True, exist_ok=True)
+    print(f"HTMLs a processar (novo+mudado): {len(pages_dirty)}")
 
-    if not REPARSE and PAGES_PARSED_PATH.exists():
-        results       = json.loads(PAGES_PARSED_PATH.read_text(encoding="utf-8"))
-        already_parsed = {r["source_url"] for r in results}
-        print(f"Já parseadas: {len(results)} páginas")
-    else:
-        results        = []
-        already_parsed = set()
-
-    errors = []
-    for i, url in enumerate(pages_found):
-        if url in already_parsed:
-            continue
-        print(f"[{i+1}/{len(pages_found)}] {url}")
-        result = parse_html_page(url, HEADERS)
-        if result:
-            results.append(result)
-        else:
-            errors.append(url)
-        time.sleep(0.3)
-
-    PAGES_PARSED_PATH.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"\nParsed: {len(results)} páginas | Erros: {len(errors)}")
-
-    # enriquecimento de datas
-    print("\nEnriquecendo datas dos HTMLs...")
-    pages_parsed = json.loads(PAGES_PARSED_PATH.read_text(encoding="utf-8"))
-    sem_data     = [p for p in pages_parsed if "published_at" not in p]
-    print(f"HTMLs sem data: {len(sem_data)} de {len(pages_parsed)}")
-
+    # enriquecimento de datas (o crawler ja entregou o texto extraido de cada pagina dirty)
+    sem_data = [p for p in pages_dirty if "published_at" not in p]
+    print(f"HTMLs sem data: {len(sem_data)} de {len(pages_dirty)}")
     for i, doc in enumerate(sem_data):
         try:
             date, source = get_published_at(doc)
@@ -404,15 +435,14 @@ def run_html_parser(pages_found):
             print(f"[{i+1}/{len(sem_data)}] {source or 'sem data'} — {date or 'N/A'}")
         except Exception as e:
             print(f"  PAROU: {e}")
-            PAGES_PARSED_PATH.write_text(json.dumps(pages_parsed, ensure_ascii=False, indent=2), encoding="utf-8")
             break
         if (i + 1) % SAVE_INTERVAL == 0:
-            PAGES_PARSED_PATH.write_text(json.dumps(pages_parsed, ensure_ascii=False, indent=2), encoding="utf-8")
+            PAGES_PARSED_PATH.write_text(json.dumps(pages_dirty, ensure_ascii=False, indent=2), encoding="utf-8")
             print(f"  Checkpoint salvo: {i+1} processados")
 
-    PAGES_PARSED_PATH.write_text(json.dumps(pages_parsed, ensure_ascii=False, indent=2), encoding="utf-8")
+    PAGES_PARSED_PATH.write_text(json.dumps(pages_dirty, ensure_ascii=False, indent=2), encoding="utf-8")
     print("Enriquecimento de HTMLs concluído.")
-    return pages_parsed
+    return pages_dirty
 
 # ── funções do parser PDF ──────────────────────────────────────────────────────
 
@@ -539,11 +569,9 @@ def structure_schedule_text(text):
             time.sleep(wait)
     return text
 
-def parse_pdf(pdf_info, headers):
-    url     = pdf_info["url"]
-    content = download_pdf_bytes(url, headers)
-    if content is None:
-        return None
+def parse_pdf(pdf_info, content):
+    # recebe os bytes ja baixados (o download e o source_hash acontecem no run_pdf_parser)
+    url = pdf_info["url"]
     if not content.startswith(b"%PDF"):
         print(f"  NÃO É PDF: {url}")
         return {"source_url": url, "format_error": True}
@@ -586,52 +614,38 @@ def parse_pdf(pdf_info, headers):
     resultado["text"] = text.strip() if not is_scanned else ""
     return resultado
 
-def run_pdf_parser(pdfs_found):
+def run_pdf_parser(pdfs_dirty, estado):
     print("\n" + "="*60)
-    print("FASE 3 — PARSER PDF")
+    print("FASE 3 — PARSER PDF (parseia os bytes ja baixados pelo crawler)")
     print("="*60)
 
     PARSED_DIR.mkdir(parents=True, exist_ok=True)
-
-    # carrega erros de formato conhecidos
     format_errors = set(json.loads(FORMAT_ERRORS_PATH.read_text(encoding="utf-8"))) if FORMAT_ERRORS_PATH.exists() else set()
+    print(f"PDFs a processar (novo+mudado): {len(pdfs_dirty)}")
 
-    if not REPARSE and PDFS_PARSED_PATH.exists():
-        pdf_results        = json.loads(PDFS_PARSED_PATH.read_text(encoding="utf-8"))
-        already_parsed_pdfs = {r["source_url"] for r in pdf_results}
-        print(f"Já parseados: {len(pdf_results)} PDFs")
-    else:
-        pdf_results         = []
-        already_parsed_pdfs = set()
+    results, pdf_errors = [], []
+    for i, rec in enumerate(pdfs_dirty):
+        url = rec["url"]
+        result = parse_pdf(rec, rec["content"])
+        if not result:
+            pdf_errors.append(url); continue
+        if result.get("format_error"):
+            format_errors.add(url); continue
+        result["source_hash"] = rec["source_hash"]
+        results.append(result)
+        print(f"[{i+1}/{len(pdfs_dirty)}] {url}")
 
-    pdf_errors = []
-    for i, pdf_info in enumerate(pdfs_found):
-        url = pdf_info["url"]
-        if url in already_parsed_pdfs or url in format_errors:
-            continue
-        print(f"[{i+1}/{len(pdfs_found)}] {url}")
-        result = parse_pdf(pdf_info, HEADERS)
-        if result:
-            if result.get("format_error"):
-                format_errors.add(url)
-            else:
-                pdf_results.append(result)
-        else:
-            pdf_errors.append(url)
-
-    PDFS_PARSED_PATH.write_text(json.dumps(pdf_results,       ensure_ascii=False, indent=2), encoding="utf-8")
     FORMAT_ERRORS_PATH.write_text(json.dumps(list(format_errors), ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"\nParsed: {len(pdf_results)} PDFs | Erros: {len(pdf_errors)}")
-    print(f"Escaneados: {sum(1 for r in pdf_results if r['is_scanned'])}")
+    print(f"\nParsed: {len(results)} PDFs | Erros: {len(pdf_errors)}")
+    print(f"Escaneados: {sum(1 for r in results if r.get('is_scanned'))}")
 
-    # enriquecimento de datas
+    # enriquecimento de datas (so nos PDFs dirty, nao escaneados)
     print("\nEnriquecendo datas dos PDFs...")
-    pdfs_parsed  = json.loads(PDFS_PARSED_PATH.read_text(encoding="utf-8"))
-    sem_data_pdf = [p for p in pdfs_parsed if "published_at" not in p and not p.get("is_scanned")]
-    print(f"PDFs sem data: {len(sem_data_pdf)} de {len(pdfs_parsed)}")
+    sem_data_pdf = [p for p in results if "published_at" not in p and not p.get("is_scanned")]
+    print(f"PDFs sem data: {len(sem_data_pdf)} de {len(results)}")
 
-    # indice de datas das paginas ja parseadas, para PDFs orfaos herdarem do pai sem novo fetch
-    parent_dates = {}
+    # datas dos pais: da base (estado) + das paginas dirty deste run, para PDFs orfaos herdarem
+    parent_dates = {u: e["published_at"] for u, e in estado.items() if e.get("published_at")}
     if PAGES_PARSED_PATH.exists():
         for p in json.loads(PAGES_PARSED_PATH.read_text(encoding="utf-8")):
             if p.get("published_at"):
@@ -643,12 +657,12 @@ def run_pdf_parser(pdfs_found):
         doc["date_source"]  = source
         print(f"[{i+1}/{len(sem_data_pdf)}] {source or 'sem data'} — {date or 'N/A'}")
         if (i + 1) % SAVE_INTERVAL == 0:
-            PDFS_PARSED_PATH.write_text(json.dumps(pdfs_parsed, ensure_ascii=False, indent=2), encoding="utf-8")
+            PDFS_PARSED_PATH.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
             print(f"  Checkpoint salvo: {i+1} processados")
 
-    PDFS_PARSED_PATH.write_text(json.dumps(pdfs_parsed, ensure_ascii=False, indent=2), encoding="utf-8")
+    PDFS_PARSED_PATH.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
     print("Enriquecimento de PDFs concluído.")
-    return pdfs_parsed
+    return results
 
 # ── funções do parser de planilhas (Google Sheets publicados) ───────────────────
 
@@ -708,30 +722,17 @@ def resolve_sheet_date(url, parent, csv_text):
                 return date
     return extract_date_from_text(csv_text)
 
-def run_sheets_parser(sheets_found):
+def run_sheets_parser(sheets_dirty):
     print("\n" + "="*60)
-    print("FASE 3.5 — PARSER PLANILHAS")
+    print("FASE 3.5 — PARSER PLANILHAS (estrutura o CSV ja baixado pelo crawler)")
     print("="*60)
 
     PARSED_DIR.mkdir(parents=True, exist_ok=True)
+    print(f"Planilhas a processar (novo+mudado): {len(sheets_dirty)}")
 
-    if not REPARSE and SHEETS_PARSED_PATH.exists():
-        results = json.loads(SHEETS_PARSED_PATH.read_text(encoding="utf-8"))
-        already_parsed = {r["source_url"] for r in results}
-        print(f"Já parseadas: {len(results)} planilhas")
-    else:
-        results = []
-        already_parsed = set()
-
-    for i, item in enumerate(sheets_found):
-        url    = item["url"]
-        parent = item.get("parent", "")
-        if url in already_parsed:
-            continue
-        print(f"[{i+1}/{len(sheets_found)}] {url}")
-        csv_text = download_sheet_csv(url)
-        if not csv_text:
-            print(f"  FALHA: download bloqueado ou vazio (provavelmente privada)"); SHEETS_FALHAS.append((url, "download")); continue
+    results = []
+    for i, rec in enumerate(sheets_dirty):
+        url, parent, csv_text = rec["url"], rec["parent"], rec["csv_text"]
         text = structure_sheet_text(csv_text)
         if not text:
             print(f"  IGNORADA: planilha sem dados uteis"); SHEETS_FALHAS.append((url, "sem_dados")); continue
@@ -740,7 +741,9 @@ def run_sheets_parser(sheets_found):
             "title":        "",
             "text":         text,
             "published_at": resolve_sheet_date(url, parent, csv_text),
+            "source_hash":  rec["source_hash"],
         })
+        print(f"[{i+1}/{len(sheets_dirty)}] {url}")
 
     SHEETS_PARSED_PATH.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"\nParsed: {len(results)} planilhas")
@@ -781,7 +784,8 @@ def run_chunker(pages_parsed, pdfs_parsed, sheets_parsed):
             "source_url":   page["source_url"],
             "title":        page["title"],
             "type":         "html",
-            "published_at": page.get("published_at")
+            "published_at": page.get("published_at"),
+            "source_hash":  page.get("source_hash"),
         }
         chunks.extend(chunk_document(page["text"], metadata))
 
@@ -793,7 +797,8 @@ def run_chunker(pages_parsed, pdfs_parsed, sheets_parsed):
             "source_url":   to_drive_view_url(pdf["source_url"]),
             "title":        pdf["title"],
             "type":         "pdf",
-            "published_at": pdf.get("published_at")
+            "published_at": pdf.get("published_at"),
+            "source_hash":  pdf.get("source_hash"),
         }
         chunks.extend(chunk_document(pdf["text"], metadata))
 
@@ -803,7 +808,8 @@ def run_chunker(pages_parsed, pdfs_parsed, sheets_parsed):
             "source_url":   sheet["source_url"],
             "title":        sheet["title"],
             "type":         "sheet",
-            "published_at": sheet.get("published_at")
+            "published_at": sheet.get("published_at"),
+            "source_hash":  sheet.get("source_hash"),
         }
         chunks.extend(chunk_document(sheet["text"], metadata))
 
@@ -814,19 +820,35 @@ def run_chunker(pages_parsed, pdfs_parsed, sheets_parsed):
 
 # ── funções de ingestão ────────────────────────────────────────────────────────
 
-def get_existing_urls():
-    existing = set()
-    cursor   = ""
+def carregar_estado():
+    # estado do que ja esta no Upstash, por URL: {url: {"source_hash":..., "ids":[...], "published_at":...}}
+    # o source_hash e o published_at sao iguais em todos os chunks de uma mesma URL
+    estado = {}
+    cursor = ""
     while True:
         res = index.range(cursor=cursor, limit=1000, include_metadata=True)
         for v in res.vectors:
-            existing.add(v.metadata["source_url"])
+            m = v.metadata or {}
+            u = m.get("source_url", "")
+            e = estado.setdefault(u, {"source_hash": m.get("source_hash"), "ids": [], "published_at": m.get("published_at")})
+            e["ids"].append(v.id)
         cursor = res.next_cursor
         if cursor == "":
             break
-    return existing
+    return estado
 
-def ingest_chunks(chunks, batch_size=100, start_id=0):
+def _agrupar_e_anotar(chunks):
+    # agrupa chunks por URL e da a cada um o id deterministico url#i (o source_hash ja vem no chunk)
+    por_url = {}
+    for c in chunks:
+        por_url.setdefault(c["source_url"], []).append(c)
+    for url, cs in por_url.items():
+        for i, c in enumerate(cs):
+            c["id"] = f"{url}#{i}"
+    return por_url
+
+def ingest_chunks(chunks, batch_size=100):
+    # cada chunk ja traz "id" e "source_hash"; embeda e faz upsert
     total = len(chunks)
     for i in range(0, total, batch_size):
         batch = chunks[i:i + batch_size]
@@ -849,40 +871,48 @@ def ingest_chunks(chunks, batch_size=100, start_id=0):
                     raise e
 
         vectors = []
-        for j, (chunk, embedding) in enumerate(zip(batch, result.embeddings)):
+        for chunk, embedding in zip(batch, result.embeddings):
             vectors.append((
-                str(start_id + i + j),
+                chunk["id"],
                 embedding.values,
                 {
                     "text":         chunk["text"],
                     "source_url":   chunk["source_url"],
                     "title":        chunk["title"],
                     "type":         chunk["type"],
-                    "published_at": chunk.get("published_at")
+                    "published_at": chunk.get("published_at"),
+                    "source_hash":  chunk.get("source_hash"),
                 }
             ))
 
         index.upsert(vectors=vectors)
         print(f"Inseridos {min(i + batch_size, total)}/{total} chunks")
 
-def run_ingest(chunks):
+def run_ingest(chunks, estado, urls_mudadas):
     print("\n" + "="*60)
     print("FASE 5 — INGESTÃO NO UPSTASH")
     print("="*60)
 
+    por_url = _agrupar_e_anotar(chunks)
+    todos   = [c for cs in por_url.values() for c in cs]
+
     if REINGEST:
         index.reset()
         print("Index zerado.")
-        start_id   = 0
-        new_chunks = chunks
-    else:
-        existing_urls = get_existing_urls()
-        new_chunks    = [c for c in chunks if c["source_url"] not in existing_urls]
-        start_id      = index.info().vector_count
-        print(f"Chunks novos a inserir: {len(new_chunks)}")
+        ingest_chunks(todos)
+        print("Ingestão concluída.")
+        return
 
-    ingest_chunks(new_chunks, start_id=start_id)
-    print("Ingestão concluída.")
+    # replace das paginas mudadas: deleta os chunks antigos antes de inserir os novos.
+    # a deteccao (novo / mudou / inalterado) ja aconteceu nos parsers, via source_hash.
+    ids_deletar = [i for url in urls_mudadas for i in estado.get(url, {}).get("ids", [])]
+    for i in range(0, len(ids_deletar), 1000):
+        index.delete(ids=ids_deletar[i:i + 1000])
+    if ids_deletar:
+        print(f"Removidos {len(ids_deletar)} chunks antigos de {len(urls_mudadas)} paginas mudadas")
+
+    ingest_chunks(todos)
+    print(f"Ingestão concluída: {len(por_url)} URLs (novas + mudadas), {len(todos)} chunks")
 
 # ── execução principal ─────────────────────────────────────────────────────────
 
@@ -891,12 +921,19 @@ if __name__ == "__main__":
     print(f"Pipeline iniciado em {inicio.strftime('%d/%m/%Y %H:%M:%S')}")
     print(f"Anos válidos: {sorted(ANOS_VALIDOS)}")
 
-    pages_found, pdfs_found, sheets_found = run_crawler()
-    pages_parsed            = run_html_parser(pages_found)
-    pdfs_parsed             = run_pdf_parser(pdfs_found)
-    sheets_parsed           = run_sheets_parser(sheets_found)
-    chunks                  = run_chunker(pages_parsed, pdfs_parsed, sheets_parsed)
-    run_ingest(chunks)
+    # estado atual da base (source_hash + ids por URL); vazio quando REINGEST vai zerar tudo
+    estado = {} if REINGEST else carregar_estado()
+    print(f"Estado do Upstash: {len(estado)} URLs conhecidas")
+
+    # o crawler baixa, hasheia e classifica na fase de crawl; emite so o dirty (novo+mudado) com conteudo
+    pages_dirty, pdfs_dirty, sheets_dirty, urls_mudadas = run_crawler(estado)
+
+    pages_parsed  = run_html_parser(pages_dirty)
+    pdfs_parsed   = run_pdf_parser(pdfs_dirty, estado)
+    sheets_parsed = run_sheets_parser(sheets_dirty)
+
+    chunks        = run_chunker(pages_parsed, pdfs_parsed, sheets_parsed)
+    run_ingest(chunks, estado, urls_mudadas)
 
     # regenera o snapshot estatico da pagina servido pelo app
     print("\n" + "="*60)
@@ -906,6 +943,12 @@ if __name__ == "__main__":
         clone_page()
     except Exception as e:
         print(f"Falha ao gerar snapshot (ingestao ja concluida): {e}")
+
+    # regenera a lista de cursos atuais (usada pelo validador e opcionalmente pelo agente)
+    try:
+        gerar_cursos_atuais()
+    except Exception as e:
+        print(f"Falha ao gerar cursos_atuais (ingestao ja concluida): {e}")
 
     # DEBUG: residuo de planilhas nao ingeridas, com o motivo
     if SHEETS_FALHAS:

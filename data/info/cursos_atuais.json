@@ -1,0 +1,28 @@
+{
+  "cursos": [
+    "Administração",
+    "Análise e Desenvolvimento de Sistemas",
+    "Automação Industrial",
+    "Comércio",
+    "Desenvolvimento de Sistemas",
+    "Eletrônica",
+    "Engenharia Eletrônica",
+    "Logística",
+    "Manutenção e Suporte em Informática",
+    "Matemática - Licenciatura"
+  ],
+  "urls": [
+    "https://ifrs.edu.br/canoas/bacharelado-em-engenharia-eletrica-eletronica-2/",
+    "https://ifrs.edu.br/canoas/bacharelado-em-engenharia-eletrica-eletronica/",
+    "https://ifrs.edu.br/canoas/cursos/bacharelado-em-engenharia-eletrica-eletronica/",
+    "https://ifrs.edu.br/canoas/no-campus/cursos/curso-superior-de-licenciatura-em-matematica/",
+    "https://ifrs.edu.br/canoas/no-campus/cursos/curso-superior-de-tecnologia-em-analise-e-desenvolvimento-de-sistemas/",
+    "https://ifrs.edu.br/canoas/no-campus/cursos/curso-superior-de-tecnologia-em-automacao-industrial/",
+    "https://ifrs.edu.br/canoas/no-campus/cursos/curso-superior-de-tecnologia-em-logistica/",
+    "https://ifrs.edu.br/canoas/no-campus/cursos/curso-tecnico-em-administracao-integrado-ao-ensino-medio/",
+    "https://ifrs.edu.br/canoas/no-campus/cursos/curso-tecnico-em-desenvolvimento-de-sistemas-integrado-ao-ensino-medio/",
+    "https://ifrs.edu.br/canoas/no-campus/cursos/curso-tecnico-em-eletronica-integrado-ao-ensino-medio/",
+    "https://ifrs.edu.br/canoas/no-campus/cursos/proeja-tecnico-em-manutencao-e-suporte-em-informatica-integrado-ao-ensino-medio/",
+    "https://ifrs.edu.br/canoas/no-campus/cursos/tecnico-em-comercio/"
+  ]
+}
