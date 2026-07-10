@@ -75,7 +75,7 @@ Entrypoint em `api/index.py` (reexpõe `from ui.app import app`); o preset Flask
 ## Próximos passos
 
 Em aberto, nesta ordem de prioridade:
-1. Bateria de testes automatizados (retrieval, respostas, edge cases). Pré-requisito para o job periódico. Estratégia de avaliação na seção abaixo.
+1. Bateria de testes automatizados: IMPLEMENTADA (Fases 1-7 via `coletar`/`validar`, juiz semântico com switch `EVAL_JUDGE`, relatório automático em `eval/runs/relatorio.md`; resultados na seção "Achados atuais"). Falta calibrar o juiz contra rótulos humanos antes de usar as métricas semânticas como régua e escalar o golden set (item 4). Continua pré-requisito do job periódico (item 5).
 2. Crawler no domínio de ingresso: cobrir `ingresso.ifrs.edu.br` (processo seletivo) liberando o domínio no `is_valid_page`; se for filtrar por ano lá, ensinar o regex a ler o formato `/AAAA-S/` (ano-semestre, ex: `/2026-2/`).
 3. Ingerir o Instagram do Grêmio/campus: fonte de informação atual que hoje escapa ao pipeline (ex: data real da festa julina, só anunciada lá, diverge do calendário). Fonte hostil: exige login, tem anti-scraping, e muitos anúncios são cards de imagem (precisariam de OCR/LLM multimodal). Opções a decidir: API oficial (Graph API, exige conta Business + app Meta + token, estável e legítima, pega legendas) vs scraping + multimodal (mais poderoso para imagens, mas frágil e na zona cinzenta dos termos).
 4. Escalar o golden set para robustez de produção: **geração sintética validada** (um LLM gera perguntas candidatas a partir dos próprios documentos da base e um juiz/humano valida o gabarito, mantendo a regra de não-circularidade) + **telemetria de produção** (perguntas reais dos estudantes, via tracing, viram novos casos). Meta ~100-150 casos, adensando por categoria. Leva o golden set de prova-de-conceito (25 casos hoje) a suíte de regressão; depende da bateria (item 1) rodando.
@@ -166,4 +166,18 @@ Golden set atual: **25 casos / 71 inputs** (pergunta + paraphrases). Distribuiç
 
 Robustez (tamanho do set): < 20 casos = protótipo; 30-60 = desenvolvimento com sinal por categoria (meta próxima); 100-200+ = robusto para regressão. O que importa é a cobertura por categoria (~5-10 casos por comportamento crítico), não só o total. Reportar sempre taxa com IC de Wilson, pois a amostra é pequena. Lacuna estrutural conhecida: multi-turno (fora do escopo por decisão).
 
-Ordem de implementação: (a) golden set curado com o dono do domínio; (b) wrapper que instrumenta o `ask` para expor query/docs/ação/resposta de cada execução; (c) fases objetivas (1-4, 7; Python puro, baratas); (d) fases semânticas (5-6) com o juiz validado. Stack: objetivo em Python puro; juiz via Gemini; DeepEval/RAGAS opcionais na fase semântica; tracing só em produção.
+### Achados atuais da bateria (jul/2026)
+
+Bateria completa (7 fases) rodada sobre a coleta (n=5, 355 execuções); Fases 5/6 julgadas pelo juiz semântico (subagentes Claude). Placar: Fase 1 decisão 98%, Fase 2 query 100%, Fase 3 retrieval doc 91%/span 88% (MRR 0.61), Fase 4 answerability 9/9 na base, Fase 5 fidelidade 98%/relevância 100%/correção 92%, Fase 6 comportamento 94%, Fase 7 citação 100%.
+
+- Sólido: query, relevância e citação em 100%; answerability confirma que todo caso respondível tem o conteúdo na base; segurança (jailbreak + fora-de-escopo) em 97%. 17 dos 25 casos passam limpo em todas as fases.
+- Erros abertos, do pior pro menor:
+  - `biblioteca-horario`: o retrieval falha (doc 20%; o doc de horários quase nunca entra no top-15, embora o conteúdo exista na base) e isso VIRA resposta errada (correção 27%: responde "9h" em vez de "8h às 21h"). Maior alavanca; é retrieval contaminando a geração.
+  - `curso-inexistente` (Fase 1 60% / Fase 6 53%): corrige a premissa mas às vezes só pergunta "quer que eu busque?" em vez de já entregar (confirmar-antes); e às vezes confunde a grade do técnico com a do TADS.
+  - `mensalidade-curso` (correção 80%): às vezes não corrige a premissa de cobrança (o IFRS é gratuito).
+  - `inicio-aulas-proximo-semestre` (87%): consciência temporal, apresenta o semestre já iniciado em vez do próximo início.
+  - `fora-escopo-basico` (Fase 6 87%): responde "2^10 = 1024" em vez de redirecionar ao escopo do campus.
+- Juiz das Fases 5/6 com switch `EVAL_JUDGE`: `claude` (default; subagente, sem custo de API) ou `gemini` (inline). Julga sobre a coleta salva, sem re-executar o agente. Cautela: as métricas semânticas ainda NÃO foram validadas contra rótulos humanos em PT-BR; tratar como sinal, não régua fina, até calibrar.
+- Relatório: `validar` gera `eval/runs/relatorio.md` (placar + o que acertou + o que errou com o motivo do juiz), regenerado a cada run; o detalhe com IC por caso fica em `eval/runs/ultimo_resumo.txt`.
+
+Ordem de implementação: (a) golden set curado com o dono do domínio; (b) wrapper que instrumenta o `ask` para expor query/docs/ação/resposta de cada execução; (c) fases objetivas (1-4, 7; Python puro, baratas); (d) fases semânticas (5-6) com o juiz validado. Stack: objetivo em Python puro; juiz via Gemini ou Claude Code (switch `EVAL_JUDGE`); DeepEval/RAGAS opcionais na fase semântica; tracing só em produção.

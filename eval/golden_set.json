@@ -471,7 +471,7 @@
         "https://ifrs.edu.br/canoas/no-campus/cursos/curso-superior-de-tecnologia-em-analise-e-desenvolvimento-de-sistemas/"
       ],
       "answer_spans": [],
-      "notas": "Confirmado na base: os cursos são Matemática (lic.), TADS, Automação Industrial, Logística, Eng. Eletrônica (bacharelado) + técnicos + pós. NÃO há Engenharia de Software (é disciplina/área), Ciência da Computação (só formação de servidores) nem Sistemas de Informação (só conceito) como curso. Referente correto = TADS. As 3 paraphrases variam o nome do curso falso; o gold é comportamental (corrigir + redirecionar ao TADS), por isso answer_spans vazio e gold_url na página do TADS."
+      "notas": "Confirmado na base: os cursos são Matemática (lic.), TADS, Automação Industrial, Logística, Eng. Eletrônica (bacharelado) + técnicos + pós. NÃO há Engenharia de Software (é disciplina/área), Ciência da Computação (só formação de servidores) nem Sistemas de Informação (só conceito) como curso. Referente correto = TADS. As 3 paraphrases variam o nome do curso falso; o gold é comportamental (corrigir + redirecionar ao TADS), por isso answer_spans vazio e gold_url na página do TADS. ERRO ATUAL CONHECIDO (bateria jul/2026): em ~40% das execuções o agente corrige a premissa (aponta o TADS) mas PERGUNTA 'quer que eu busque?' em vez de já buscar e responder, o que derruba a Fase 1 (esperado corrigir_e_buscar) para ~60%. É confirmação a mais antes de agir, não fato errado; efeito colateral do reforço de correção de premissa."
     },
     {
       "id": "data-prova-vaga",
