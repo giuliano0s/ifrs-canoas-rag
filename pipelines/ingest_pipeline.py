@@ -8,10 +8,12 @@ metadata do Upstash. Só o que é novo ou mudou segue para parse (LLM) e ingest 
 página mudada tem os chunks antigos substituídos (replace por id determinístico url#i).
 
 Flags de controle:
-  REPARSE   = True > ignora os hashes e reprocessa tudo (replace geral, sem zerar o index)
-  REINGEST  = True > zera o index e reingere tudo do zero
+  REPARSE         = True > ignora os hashes e reprocessa tudo (replace geral, sem zerar o index)
+  REINGEST        = True > zera o index e reingere tudo do zero
+  INCLUDE_SCANNED = True > baixa/processa PDFs escaneados (imagem). False (default) pula o
+                    download dos ja conhecidos como escaneados. Deixar True com OCR/pixelrag.
 
-  Default (ambas False) = incremental por source_hash.
+  Default (REPARSE/REINGEST False) = incremental por source_hash.
 
 Pipeline desenvolvida originalmente em ../notebooks
 """
@@ -58,6 +60,9 @@ def _flag_env(nome, default):
 # flags de controle de execução; override opcional via env (ex: $env:REPARSE="True")
 REPARSE  = _flag_env("REPARSE", False)
 REINGEST = _flag_env("REINGEST", False)
+# baixar PDFs escaneados (sem texto). False = pula os ja registrados como escaneados,
+# evitando o re-download recorrente; deixar True quando houver OCR/pixelrag.
+INCLUDE_SCANNED = _flag_env("INCLUDE_SCANNED", False)
 
 # configurações gerais
 BASE_URL        = "https://ifrs.edu.br/canoas/"
@@ -102,6 +107,7 @@ PAGES_PARSED_PATH = PARSED_DIR / "pages_parsed.json"
 PDFS_PARSED_PATH  = PARSED_DIR / "pdfs_parsed.json"
 SHEETS_PARSED_PATH = PARSED_DIR / "sheets_parsed.json"
 FORMAT_ERRORS_PATH = PARSED_DIR / "pdfs_format_errors.json"
+SCANNED_PATH       = PARSED_DIR / "pdfs_scanned.json"
 CHUNKS_PATH       = CHUNKS_DIR / "chunks.json"
 WHITELIST_PATH    = INFO_DIR / "whitelist.txt"
 
@@ -196,22 +202,29 @@ def run_crawler(estado):
     st_html = {"nova": 0, "mudada": 0, "inalterada": 0}
     st_pdfd = {"nova": 0, "mudada": 0, "inalterada": 0}
 
+    # PDFs ja conhecidos como escaneados: com INCLUDE_SCANNED=False, nem sao baixados de novo
+    scanned_conhecidos = set(json.loads(SCANNED_PATH.read_text(encoding="utf-8"))) if SCANNED_PATH.exists() else set()
+    if not INCLUDE_SCANNED and scanned_conhecidos:
+        print(f"Escaneados conhecidos (pulados sem baixar): {len(scanned_conhecidos)}")
+
     # BFS: baixa cada URL, segue os links (acha filhos novos) e classifica HTML e PDF direto ali mesmo
+    n_erro = n_bloq = 0
     while queue:
         url = queue.popleft()
         if url in visited:
             continue
         visited.add(url)
-        print(f"[{len(visited)}/{len(visited)+len(queue)}] {url}")
+        if len(visited) % 100 == 0:
+            print(f"  visitadas {len(visited)} | fila {len(queue)} | dirty {len(pages_dirty)+len(pdfs_dirty)} | erros {n_erro+n_bloq}")
 
         try:
             response = requests.get(url, timeout=10, headers=HEADERS)
             response.raise_for_status()
             if "Radware" in response.text or "captcha" in response.text.lower():
-                print(f"  BLOQUEADO: {url}")
+                n_bloq += 1
                 continue
         except Exception as e:
-            print(f"  ERRO: {e}")
+            n_erro += 1
             continue
 
         # PDF direto: o crawler ja tem os bytes -> hasheia e classifica sem baixar de novo
@@ -263,12 +276,12 @@ def run_crawler(estado):
                 download_url = build_download_url(full_url)
                 if download_url not in queued:
                     drive_cands.append({"url": download_url, "parent": url}); queued.add(download_url); novos += 1
-            elif is_pdf_by_extension(full_url):
+            elif is_pdf_by_extension(full_url) and (INCLUDE_SCANNED or full_url in whitelist or to_drive_view_url(full_url) not in scanned_conhecidos):
                 queue.append(full_url); queued.add(full_url); novos += 1
-        print(f"  {novos} novos links")
         time.sleep(0.3)
 
-    print(f"\nHTML: {st_html['nova']} novas, {st_html['mudada']} mudadas, {st_html['inalterada']} inalteradas")
+    print(f"\nCrawl: {len(visited)} URLs visitadas | {n_erro} erros, {n_bloq} bloqueados")
+    print(f"HTML: {st_html['nova']} novas, {st_html['mudada']} mudadas, {st_html['inalterada']} inalteradas")
     print(f"PDF direto: {st_pdfd['nova']} novas, {st_pdfd['mudada']} mudadas, {st_pdfd['inalterada']} inalteradas")
 
     # pos-passo: baixa, hasheia e classifica os PDFs do Drive e as planilhas (nao baixados no BFS)
@@ -276,6 +289,8 @@ def run_crawler(estado):
     st_pdf = {"nova": 0, "mudada": 0, "inalterada": 0}
     for cand in drive_cands:
         url, parent = cand["url"], cand["parent"]
+        if not INCLUDE_SCANNED and to_drive_view_url(url) in scanned_conhecidos:
+            continue
         pdfs_all.append({"url": url, "parent": parent})
         content = download_pdf_bytes(url, HEADERS)
         if content is None:
@@ -432,13 +447,12 @@ def run_html_parser(pages_dirty):
             if date:
                 doc["published_at"] = date
                 doc["date_source"]  = source
-            print(f"[{i+1}/{len(sem_data)}] {source or 'sem data'} — {date or 'N/A'}")
         except Exception as e:
             print(f"  PAROU: {e}")
             break
         if (i + 1) % SAVE_INTERVAL == 0:
             PAGES_PARSED_PATH.write_text(json.dumps(pages_dirty, ensure_ascii=False, indent=2), encoding="utf-8")
-            print(f"  Checkpoint salvo: {i+1} processados")
+            print(f"  datas: {i+1}/{len(sem_data)} (checkpoint salvo)")
 
     PAGES_PARSED_PATH.write_text(json.dumps(pages_dirty, ensure_ascii=False, indent=2), encoding="utf-8")
     print("Enriquecimento de HTMLs concluído.")
@@ -599,11 +613,8 @@ def parse_pdf(pdf_info, content):
     }
 
     if not is_scanned and is_schedule_pdf(title):
-        print(f"  Estruturando horário...")
         text = structure_schedule_text(text)
-        print(text)
     elif not is_scanned and eh_calendario:
-        print(f"  Estruturando calendário...")
         text = structure_calendar_text(calendar_text)
         # o ano de vigencia do calendario vem do conteudo (URL tem so o mes de publicacao)
         ano = extract_date_from_text(text)
@@ -621,9 +632,10 @@ def run_pdf_parser(pdfs_dirty, estado):
 
     PARSED_DIR.mkdir(parents=True, exist_ok=True)
     format_errors = set(json.loads(FORMAT_ERRORS_PATH.read_text(encoding="utf-8"))) if FORMAT_ERRORS_PATH.exists() else set()
+    scanned       = set(json.loads(SCANNED_PATH.read_text(encoding="utf-8"))) if SCANNED_PATH.exists() else set()
     print(f"PDFs a processar (novo+mudado): {len(pdfs_dirty)}")
 
-    results, pdf_errors = [], []
+    results, pdf_errors, n_scan = [], [], 0
     for i, rec in enumerate(pdfs_dirty):
         url = rec["url"]
         result = parse_pdf(rec, rec["content"])
@@ -631,13 +643,17 @@ def run_pdf_parser(pdfs_dirty, estado):
             pdf_errors.append(url); continue
         if result.get("format_error"):
             format_errors.add(url); continue
+        if result.get("is_scanned"):
+            # sem texto extraivel: registra para o crawler pular o download nos proximos runs
+            scanned.add(to_drive_view_url(url)); n_scan += 1; continue
         result["source_hash"] = rec["source_hash"]
         results.append(result)
-        print(f"[{i+1}/{len(pdfs_dirty)}] {url}")
+        if (i + 1) % 100 == 0:
+            print(f"  parseados {i+1}/{len(pdfs_dirty)}")
 
     FORMAT_ERRORS_PATH.write_text(json.dumps(list(format_errors), ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"\nParsed: {len(results)} PDFs | Erros: {len(pdf_errors)}")
-    print(f"Escaneados: {sum(1 for r in results if r.get('is_scanned'))}")
+    SCANNED_PATH.write_text(json.dumps(sorted(scanned), ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"\nParsed: {len(results)} PDFs | Erros: {len(pdf_errors)} | Escaneados registrados: {n_scan}")
 
     # enriquecimento de datas (so nos PDFs dirty, nao escaneados)
     print("\nEnriquecendo datas dos PDFs...")
@@ -655,10 +671,9 @@ def run_pdf_parser(pdfs_dirty, estado):
         date, source = get_published_at(doc, parent_dates=parent_dates)
         doc["published_at"] = date
         doc["date_source"]  = source
-        print(f"[{i+1}/{len(sem_data_pdf)}] {source or 'sem data'} — {date or 'N/A'}")
         if (i + 1) % SAVE_INTERVAL == 0:
             PDFS_PARSED_PATH.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
-            print(f"  Checkpoint salvo: {i+1} processados")
+            print(f"  datas: {i+1}/{len(sem_data_pdf)} (checkpoint salvo)")
 
     PDFS_PARSED_PATH.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
     print("Enriquecimento de PDFs concluído.")
@@ -743,7 +758,6 @@ def run_sheets_parser(sheets_dirty):
             "published_at": resolve_sheet_date(url, parent, csv_text),
             "source_hash":  rec["source_hash"],
         })
-        print(f"[{i+1}/{len(sheets_dirty)}] {url}")
 
     SHEETS_PARSED_PATH.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"\nParsed: {len(results)} planilhas")
@@ -904,12 +918,19 @@ def run_ingest(chunks, estado, urls_mudadas):
         return
 
     # replace das paginas mudadas: deleta os chunks antigos antes de inserir os novos.
-    # a deteccao (novo / mudou / inalterado) ja aconteceu nos parsers, via source_hash.
-    ids_deletar = [i for url in urls_mudadas for i in estado.get(url, {}).get("ids", [])]
+    # a deteccao (novo / mudou / inalterado) ja aconteceu no crawler, via source_hash.
+    # so deleta o antigo de uma URL mudada que PRODUZIU chunk novo (esta em por_url); se o
+    # parse do conteudo novo falhou (PDF corrompido, planilha vazia), o antigo e preservado
+    # e a URL segue "mudada" ate um run futuro conseguir reprocessa-la (nunca deleta sem repor).
+    reinseridas = urls_mudadas & set(por_url)
+    ids_deletar = [i for url in reinseridas for i in estado.get(url, {}).get("ids", [])]
     for i in range(0, len(ids_deletar), 1000):
         index.delete(ids=ids_deletar[i:i + 1000])
     if ids_deletar:
-        print(f"Removidos {len(ids_deletar)} chunks antigos de {len(urls_mudadas)} paginas mudadas")
+        print(f"Removidos {len(ids_deletar)} chunks antigos de {len(reinseridas)} paginas mudadas")
+    nao_repostas = urls_mudadas - reinseridas
+    if nao_repostas:
+        print(f"AVISO: {len(nao_repostas)} URLs mudadas sem conteudo novo valido; antigo preservado")
 
     ingest_chunks(todos)
     print(f"Ingestão concluída: {len(por_url)} URLs (novas + mudadas), {len(todos)} chunks")
