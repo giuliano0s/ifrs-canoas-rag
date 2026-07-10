@@ -32,6 +32,15 @@ _prompt_path = os.path.join(os.path.dirname(__file__), f"../data/info/{AGENT_NAM
 with open(_prompt_path, "r", encoding="utf-8") as f:
     agent_prompt = f.read()
 
+# lista de cursos atuais, injetada no prompt: o agente corrige "curso inexistente" -> curso real
+import json
+_cursos_path = os.path.join(os.path.dirname(__file__), "../data/info/cursos_atuais.json")
+try:
+    with open(_cursos_path, "r", encoding="utf-8") as f:
+        cursos_atuais = ", ".join(json.load(f).get("cursos", []))
+except Exception:
+    cursos_atuais = "(lista indisponivel)"
+
 
 def _safe(s):
     # protege os prints de log contra caracteres fora do encoding do console (evita crash no Windows)
@@ -225,7 +234,7 @@ def ask(query, history=None, max_steps=3, trace=None):
 
     # config com o prompt do agente como system_instruction e a ferramenta de busca
     config = types.GenerateContentConfig(
-        system_instruction=agent_prompt.format(data_atual=data_atual),
+        system_instruction=agent_prompt.format(data_atual=data_atual, cursos=cursos_atuais),
         tools=[buscar_documentos_tool],
         temperature=0.7,
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),

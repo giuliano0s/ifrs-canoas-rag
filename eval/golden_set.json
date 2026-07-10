@@ -23,7 +23,7 @@
       "tipo": "premissa_errada: o campus tem diretor-geral; reitor é cargo do IFRS inteiro",
       "acao_esperada": "corrigir_e_buscar",
       "criterios_query": {
-        "deve_conter": ["diretor", "canoas"],
+        "deve_conter": ["diretor"],
         "nao_deve_conter": ["reitor"]
       },
       "existe_na_base": true,
@@ -53,15 +53,15 @@
         "nao_deve_conter": []
       },
       "existe_na_base": true,
-      "resposta_esperada": "O Prof. Igor Lorenzato Almeida (Lógica de Programação / Programação Estruturada) atende, junto com monitor, às quartas-feiras das 8h às 12h (Lab D10) e às quintas-feiras das 13h às 17h (Lab D06), conforme a planilha de horários de monitoria de 2026.",
+      "resposta_esperada": "Há dois professores Igor. O provável referente é o Prof. Ígor Lorenzato Almeida (coordenador do TADS), que atende às quintas das 18h às 20h e sextas das 13h às 15h, na sala F117; o outro é o Prof. Ígor Abrahão Paranhos (seg/ter das 17h às 19h, sala F124). O ideal é distinguir os dois. Atendimento (salas F) é distinto de monitoria (labs).",
       "gold_urls": [
-        "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnfY1_Wn1-9RmB2bZdUG0YySgTeDEpbGg94c5lEmiqD6iP92dApsy4usbx3TY68OHeJ7SS1WoBtZvJ/pubhtml?gid=708551225&single=true"
+        "https://docs.google.com/spreadsheets/d/e/2PACX-1vSe0FNxNDSYT0Zcd4AiYRPqUZri0OgIpuviesghmmDT_uctiIP5WNxkg7wDaXWnat_6O5EaW7BpQ20U/pubhtml?gid=791545582&single=true"
       ],
       "answer_spans": [
-        "quartas-feiras das 8h às 12h no Lab D10",
-        "quintas-feiras das 13h às 17h no Lab D06"
+        "quinta das 18h - 20h, sala F117",
+        "sexta das 13h - 15h, sala F117"
       ],
-      "notas": "NÃO é caso ambíguo: o Igor, como vários professores, tem horário de atendimento publicado em planilha, então o agente deve buscar e responder direto (nunca perguntar). Horário na planilha de horários de monitoria 2026 (type=sheet): quartas 8h-12h (Lab D10) e quintas 13h-17h (Lab D06). O PIT 2024.1 traz só a carga semanal (5,0h), sem dia/hora. Este caso fundiu o antigo 'atendimento-igor-ambiguo', removido por não haver ambiguidade real."
+      "notas": "CORRIGIDO após revisão manual: (1) há DOIS Igors na base (Ígor Lorenzato Almeida e Ígor Abrahão Paranhos), então 'horário do Igor' É ambíguo e o agente acerta ao distinguir os dois. (2) atendimento (planilha gid=791545582, salas F117/F124) é DIFERENTE de monitoria (planilha gid=708551225, labs D10/D06); o gold anterior confundia os dois. Spans conferidos no conteúdo da planilha de atendimento. acao_esperada segue 'buscar' (listar os dois é o comportamento ideal)."
     },
     {
       "id": "atendimento-vago",
@@ -91,19 +91,18 @@
       "tipo": "dado_atual_eventual + consciência_temporal: data varia por ano; edição atual às vezes só no Instagram",
       "acao_esperada": "buscar",
       "criterios_query": {
-        "deve_conter": ["festa", "junina"],
+        "deve_conter": [["junina", "julina"]],
         "nao_deve_conter": []
       },
       "existe_na_base": "parcial",
-      "resposta_esperada": "A base não tem a data da edição de 2026. A edição mais recente registrada é a festa julina de 05/07/2025 (organizada pelo Grêmio). Deve apresentar como passada e ressalvar que não há anúncio de 2026 na base.",
+      "resposta_esperada": "Pelos documentos (calendário acadêmico 2026), a Festa Junina consta em 27 de julho de 2026 (sábado letivo); responder isso é fiel às fontes e correto pela base. RESSALVA (lacuna conhecida): a data real pode ter mudado e o anúncio atual sai só no Instagram, que a base não acompanha.",
       "gold_urls": [
-        "https://ifrs.edu.br/canoas/festa-julinha-acontece-no-sabado-05-07/"
+        "https://ifrs.edu.br/canoas/wp-content/uploads/sites/6/2025/11/RESOLUCAO-No-17-2025-SCC-CAN-Aprova-o-Calendario-Academico-2026-do-Campus-Canoas.pdf"
       ],
       "answer_spans": [
-        "Festa julina acontece no sábado, 05/07",
-        "05 de julho"
+        "Festa Junina do Campus Canoas: 27 de julho de 2026"
       ],
-      "notas": "Caso MANTIDO PROPOSITALMENTE no benchmark para evidenciar uma limitação conhecida: a base não acompanha o Instagram, então a edição vigente não é recuperável. Confirmado por conteúdo: edições na base são 2019 (08/06), 2022 (23/07), 2023 (08/07), 2025 (05/07). NENHUMA de 2026. O esperado (05/07) refere-se à última edição registrada (2025); o sistema deve apresentá-la como passada e ressalvar a ausência de dado de 2026."
+      "notas": "CORRIGIDO após revisão: a base TEM a data pelo calendário 2026 (RESOLUCAO 17/2025): 'Festa Junina do Campus Canoas: 27 de julho de 2026 (sábado letivo)' — o calendário ainda traz uma linha conflitante de 27/06 (inconsistência da fonte). A nota anterior dizia erradamente que a base não tinha 2026. A LACUNA real é o Instagram: a data efetiva foi alterada e anunciada só lá, fora da base. Caso mantido para EVIDENCIAR a lacuna do Instagram (roadmap item 3): o agente acerta pelos docs (27/07); a divergência com a realidade é a lacuna, não erro do agente."
     },
     {
       "id": "auxilio-estudantil",
@@ -115,7 +114,7 @@
       "tipo": "procedural_direta",
       "acao_esperada": "buscar",
       "criterios_query": {
-        "deve_conter": ["auxilio", "estudantil"],
+        "deve_conter": ["estudantil", ["auxilio", "assistencia"]],
         "nao_deve_conter": []
       },
       "existe_na_base": true,
@@ -163,7 +162,7 @@
       "tipo": "consciencia_temporal: a resposta certa é o próximo início a partir da data atual, não o semestre já iniciado",
       "acao_esperada": "buscar",
       "criterios_query": {
-        "deve_conter": ["aulas"],
+        "deve_conter": [["aulas", "semestre", "calendario"]],
         "nao_deve_conter": []
       },
       "existe_na_base": true,
@@ -187,7 +186,7 @@
       "tipo": "direta_com_discriminador_de_curso: superior (TADS) NÃO é o técnico",
       "acao_esperada": "buscar",
       "criterios_query": {
-        "deve_conter": ["atividades complementares", "analise e desenvolvimento"],
+        "deve_conter": [["complementares", "acc"], ["analise e desenvolvimento", "tads", "ads"]],
         "nao_deve_conter": []
       },
       "existe_na_base": true,
@@ -235,7 +234,7 @@
       "tipo": "direta_factual_pontual",
       "acao_esperada": "buscar",
       "criterios_query": {
-        "deve_conter": ["coord", "tads"],
+        "deve_conter": [["coord", "coordenacao", "contato", "email"], ["tads", "analise e desenvolvimento", "ads"]],
         "nao_deve_conter": []
       },
       "existe_na_base": true,
@@ -449,12 +448,8 @@
       },
       "existe_na_base": true,
       "resposta_esperada": "Não há mensalidade: o IFRS é uma instituição pública federal e oferta seus cursos (técnicos, superiores, especialização e mestrado) gratuitamente. Corrigir a premissa de cobrança.",
-      "gold_urls": [
-        "https://ifrs.edu.br/canoas/institucional/sobre/o-campus/"
-      ],
-      "answer_spans": [
-        "ofertar gratuitamente cursos de nível superior"
-      ],
+      "gold_urls": [],
+      "answer_spans": [],
       "notas": "Premissa errada segura (fato institucional: IFRS federal e gratuito). Confirmado por conteúdo: a página 'O Campus' afirma que o IFRS oferta gratuitamente cursos de nível superior, especializações e mestrado, além dos técnicos. Aceita corrigir_e_buscar OU responder_direto: responder direto que é gratuito (fato notório) também está certo; o acerto do fato é medido na Fase 5, não na decisão de ação."
     },
     {
@@ -467,7 +462,7 @@
       "tipo": "premissa_errada_curso_inexistente: o campus não oferece esse curso; o curso de TI é o TADS (o nome falso varia nas paraphrases, o comportamento é o mesmo)",
       "acao_esperada": "corrigir_e_buscar",
       "criterios_query": {
-        "deve_conter": ["analise e desenvolvimento"],
+        "deve_conter": [["@cursos_atuais", "tads"]],
         "nao_deve_conter": []
       },
       "existe_na_base": true,
