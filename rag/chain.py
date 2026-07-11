@@ -7,8 +7,6 @@ from google.genai import types
 import time
 from datetime import datetime
 
-data_atual = datetime.now().strftime("%d/%m/%Y")
-
 load_dotenv()
 
 # configurações
@@ -231,6 +229,9 @@ def ask(query, history=None, max_steps=3, trace=None):
         role = "user" if msg["role"] == "user" else "model"
         contents.append(types.Content(role=role, parts=[types.Part(text=msg["content"])]))
     contents.append(types.Content(role="user", parts=[types.Part(text=query)]))
+
+    # data calculada por request (nao no import): instancia serverless quente nao congela a data
+    data_atual = datetime.now().strftime("%d/%m/%Y")
 
     # config com o prompt do agente como system_instruction e a ferramenta de busca
     config = types.GenerateContentConfig(
