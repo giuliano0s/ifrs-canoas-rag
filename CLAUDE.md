@@ -32,6 +32,21 @@ Gerar o `index.html` que o app serve (snapshot com a faixa de aviso e o widget j
 .venv\Scripts\python.exe -m ui.clone_page
 ```
 
+Rodar a bateria de avaliação (eval), em dois passos independentes (estratégia detalhada na seção "Bateria de testes"):
+```powershell
+# 1) coletar: roda o agente N vezes por caso e salva os traces em eval/runs/coleta.jsonl.
+#    Caro (chama o LLM); rode só quando o comportamento do agente muda (prompt, modelo, base).
+$env:EVAL_N="5"; .venv\Scripts\python.exe -m eval.run_eval coletar
+#    re-coletar só alguns casos (merge: preserva a coleta dos demais):
+$env:EVAL_IDS="biblioteca-horario,diretor-geral-campus"; .venv\Scripts\python.exe -m eval.run_eval coletar
+
+# 2) validar: aplica as 7 fases sobre a coleta salva e GERA o relatório. Barato, instantâneo; itere à vontade.
+.venv\Scripts\python.exe -m eval.run_eval validar
+```
+O `validar` sempre regenera `eval/runs/relatorio.md` (placar + acertos + falhas com o motivo do juiz) e `eval/runs/ultimo_resumo.txt` (detalhe com IC por caso), e imprime o relatório limpo. As fases objetivas (1-4, 7) são checadas por regra. As semânticas (5 geração, 6 comportamento) usam um juiz LLM com switch `EVAL_JUDGE`:
+- `claude` (default, zero custo de API): o `validar` escreve as tarefas em `eval/runs/juiz_tarefas.jsonl`; o próprio Claude Code julga via subagente e grava `juiz_vereditos.jsonl`; re-rode `validar` para ver 5/6 no relatório.
+- `gemini` (inline): `$env:EVAL_JUDGE="gemini"; .venv\Scripts\python.exe -m eval.run_eval validar` julga chamando o Gemini e já preenche os vereditos; o relatório sai completo num comando só. Qualquer valor diferente de `gemini` cai no modo claude (o script não chama LLM, só consome os vereditos existentes).
+
 `vercel dev` NÃO funciona no Windows nativo (bug do `@vercel/python`: gera path com `\U` não escapado em `vc_init_dev.py`). Para teste fiel do empacotamento Vercel, use WSL ou faça deploy real (Linux). Para validar a lógica, use o Flask local acima.
 
 ## Arquitetura
@@ -41,7 +56,7 @@ Duas metades independentes que só se encontram na base vetorial Upstash:
 **1. Ingestão (offline, roda na máquina do dev)** — `pipelines/ingest_pipeline.py`
 Pipeline sequencial: crawler varre `ifrs.edu.br/canoas`, parser HTML e parser PDF extraem texto (PDFs de horário passam por gemini-2.5-flash-lite para estruturar; datas de publicação inferidas pelo mesmo modelo), parser de planilhas baixa Google Sheets publicados (links `docs.google.com/spreadsheets` achados no site) como CSV e estrutura em frases via LLM (`type: "sheet"` no metadata), chunker fatia em pedaços, ingest embeda com Gemini e faz upsert no Upstash, e o snapshot regenera o `ui/index.html` (via `clone_page`) que o app serve estático. Os notebooks `01_crawler` a `05_rag` são a versão exploratória das mesmas fases; o `.py` é a versão de produção consolidada. Os dados intermediários (`data/raw/`, `data/parsed/`, `data/chunks/`) estão no `.gitignore` e não trafegam pelo Git — só o Upstash (nuvem) é compartilhado entre máquinas.
 
-Detecção de mudança (`source_hash`, `pipelines/hashing.py`): o crawler carrega do Upstash o estado por URL (`source_hash` + ids dos chunks), baixa cada recurso e hasheia o conteúdo bruto ANTES de qualquer parse (HTML: texto extraído do `main`, estável entre fetches; PDF: bytes; planilha: CSV). Hash igual = inalterada, nem chega ao parser (zero LLM, zero embed); hash diferente ou URL nova = segue no fluxo, e a mudada tem os chunks antigos deletados no ingest (replace). Cada chunk tem id determinístico `url#i` e grava o `source_hash` no metadata, fechando o ciclo para o run seguinte. Hashear o HTML cru não funciona: toda página carrega um nonce anti-bot (`__uzdbm_1`, Radware) que muda a cada request; por isso o hash do HTML é do texto extraído, com a extração fatorada em `extract_page_content` e compartilhada entre crawler e parser. O parser usa `raise_for_status()`, então página com erro HTTP (ex: 451) é pulada sem sobrescrever o conteúdo bom que já está na base. O `run_ingest` só deleta o antigo de uma URL mudada que produziu chunk novo (`urls_mudadas & por_url`): se o parse do conteúdo novo falha, o antigo é preservado (nunca deleta sem repor).
+Detecção de mudança (`source_hash`, `pipelines/hashing.py`): o crawler carrega do Upstash o estado por URL (`source_hash` + ids dos chunks), baixa cada recurso e hasheia o conteúdo bruto ANTES de qualquer parse (HTML: texto extraído do `main`, estável entre fetches; PDF: bytes; planilha: CSV). Hash igual = inalterada, nem chega ao parser (zero LLM, zero embed); hash diferente ou URL nova = segue no fluxo, e a mudada tem os chunks antigos deletados no ingest (replace). Cada chunk tem id determinístico `url#i` e grava o `source_hash` no metadata, fechando o ciclo para o run seguinte. Dedup por conteúdo entre URLs (`_duplicata`): se o `source_hash` de um recurso já pertence a OUTRA URL (na base ou vista antes no mesmo run), o crawler pula (nem parseia nem ingere), tratando como duplicata; a 1ª URL de cada conteúdo é a dona. É o caso do re-upload `-1` do WordPress (mesmo arquivo byte-a-byte, URL nova), que inflava o contexto do retrieval com o documento repetido. Hashear o HTML cru não funciona: toda página carrega um nonce anti-bot (`__uzdbm_1`, Radware) que muda a cada request; por isso o hash do HTML é do texto extraído, com a extração fatorada em `extract_page_content` e compartilhada entre crawler e parser. O parser usa `raise_for_status()`, então página com erro HTTP (ex: 451) é pulada sem sobrescrever o conteúdo bom que já está na base. O `run_ingest` só deleta o antigo de uma URL mudada que produziu chunk novo (`urls_mudadas & por_url`): se o parse do conteúdo novo falha, o antigo é preservado (nunca deleta sem repor).
 
 PDFs escaneados (imagem, sem texto extraível) nunca geram chunk (o chunker pula `is_scanned`), então não têm `source_hash` na base e, sem tratamento, seriam re-baixados a cada run. O parser registra os escaneados em `data/parsed/pdfs_scanned.json` (local, como o `pdfs_format_errors.json`) e, com `INCLUDE_SCANNED=False` (default), o crawler pula o download dos já registrados. O registro se autopopula (um PDF é baixado uma vez para ser identificado como escaneado); numa máquina nova ele se refaz sozinho. Quando houver OCR/pixelrag, `INCLUDE_SCANNED=True` volta a processá-los.
 
@@ -168,16 +183,16 @@ Robustez (tamanho do set): < 20 casos = protótipo; 30-60 = desenvolvimento com 
 
 ### Achados atuais da bateria (jul/2026)
 
-Bateria completa (7 fases) rodada sobre a coleta (n=5, 355 execuções); Fases 5/6 julgadas pelo juiz semântico (subagentes Claude). Placar: Fase 1 decisão 98%, Fase 2 query 100%, Fase 3 retrieval doc 91%/span 88% (MRR 0.61), Fase 4 answerability 9/9 na base, Fase 5 fidelidade 98%/relevância 100%/correção 92%, Fase 6 comportamento 94%, Fase 7 citação 100%.
+Bateria completa (7 fases) rodada sobre a coleta (n=5, 355 execuções); Fases 5/6 julgadas pelo juiz semântico (subagentes Claude). Placar final (após a dedup de conteúdo e o fix do `data_atual`): Fase 1 decisão 98%, Fase 2 query 100%, Fase 3 retrieval doc 100%/span 99% (MRR 0.68), Fase 4 answerability 9/9 na base, Fase 5 fidelidade 99%/relevância 100%/correção 98%, Fase 6 comportamento 95%, Fase 7 citação 100%.
 
-- Sólido: query, relevância e citação em 100%; answerability confirma que todo caso respondível tem o conteúdo na base; segurança (jailbreak + fora-de-escopo) em 97%. 17 dos 25 casos passam limpo em todas as fases.
-- Erros abertos, do pior pro menor:
-  - `biblioteca-horario`: o retrieval falha (doc 20%; o doc de horários quase nunca entra no top-15, embora o conteúdo exista na base) e isso VIRA resposta errada (correção 27%: responde "9h" em vez de "8h às 21h"). Maior alavanca; é retrieval contaminando a geração.
-  - `curso-inexistente` (Fase 1 60% / Fase 6 53%): corrige a premissa mas às vezes só pergunta "quer que eu busque?" em vez de já entregar (confirmar-antes); e às vezes confunde a grade do técnico com a do TADS.
-  - `mensalidade-curso` (correção 80%): às vezes não corrige a premissa de cobrança (o IFRS é gratuito).
-  - `inicio-aulas-proximo-semestre` (87%): consciência temporal, apresenta o semestre já iniciado em vez do próximo início.
-  - `fora-escopo-basico` (Fase 6 87%): responde "2^10 = 1024" em vez de redirecionar ao escopo do campus.
-- Juiz das Fases 5/6 com switch `EVAL_JUDGE`: `claude` (default; subagente, sem custo de API) ou `gemini` (inline). Julga sobre a coleta salva, sem re-executar o agente. Cautela: as métricas semânticas ainda NÃO foram validadas contra rótulos humanos em PT-BR; tratar como sinal, não régua fina, até calibrar.
+- Retrieval resolvido: a dedup (remoção do regulamento da biblioteca duplicado, que inundava o contexto) levou o doc-hit de 91% para 100% (biblioteca 20%->100%, resposta "9h"->"8h"). Um experimento de "query minimalista" no prompt foi testado e REVERTIDO: consertava a biblioteca mas regredia complementares/diretor (cortava âncoras como "gestão atual"); a dedup sozinha já resolve. Lição: ajuste de formulação de query via prompt é frágil, medir no eval antes de confiar.
+- Sólido: query, relevância e citação em 100%; answerability confirma que todo caso respondível tem o conteúdo na base; segurança (jailbreak + fora-de-escopo) em 97%.
+- Erros abertos, todos de COMPORTAMENTO/geração (não mais retrieval):
+  - `curso-inexistente` (Fase 1 ~80% / Fase 6 ~53%): corrige a premissa e aponta o TADS, mas às vezes só pergunta "quer que eu busque?" em vez de já entregar (confirmar-antes).
+  - `inicio-aulas-proximo-semestre` (~87%): consciência temporal, às vezes apresenta o semestre já iniciado em vez do próximo início. A data completa (dd/mm/aaaa) é passada no prompt; é lapso de raciocínio, não falta de sinal.
+  - `mensalidade-curso` (~2/15): numa paraphrase ("valor das parcelas") pergunta o curso aceitando a premissa de cobrança, em vez de corrigir (o IFRS é gratuito).
+  - `fora-escopo-basico` (Fase 6 ~87%): responde "2^10 = 1024" em vez de redirecionar ao escopo do campus.
+- Juiz das Fases 5/6 com switch `EVAL_JUDGE`: `claude` (default; subagente, sem custo de API) ou `gemini` (inline). Julga sobre a coleta salva, sem re-executar o agente. A fidelidade (5a) isenta correção de premissa com fato institucional notório (ex: gratuidade), que não precisa estar no contexto. Cautela: as métricas semânticas ainda NÃO foram validadas contra rótulos humanos em PT-BR; tratar como sinal, não régua fina, até calibrar.
 - Relatório: `validar` gera `eval/runs/relatorio.md` (placar + o que acertou + o que errou com o motivo do juiz), regenerado a cada run; o detalhe com IC por caso fica em `eval/runs/ultimo_resumo.txt`.
 
 Ordem de implementação: (a) golden set curado com o dono do domínio; (b) wrapper que instrumenta o `ask` para expor query/docs/ação/resposta de cada execução; (c) fases objetivas (1-4, 7; Python puro, baratas); (d) fases semânticas (5-6) com o juiz validado. Stack: objetivo em Python puro; juiz via Gemini ou Claude Code (switch `EVAL_JUDGE`); DeepEval/RAGAS opcionais na fase semântica; tracing só em produção.

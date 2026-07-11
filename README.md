@@ -102,7 +102,7 @@ O backend é stateless: não guarda histórico nem sessão. O histórico da conv
 
 O rate limit usa Upstash Redis (20 requisições por minuto por IP) para proteger contra abuso de chamadas à LLM.
 
-A página servida ao usuário é um clone ao vivo do site do IFRS, montado a cada requisição (com cache em memória), e exibe uma faixa de aviso informando que é um ambiente de teste não oficial.
+A página servida ao usuário é um snapshot estático do site do IFRS, gerado offline (e commitado) com o widget de chat e uma faixa de aviso já injetados, não buscado ao vivo a cada requisição. Assim a página só muda quando a base muda, e o filesystem read-only do Vercel não é um problema. A faixa avisa que é um ambiente de teste não oficial.
 
 ---
 
@@ -206,6 +206,39 @@ $env:PORT=5050; python -m ui.app
 ```
 
 A aplicação ficará disponível em `http://localhost:<porta>`.
+
+---
+
+# Avaliação (eval)
+
+O projeto inclui uma bateria de testes automatizada que mede a qualidade do assistente sobre um conjunto curado de perguntas (o *golden set*). Como o pipeline passa pela LLM (não é determinístico), cada caso roda N vezes e reporta-se a **taxa de acerto** com intervalo de confiança, não um simples passa/falha.
+
+A avaliação percorre 7 fases, espelhando o caminho real do agente:
+
+1. **Decisão** - escolheu a ação certa (buscar, perguntar, corrigir uma premissa falsa, recusar)?
+2. **Formulação da query** - a busca levou o discriminador certo (curso, ano, tipo)?
+3. **Retrieval** - o documento correto foi recuperado?
+4. **Answerability** - a resposta existe na base (separa "a busca falhou" de "a base não tem")?
+5. **Geração** - a resposta é fiel ao contexto, relevante e correta?
+6. **Comportamento** - recusou/perguntou quando devia, ressalvou dado antigo, resistiu a jailbreak?
+7. **Citação** - as fontes citadas estão entre as recuperadas?
+
+As fases 1-4 e 7 são checadas por regra (sem LLM). As fases 5-6 usam um juiz LLM.
+
+Requer as dependências de desenvolvimento (`pip install -r requirements-dev.txt`). Roda em dois passos:
+
+```bash
+# 1) coleta: roda o agente e salva os traces (caro; só quando o agente muda)
+EVAL_N=5 python -m eval.run_eval coletar
+
+# 2) validação: aplica as fases sobre a coleta e gera o relatório (barato, instantâneo)
+python -m eval.run_eval validar
+```
+
+O `validar` gera automaticamente `eval/runs/relatorio.md`: um placar por fase, o que o assistente acertou e o que errou (com o motivo de cada falha). O juiz das fases 5-6 tem dois modos, via a variável `EVAL_JUDGE`:
+
+- **`claude`** (padrão): não usa API paga; o próprio Claude Code avalia as respostas.
+- **`gemini`**: avalia chamando a API do Gemini, num comando só (`EVAL_JUDGE=gemini python -m eval.run_eval validar`).
 
 ---
 

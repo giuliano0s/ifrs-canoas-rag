@@ -91,11 +91,23 @@ def _executar(case_id, inp, run):
 def coletar(n=1, filtro_ids=None):
     casos = carregar_casos()
     alvo  = [c for c in casos if not filtro_ids or c["id"] in filtro_ids]
+    alvo_ids = {c["id"] for c in alvo}
+    # merge: ao coletar so um subconjunto (filtro_ids), preserva os registros dos casos NAO
+    # filtrados que ja estao na coleta (recoletar a biblioteca nao apaga a coleta dos outros).
+    preservados = []
+    if filtro_ids and os.path.exists(COLETA):
+        for l in open(COLETA, encoding="utf-8"):
+            if l.strip() and json.loads(l).get("case_id") not in alvo_ids:
+                preservados.append(l.rstrip("\n"))
     total = sum(len(inputs_do_caso(c)) for c in alvo) * n
     os.makedirs(os.path.dirname(COLETA), exist_ok=True)
-    print(f"Coletando {total} execucoes (n={n}) -> {COLETA}", flush=True)
+    print(f"Coletando {total} execucoes (n={n}) de {len(alvo)} casos"
+          + (f", preservando {len(preservados)} registros de outros casos" if preservados else "")
+          + f" -> {COLETA}", flush=True)
     feitos = 0
     with open(COLETA, "w", encoding="utf-8") as f:
+        for l in preservados:
+            f.write(l + "\n")
         for caso in alvo:
             for inp in inputs_do_caso(caso):
                 for r in range(n):
@@ -311,7 +323,10 @@ _RUBRICA = (
     "PERGUNTA de um estudante, a RESPOSTA do assistente, o CONTEXTO recuperado e a REFERÊNCIA "
     "do que se espera. Avalie SOMENTE os critérios pedidos.\n\n"
     "Critérios:\n"
-    "- fidelidade: a resposta se apoia no CONTEXTO, sem afirmar fato que o contexto não sustenta.\n"
+    "- fidelidade: a resposta se apoia no CONTEXTO, sem afirmar fato que o contexto não sustenta. "
+    "EXCEÇÃO: correção de premissa falsa com fato institucional notório (ex: o IFRS é público e gratuito) "
+    "NÃO precisa estar no contexto; não penalize fidelidade por isso, ainda mais quando a resposta admite "
+    "honestamente que os documentos não cobrem o ponto.\n"
     "- relevancia: a resposta trata do que foi perguntado, sem desviar do assunto.\n"
     "- correcao: o fato central da resposta bate com a REFERÊNCIA (que NÃO é literal; a resposta "
     "pode ser mais completa). false se contradiz ou erra o fato.\n"
@@ -667,7 +682,9 @@ def validar():
 if __name__ == "__main__":
     modo = sys.argv[1] if len(sys.argv) > 1 else "validar"
     if modo == "coletar":
-        coletar(n=int(os.environ.get("EVAL_N", "1")))
+        ids = os.environ.get("EVAL_IDS")
+        filtro = [s.strip() for s in ids.split(",") if s.strip()] if ids else None
+        coletar(n=int(os.environ.get("EVAL_N", "1")), filtro_ids=filtro)
     elif modo == "validar":
         validar()
     else:

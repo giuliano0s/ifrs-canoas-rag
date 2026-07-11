@@ -202,6 +202,16 @@ def run_crawler(estado):
     st_html = {"nova": 0, "mudada": 0, "inalterada": 0}
     st_pdfd = {"nova": 0, "mudada": 0, "inalterada": 0}
 
+    # dedup por conteudo entre URLs distintas: mapa source_hash -> URL dona (na base) mais o
+    # acumulador do que ja foi visto neste run. Conteudo repetido sob outra URL (ex: re-upload
+    # "-1" do WordPress) e pulado, para o mesmo documento nao inflar o contexto do retrieval.
+    hash_base = {}
+    for u, e in estado.items():
+        if e.get("source_hash"):
+            hash_base.setdefault(e["source_hash"], u)
+    vistos_hash = {}
+    n_dup = 0
+
     # PDFs ja conhecidos como escaneados: com INCLUDE_SCANNED=False, nem sao baixados de novo
     scanned_conhecidos = set(json.loads(SCANNED_PATH.read_text(encoding="utf-8"))) if SCANNED_PATH.exists() else set()
     if not INCLUDE_SCANNED and scanned_conhecidos:
@@ -233,6 +243,9 @@ def run_crawler(estado):
             pdfs_all.append({"url": url, "parent": ""})
             sh     = source_hash(content)
             chave  = to_drive_view_url(url)
+            if _duplicata(chave, sh, hash_base, vistos_hash):
+                n_dup += 1
+                continue
             status = _classificar(chave, sh, estado)
             st_pdfd[status] += 1
             if status != "inalterada":
@@ -252,13 +265,16 @@ def run_crawler(estado):
             pages_all.append(url)
             title, text = extract_page_content(soup)
             if text is not None:
-                sh     = source_hash(text)
-                status = _classificar(url, sh, estado)
-                st_html[status] += 1
-                if status != "inalterada":
-                    pages_dirty.append({"source_url": url, "title": title, "text": text, "source_hash": sh})
-                    if status == "mudada":
-                        urls_mudadas.add(url)
+                sh = source_hash(text)
+                if _duplicata(url, sh, hash_base, vistos_hash):
+                    n_dup += 1
+                else:
+                    status = _classificar(url, sh, estado)
+                    st_html[status] += 1
+                    if status != "inalterada":
+                        pages_dirty.append({"source_url": url, "title": title, "text": text, "source_hash": sh})
+                        if status == "mudada":
+                            urls_mudadas.add(url)
 
         # segue os links (sempre, para descobrir filhos novos); coleta planilhas e PDFs do Drive
         novos = 0
@@ -297,6 +313,9 @@ def run_crawler(estado):
             continue
         sh     = source_hash(content)
         chave  = to_drive_view_url(url)
+        if _duplicata(chave, sh, hash_base, vistos_hash):
+            n_dup += 1
+            continue
         status = _classificar(chave, sh, estado)
         st_pdf[status] += 1
         if status != "inalterada":
@@ -313,6 +332,9 @@ def run_crawler(estado):
         if not csv_text:
             SHEETS_FALHAS.append((url, "download")); continue
         sh     = source_hash(csv_text)
+        if _duplicata(url, sh, hash_base, vistos_hash):
+            n_dup += 1
+            continue
         status = _classificar(url, sh, estado)
         st_sheet[status] += 1
         if status != "inalterada":
@@ -330,6 +352,7 @@ def run_crawler(estado):
     print(f"\nDescobertas: {len(pages_all)} paginas, {len(pdfs_all)} PDFs, {len(sheets_all)} planilhas")
     print(f"Dirty (novo+mudado): {len(pages_dirty)} paginas, {len(pdfs_dirty)} PDFs, {len(sheets_dirty)} planilhas")
     print(f"A substituir (mudadas): {len(urls_mudadas)}")
+    print(f"Duplicatas de conteudo (mesmo hash sob outra URL, puladas): {n_dup}")
 
     return pages_dirty, pdfs_dirty, sheets_dirty, urls_mudadas
 
@@ -429,6 +452,16 @@ def _classificar(url, sh, estado):
     if REPARSE or REINGEST:
         return "mudada"
     return "inalterada" if prev.get("source_hash") == sh else "mudada"
+
+def _duplicata(url, sh, hash_base, vistos_hash):
+    # True se este conteudo (source_hash) ja pertence a OUTRA URL, na base ou vista antes neste
+    # run: e o MESMO documento sob URL diferente (ex: re-upload "-1" do WordPress). Deve pular.
+    # A 1a URL de cada conteudo vira a dona; as repetidas seguintes caem aqui e sao ignoradas.
+    dono = hash_base.get(sh) or vistos_hash.get(sh)
+    if dono and dono != url:
+        return True
+    vistos_hash.setdefault(sh, url)
+    return False
 
 def run_html_parser(pages_dirty):
     print("\n" + "="*60)
