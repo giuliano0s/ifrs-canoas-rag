@@ -25,8 +25,6 @@ Thumbs.db
 .deepeval/
 .deepeval-cache.json
 .deepeval_telemetry.txt
-# eval/runs: ignora os intermediarios (coleta bruta, tarefas e vereditos do juiz);
-# versiona so a PROVA de desempenho (os relatorios)
-eval/runs/*
-!eval/runs/relatorio.md
-!eval/runs/ultimo_resumo.txt
+# eval/runs: versionado como prova (relatorios + tarefas/vereditos do juiz).
+# So o coleta.jsonl (traces brutos, ~10MB, regenerado por inteiro a cada run) fica de fora, para nao inflar o historico.
+eval/runs/coleta.jsonl

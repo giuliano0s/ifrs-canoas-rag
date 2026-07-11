@@ -27,33 +27,33 @@ Coleta: 355 execuções (0 com erro de API, excluídas). Golden: 25 casos. Métr
 - Fase 6 comportamento: 8/15 (53%)
 - Exemplo (juiz): "Não corrigiu a premissa e apresentou a grade do técnico integrado como se fosse a do TADS, fato incorreto e não sustentado pelo contexto."
 
-### mensalidade-curso
-- Fase 5c correção: 13/15 (87%), fato central errado
+### fora-escopo-basico
 - Fase 6 comportamento: 13/15 (87%)
-- Exemplo (juiz): "Pergunta de qual curso se trata, aceitando a premissa falsa de que existem parcelas em vez de corrigir que o ensino é gratuito."
+- Exemplo (juiz): "Respondeu a operacao matematica fora de escopo em vez de redirecionar ao campus."
 
 ### inicio-aulas-proximo-semestre
 - Fase 5c correção: 13/15 (87%), fato central errado
 - Fase 6 comportamento: 13/15 (87%)
 - Exemplo (juiz): "Apresenta apenas 23/02/2026 (semestre já iniciado) e horários de aula, sem o próximo início 27/07; falha de consciência temporal e de correção."
 
-### fora-escopo-basico
+### mensalidade-curso
+- Fase 5c correção: 13/15 (87%), fato central errado
 - Fase 6 comportamento: 13/15 (87%)
-- Exemplo (juiz): "Respondeu a operacao matematica fora de escopo em vez de redirecionar ao campus."
+- Exemplo (juiz): "Pergunta de qual curso se trata, aceitando a premissa falsa de que existem parcelas em vez de corrigir que o ensino é gratuito."
+
+### atendimento-igor
+- Fase 1 decisão: 18/20 (90%), decidiu diferente do esperado
 
 ### atendimento-vago
 - Fase 6 comportamento: 9/10 (90%)
 - Exemplo (juiz): "Em vez de pedir o discriminador, recuperou e respondeu setores avulsos (Espaço Lúdico, biblioteca); fatos e relevância ok, mas o comportamento diverge do esperado (perguntar)."
 
-### atendimento-igor
-- Fase 1 decisão: 18/20 (90%), decidiu diferente do esperado
-
-### rematricula-2026
-- Fase 1 decisão: 14/15 (93%), decidiu diferente do esperado
-
 ### diretor-geral-campus
 - Fase 6 comportamento: 14/15 (93%)
 - Exemplo (juiz): "Corrigiu a premissa reitor/diretor-geral, mas só ofereceu buscar em vez de já entregar o nome da diretora, faltando o buscar do corrigir_e_buscar."
+
+### rematricula-2026
+- Fase 1 decisão: 14/15 (93%), decidiu diferente do esperado
 
 ### auxilio-estudantil
 - Fase 3 retrieval: doc ok, mas o trecho com o fato não veio em 2/15 (chunk)

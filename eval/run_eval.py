@@ -520,7 +520,7 @@ def gerar_relatorio(f1, f2, f3, rrs, f4d, dest, f7, vereditos, n_exec, n_erros):
 
     # falhas por caso: reune as fases em que o caso ficou abaixo de 100% + motivo
     falhas = {}
-    for c in set(f1):
+    for c in sorted(f1):
         linhas = []
         k, n = pc(f1, c)
         if n and k < n:
