@@ -10,7 +10,7 @@
 Uso:  python -m eval.run_eval coletar    (usa EVAL_N, EVAL_THROTTLE)
       python -m eval.run_eval validar
 """
-import os, sys, io, re, json, time, unicodedata, contextlib
+import os, sys, io, re, json, time, unicodedata, contextlib, hashlib
 from datetime import datetime
 
 # console em UTF-8 (Windows cp1252 quebra acento/emoji)
@@ -30,6 +30,7 @@ COLETA = os.path.join(_DIR, "runs", "coleta.jsonl")
 RESUMO = os.path.join(_DIR, "runs", "ultimo_resumo.txt")
 RELATORIO = os.path.join(_DIR, "runs", "relatorio.md")
 CURSOS = os.path.join(_RAIZ, "data", "info", "cursos_atuais.json")
+PROMPT = os.path.join(_RAIZ, "data", "info", "agente-ifrs.txt")
 
 # throttle entre execucoes na coleta: o ask manda contexto grande (~12k tokens/busca);
 # em rajada estoura o limite de tokens/min da API. espaçar mantem abaixo do teto.
@@ -63,22 +64,24 @@ def _silencia_log():
     finally:
         sys.stdout = antigo
 
-def _executar(case_id, inp, run):
+def _executar(case_id, inp, run, data_referencia=None, stamp=None):
     # roda o ask real com retry; erro transitorio de API vira ERRO da execucao (nunca
     # derruba a coleta). o registro guarda so a SAIDA; as expectativas vem do golden ao validar.
+    # data_referencia (so casos temporais): sobrescreve a data de hoje do agente para o gold
+    # temporal nao apodrecer com o tempo; sem ela, o ask usa a data real.
     from rag.chain import ask
     trace, resposta, erro = {}, None, None
     for tent in range(3):
         try:
             trace = {}
             with _silencia_log():
-                resposta = ask(inp, trace=trace)
+                resposta = ask(inp, trace=trace, data_atual=data_referencia)
             erro = None
             break
         except Exception as e:
             erro = f"{type(e).__name__}: {str(e)[:120]}"
             time.sleep(8 * (tent + 1))
-    return {
+    rec = {
         "case_id":   case_id,
         "input":     inp,
         "run":       run,
@@ -87,11 +90,18 @@ def _executar(case_id, inp, run):
         "resposta":  resposta,
         "buscas":    trace.get("buscas", []),
     }
+    if stamp:
+        rec.update(stamp)  # modelo, prompt_versao, ts: versao do agente que gerou o registro
+    return rec
 
 def coletar(n=1, filtro_ids=None):
+    from rag.chain import MODEL
     casos = carregar_casos()
     alvo  = [c for c in casos if not filtro_ids or c["id"] in filtro_ids]
     alvo_ids = {c["id"] for c in alvo}
+    # carimbo de versao do agente em cada registro (rastreabilidade: qual config gerou o dado)
+    prompt_versao = hashlib.sha256(open(PROMPT, encoding="utf-8").read().encode("utf-8")).hexdigest()[:12]
+    stamp = {"modelo": MODEL, "prompt_versao": prompt_versao, "ts": datetime.now().isoformat(timespec="seconds")}
     # merge: ao coletar so um subconjunto (filtro_ids), preserva os registros dos casos NAO
     # filtrados que ja estao na coleta (recoletar a biblioteca nao apaga a coleta dos outros).
     preservados = []
@@ -111,7 +121,7 @@ def coletar(n=1, filtro_ids=None):
         for caso in alvo:
             for inp in inputs_do_caso(caso):
                 for r in range(n):
-                    rec = _executar(caso["id"], inp, r)
+                    rec = _executar(caso["id"], inp, r, data_referencia=caso.get("data_referencia"), stamp=stamp)
                     f.write(json.dumps(rec, ensure_ascii=False) + "\n"); f.flush()
                     feitos += 1
                     if feitos % 20 == 0:
@@ -305,7 +315,9 @@ def _tarefas_juiz(regs, casos):
         caso = casos.get(r["case_id"])
         if not caso:
             continue
-        ctx = [t[:600] for b in r.get("buscas", []) for t in b.get("chunks_textos", [])][:6]
+        # contexto COMPLETO pro juiz (todos os chunks recuperados, ate 2000 chars cada): truncar
+        # para 6x600 escondia o trecho que ancorava a resposta e gerava falso "sem apoio no contexto".
+        ctx = [t[:2000] for b in r.get("buscas", []) for t in b.get("chunks_textos", [])]
         tarefas.append({
             "case_id": r["case_id"], "input": r["input"], "run": r["run"],
             "checar": _dims(caso, r),

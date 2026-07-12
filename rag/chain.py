@@ -187,36 +187,7 @@ def _executar_busca(search_query, trace=None):
     return f"{context}\nFONTES:\n{sources_text}"
 
 
-def _history_text(history):
-    # serializa o histórico para os prompts em texto (fallback)
-    text = ""
-    for msg in history:
-        role = "Estudante" if msg["role"] == "user" else "Assistente"
-        text += f"{role}: {msg['content']}\n"
-    return text
-
-
-def _fallback_internet(query, history_text):
-    # base sem resultado: responde buscando na internet, priorizando o ifrs
-    response = google_client.models.generate_content(
-        model=MODEL,
-        contents=f"Você é um assistente do IFRS Campus Canoas.\n\nHistórico:\n{history_text}\n\nResponda a seguinte pergunta buscando na internet, priorizando fontes do IFRS: {query}",
-        config={"tools": [{"google_search": {}}], "temperature": 0.7},
-    )
-
-    result = response.text
-    try:
-        chunks = response.candidates[0].grounding_metadata.grounding_chunks
-        for c in chunks:
-            if c.web:
-                result += "\n\n*Esta resposta foi obtida por busca na internet, pois não encontrei o conteúdo na base de documentos do campus.*"
-                break
-    except Exception:
-        pass
-    return result
-
-
-def ask(query, history=None, max_steps=3, trace=None):
+def ask(query, history=None, max_steps=3, trace=None, data_atual=None):
     history = history or []
 
     # inicializa o trace opcional (eval/telemetria); em producao trace=None e nada muda
@@ -230,8 +201,10 @@ def ask(query, history=None, max_steps=3, trace=None):
         contents.append(types.Content(role=role, parts=[types.Part(text=msg["content"])]))
     contents.append(types.Content(role="user", parts=[types.Part(text=query)]))
 
-    # data calculada por request (nao no import): instancia serverless quente nao congela a data
-    data_atual = datetime.now().strftime("%d/%m/%Y")
+    # data por request (nao no import): instancia serverless quente nao congela a data.
+    # override opcional: o eval fixa a data de referencia nos casos temporais; em producao
+    # vem None e usa a data real de hoje.
+    data_atual = data_atual or datetime.now().strftime("%d/%m/%Y")
 
     # config com o prompt do agente como system_instruction e a ferramenta de busca
     config = types.GenerateContentConfig(
@@ -259,17 +232,15 @@ def ask(query, history=None, max_steps=3, trace=None):
                 trace["resposta"] = resposta
             return resposta
 
-        # o modelo pediu busca: executa e devolve o contexto, ou cai no fallback se vazio
+        # o modelo pediu busca: executa e devolve o contexto
         if trace is not None:
             trace["acao"] = "buscar"
         search_query = (fc.args or {}).get("query", query)
         context = _executar_busca(search_query, trace=trace)
+        # sem resultado na base: informa o modelo e deixa ele responder honestamente que nao
+        # encontrou (o prompt manda dizer isso); nao busca na internet nem inventa
         if context is None:
-            resposta = _fallback_internet(query, _history_text(history))
-            if trace is not None:
-                trace["resposta"] = resposta
-                trace["fallback_internet"] = True
-            return resposta
+            context = "Nenhum documento relevante foi encontrado na base para esta consulta."
 
         contents.append(cand)
         contents.append(types.Content(role="user", parts=[

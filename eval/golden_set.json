@@ -89,6 +89,7 @@
         "data da festa junina de Canoas"
       ],
       "tipo": "dado_atual_eventual + consciência_temporal: data varia por ano; edição atual às vezes só no Instagram",
+      "data_referencia": "07/07/2026",
       "acao_esperada": "buscar",
       "criterios_query": {
         "deve_conter": [["junina", "julina"]],
@@ -160,6 +161,7 @@
         "qual a data da volta às aulas?"
       ],
       "tipo": "consciencia_temporal: a resposta certa é o próximo início a partir da data atual, não o semestre já iniciado",
+      "data_referencia": "07/07/2026",
       "acao_esperada": "buscar",
       "criterios_query": {
         "deve_conter": [["aulas", "semestre", "calendario"]],
@@ -207,6 +209,7 @@
         "datas de rematrícula dos cursos superiores"
       ],
       "tipo": "direta_temporal + consciência_temporal: há dois semestres na base, o vigente muda com a data",
+      "data_referencia": "07/07/2026",
       "acao_esperada": "buscar",
       "criterios_query": {
         "deve_conter": ["rematricula"],
