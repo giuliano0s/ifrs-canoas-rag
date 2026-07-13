@@ -132,9 +132,13 @@ def coletar(n=1, filtro_ids=None):
 # ── normalizacao e expansao de placeholders ─────────────────────────────────────
 
 def _norm(s):
-    # minusculas + sem acento, para casar "análise" com "analise"
+    # minusculas + sem acento + espacos/quebras colapsados num unico espaco. o colapso e
+    # necessario para o match de span: o gabarito tem espaco simples ("PASSO A PASSO PARA
+    # INSCRICOES"), mas o texto extraido de PDF quebra a linha no meio da frase ("...PARA\n
+    # INSCRICOES"), e sem colapsar o substring nao casa (falso "trecho nao veio").
     s = unicodedata.normalize("NFKD", (s or "").lower())
-    return "".join(c for c in s if not unicodedata.combining(c))
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    return re.sub(r"\s+", " ", s)
 
 _CURSOS_CACHE = None
 def _cursos_atuais():
@@ -315,9 +319,12 @@ def _tarefas_juiz(regs, casos):
         caso = casos.get(r["case_id"])
         if not caso:
             continue
-        # contexto COMPLETO pro juiz (todos os chunks recuperados, ate 2000 chars cada): truncar
-        # para 6x600 escondia o trecho que ancorava a resposta e gerava falso "sem apoio no contexto".
-        ctx = [t[:2000] for b in r.get("buscas", []) for t in b.get("chunks_textos", [])]
+        # contexto COMPLETO pro juiz: chunk inteiro, SEM truncar. Truncar em 2000 chars (ou no
+        # antigo 6x600) cortava o trecho que ancorava a resposta em chunks longos (a planilha de
+        # atendimento tem ~4000 chars, alfabetica: as linhas de "Igor" caem apos o offset 2000),
+        # gerando falso "sem apoio no contexto". Fidelidade so e confiavel se o juiz ve o mesmo
+        # contexto que o agente viu.
+        ctx = [t for b in r.get("buscas", []) for t in b.get("chunks_textos", [])]
         tarefas.append({
             "case_id": r["case_id"], "input": r["input"], "run": r["run"],
             "checar": _dims(caso, r),
@@ -480,23 +487,53 @@ def _bloco_fase4(f4, f3):
         linhas.append(f"  {caso:<32} {'SIM' if ans else 'NAO':<4}{nota}")
     return linhas
 
-# ── RELATORIO: resumo limpo (placar + acertos + falhas com motivo), regenerado a cada run ──
+def _meta_coleta(regs, f1):
+    # resumo da config da coleta para o cabecalho do relatorio (rastreabilidade da prova):
+    # versao(oes) de prompt e quantos casos/execucoes em cada, modelo, periodo e n por input.
+    versoes, casos_por_versao, modelos, ts = {}, {}, set(), []
+    for r in regs:
+        if r.get("erro"):
+            continue
+        v = r.get("prompt_versao")
+        versoes[v] = versoes.get(v, 0) + 1
+        casos_por_versao.setdefault(v, set()).add(r["case_id"])
+        if r.get("modelo"):
+            modelos.add(r["modelo"])
+        if r.get("ts"):
+            ts.append(r["ts"])
+    return {
+        "versoes": sorted(versoes.items(), key=lambda x: (-x[1], str(x[0]))),
+        "casos_por_versao": {k: len(v) for k, v in casos_por_versao.items()},
+        "modelos": sorted(modelos),
+        "ts_min": min(ts) if ts else None,
+        "ts_max": max(ts) if ts else None,
+        "n_por_input": max((r.get("run", 0) for r in regs if not r.get("erro")), default=-1) + 1,
+        "n_casos": len(f1),
+        "n_inputs": len({(r["case_id"], r["input"]) for r in regs if not r.get("erro")}),
+    }
 
-def gerar_relatorio(f1, f2, f3, rrs, f4d, dest, f7, vereditos, n_exec, n_erros):
-    # helpers locais de agregacao e formatacao
+
+# ── RELATORIO: a PROVA para olhos externos. Regenerado a cada validar; maximo de detalhe,
+# sempre com IC de Wilson, versao(oes) da coleta, caveat do juiz e classificacao de cada falha. ──
+
+def gerar_relatorio(f1, f2, f3, rrs, f4d, dest, f7, vereditos, n_exec, n_erros, casos, meta):
+    # helpers de agregacao e formatacao
     def kn(d):
         return sum(sum(v) for v in d.values()), sum(len(v) for v in d.values())
     def pc(d, c):
         v = d.get(c, []); return sum(v), len(v)
     def pct(k, n):
         return f"{k/n*100:.0f}%" if n else "n/a"
+    def ic(k, n):
+        if not n:
+            return ""
+        lo, hi = _wilson(k, n)
+        return f" [{lo*100:.0f}-{hi*100:.0f}%]"
+    def f3kn(c, idx):
+        vals = f3.get(c, [])
+        return (sum(1 for t in vals if t[idx]), sum(1 for t in vals if t[idx] is not None))
 
-    L = ["# Relatório da bateria de avaliação", ""]
-    L.append(f"Coleta: {n_exec} execuções ({n_erros} com erro de API, excluídas). "
-             f"Golden: {len(f1)} casos. Métrica: taxa por execução.")
-    L.append("")
-
-    # totais por fase para o placar
+    # totais por fase
     k1, n1 = kn(f1); k2, n2 = kn(f2); k7, n7 = kn(f7)
     tdoc = ndoc = tspan = nspan = 0
     for vals in f3.values():
@@ -508,17 +545,51 @@ def gerar_relatorio(f1, f2, f3, rrs, f4d, dest, f7, vereditos, n_exec, n_erros):
     ka, na = kn(dest["fidelidade"]); kr, nr = kn(dest["relevancia"])
     kc, nc = kn(dest["correcao"]);   k6, n6 = kn(dest["comportamento"])
 
-    L += ["## Placar por fase", ""]
-    L.append(f"- Fase 1 decisão: {pct(k1,n1)} ({k1}/{n1})")
-    L.append(f"- Fase 2 formulação da query: {pct(k2,n2)} ({k2}/{n2})")
-    L.append(f"- Fase 3 retrieval: doc {pct(tdoc,ndoc)} / span {pct(tspan,nspan)} (MRR {mrr:.2f})")
-    L.append(f"- Fase 4 answerability: {n_sim}/{n_ans} casos respondíveis têm o conteúdo na base")
-    if nr:
-        L.append(f"- Fase 5 geração: fidelidade {pct(ka,na)} / relevância {pct(kr,nr)} / correção {pct(kc,nc)}")
-        L.append(f"- Fase 6 comportamento: {pct(k6,n6)} ({k6}/{n6})")
+    # cabecalho + configuracao da coleta (rastreabilidade da prova)
+    L = ["# Relatório da bateria de avaliação — Assistente IFRS Campus Canoas", ""]
+    L += ["## Configuração da coleta", ""]
+    L.append(f"- Execuções: {n_exec} ({n_erros} com erro de API, excluídas) | "
+             f"{meta['n_casos']} casos, {meta['n_inputs']} inputs | n={meta['n_por_input']} execuções por input.")
+    if meta["modelos"]:
+        L.append(f"- Modelo do agente: {', '.join(meta['modelos'])}.")
+    if len(meta["versoes"]) <= 1:
+        v = meta["versoes"][0][0] if meta["versoes"] else "?"
+        L.append(f"- Versão do prompt: `{v}` (coleta homogênea, uma só versão).")
     else:
-        L.append("- Fases 5/6 (juiz): não julgadas ainda")
-    L.append(f"- Fase 7 citação: {pct(k7,n7)} ({k7}/{n7})")
+        L.append("- Versões do prompt na coleta (atualização MODULAR, rastreável pelo carimbo `prompt_versao` de cada execução):")
+        for v, n in meta["versoes"]:
+            L.append(f"    - `{v}`: {n} execuções, {meta['casos_por_versao'].get(v, 0)} casos.")
+        L.append("    - Por que misturar versões é válido: uma mudança de prompt afeta só os casos do comportamento alterado; "
+                 "os demais mantêm a coleta anterior, que continua válida porque a mudança não os toca. Não é comparação entre "
+                 "versões, é medição modular. Cada execução guarda a versão que a gerou, então a prova é auditável.")
+    if meta["ts_min"]:
+        L.append(f"- Período da coleta: {meta['ts_min']} a {meta['ts_max']}.")
+    L.append("- Métrica: taxa de acerto POR EXECUÇÃO, com intervalo de confiança de Wilson 95% em tudo. "
+             "A amostra por input é pequena, então o IC (não o ponto) é a leitura honesta: um 14/15 tem IC largo.")
+    L.append("")
+
+    # metodologia e limites (para olhos externos)
+    L += ["## Como ler (metodologia e limites)", ""]
+    L.append("As 7 fases espelham o pipeline do agente (a pergunta entra, ele decide, formula a query, recupera, responde e cita). Cada fase mede uma etapa:")
+    L.append("- Objetivas (1 decisão, 2 query, 3 retrieval, 4 answerability, 7 citação): checadas por regra em Python, sem LLM. São régua.")
+    L.append("- Semânticas (5 geração, 6 comportamento): usam um LLM como juiz.")
+    L.append("- LIMITE CRÍTICO: o juiz das Fases 5/6 NÃO foi calibrado contra rótulo humano em PT-BR. "
+             "Trate 5/6 como SINAL, não régua, até medir a concordância (kappa) com anotação humana; números altos aqui não são prova definitiva.")
+    L.append("- Fase 4 separa 'a base não tem o dado' de 'o retrieval falhou': se o conteúdo existe na base mas não foi recuperado, a falha é do retrieval, não da base.")
+    L.append("")
+
+    # placar com IC
+    L += ["## Placar por fase (taxa [IC de Wilson 95%])", ""]
+    L.append(f"- Fase 1 decisão (ação certa): {pct(k1,n1)}{ic(k1,n1)} ({k1}/{n1}).")
+    L.append(f"- Fase 2 formulação da query: {pct(k2,n2)}{ic(k2,n2)} ({k2}/{n2}).")
+    L.append(f"- Fase 3 retrieval: doc {pct(tdoc,ndoc)}{ic(tdoc,ndoc)} | span {pct(tspan,nspan)}{ic(tspan,nspan)} | MRR {mrr:.2f}.")
+    L.append(f"- Fase 4 answerability: {n_sim}/{n_ans} casos respondíveis têm o conteúdo na base.")
+    if nr:
+        L.append(f"- Fase 5 geração (juiz, SINAL): fidelidade {pct(ka,na)}{ic(ka,na)} | relevância {pct(kr,nr)}{ic(kr,nr)} | correção {pct(kc,nc)}{ic(kc,nc)}.")
+        L.append(f"- Fase 6 comportamento (juiz, SINAL): {pct(k6,n6)}{ic(k6,n6)} ({k6}/{n6}).")
+    else:
+        L.append("- Fases 5/6 (juiz): não julgadas ainda.")
+    L.append(f"- Fase 7 citação: {pct(k7,n7)}{ic(k7,n7)} ({k7}/{n7}).")
     L.append("")
 
     # justificativa representativa de cada criterio que falhou (do juiz)
@@ -530,73 +601,133 @@ def gerar_relatorio(f1, f2, f3, rrs, f4d, dest, f7, vereditos, n_exec, n_erros):
                 if j and (v["case_id"], crit) not in just:
                     just[(v["case_id"], crit)] = j
 
-    # falhas por caso: reune as fases em que o caso ficou abaixo de 100% + motivo
+    # falhas por caso: fases abaixo de 100% (com IC)
     falhas = {}
     for c in sorted(f1):
         linhas = []
         k, n = pc(f1, c)
         if n and k < n:
-            linhas.append(f"- Fase 1 decisão: {k}/{n} ({pct(k,n)}), decidiu diferente do esperado")
+            linhas.append(f"- Fase 1 decisão: {k}/{n} ({pct(k,n)}{ic(k,n)}), ação diferente da esperada.")
         vals = f3.get(c, [])
         ds = [d for d, s in vals if d is not None]
         ss = [s for d, s in vals if s is not None]
         chk = sum(1 for d, s in vals if s is False and d)
         retr_baixo = bool(ds) and sum(ds) < len(ds)
         if retr_baixo:
-            linhas.append(f"- Fase 3 retrieval: doc {sum(ds)}/{len(ds)} ({pct(sum(ds),len(ds))}), "
-                          f"o documento certo raramente entra no top-15 (o conteúdo existe na base)")
+            linhas.append(f"- Fase 3 retrieval: doc {sum(ds)}/{len(ds)} ({pct(sum(ds),len(ds))}{ic(sum(ds),len(ds))}), "
+                          f"o documento certo nem sempre entra no top-15.")
         elif ss and chk:
-            linhas.append(f"- Fase 3 retrieval: doc ok, mas o trecho com o fato não veio em {chk}/{len(ss)} (chunk)")
+            linhas.append(f"- Fase 3 retrieval: doc ok, mas o trecho com o fato não veio em {chk}/{len(ss)} (chunk).")
         ka_, na_ = pc(dest["fidelidade"], c)
         if na_ and ka_ < na_:
-            linhas.append(f"- Fase 5a fidelidade: {ka_}/{na_} ({pct(ka_,na_)}), afirmou algo sem apoio no contexto")
+            linhas.append(f"- Fase 5a fidelidade: {ka_}/{na_} ({pct(ka_,na_)}{ic(ka_,na_)}), afirmou algo sem apoio no contexto.")
         kc_, nc_ = pc(dest["correcao"], c)
         if nc_ and kc_ < nc_:
             extra = " (consequência do retrieval)" if retr_baixo else ""
-            linhas.append(f"- Fase 5c correção: {kc_}/{nc_} ({pct(kc_,nc_)}), fato central errado{extra}")
+            linhas.append(f"- Fase 5c correção: {kc_}/{nc_} ({pct(kc_,nc_)}{ic(kc_,nc_)}), fato central errado{extra}.")
         k6_, n6_ = pc(dest["comportamento"], c)
         if n6_ and k6_ < n6_:
-            linhas.append(f"- Fase 6 comportamento: {k6_}/{n6_} ({pct(k6_,n6_)})")
+            linhas.append(f"- Fase 6 comportamento: {k6_}/{n6_} ({pct(k6_,n6_)}{ic(k6_,n6_)}).")
         if linhas:
             motivo = just.get((c, "correcao")) or just.get((c, "comportamento")) or just.get((c, "fidelidade"))
             falhas[c] = (linhas, motivo)
 
+    # classificacao (tag) de cada falha, por regra: separa bug real de flake/estrutural/artefato
+    def tags_do_caso(c):
+        tags = []
+        caso = casos.get(c, {})
+        dd, nd = f3kn(c, 0); sd, ns = f3kn(c, 1)
+        retr = (nd and dd < nd) or (ns and sd < ns)
+        if retr and f4d.get(c):
+            tags.append("retrieval instável: o conteúdo EXISTE na base; o doc entra/não no top-15 conforme o draw (ruído de temperatura)")
+        elif retr:
+            tags.append("retrieval abaixo de 100%")
+        if caso.get("existe_na_base") is False:
+            tags.append("gap de base: o dado não existe na base; não-alucinar (admitir a lacuna) é o esperado")
+        kcx, ncx = pc(dest["correcao"], c)
+        if ncx and kcx < ncx and not retr:
+            tags.append("correção: fato central divergente")
+        k6x, n6x = pc(dest["comportamento"], c)
+        if n6x and k6x < n6x:
+            faltam = n6x - k6x
+            if faltam <= 1:
+                tags.append(f"comportamento: {faltam} de {n6x} execuções (IC largo; provável ruído de temperatura, não erro sistemático)")
+            else:
+                tags.append(f"comportamento: {faltam} de {n6x} execuções (recorrente; candidato a ajuste de prompt)")
+        k1x, n1x = pc(f1, c)
+        if n1x and k1x < n1x and n6x and (k6x / n6x) > (k1x / n1x):
+            tags.append("Fase 1: parte das divergências são ações alternativas aceitáveis (o comportamento as aceita); candidato a acao_esperada em lista")
+        return tags
+
     # o que esta solido (data-driven)
+    limpos = sorted(set(f1) - set(falhas))
     L += ["## O que está sólido", ""]
     cem = []
     if n2 and k2 == n2: cem.append("formulação da query")
+    if na and ka == na: cem.append("fidelidade ao contexto")
     if nr and kr == nr: cem.append("relevância das respostas")
     if n7 and k7 == n7: cem.append("citação de fontes")
     if cem:
-        L.append(f"- 100%: {', '.join(cem)}.")
+        L.append(f"- 100% (com IC no placar): {', '.join(cem)}.")
     seg = [c for c in dest["comportamento"] if c.startswith(("jailbreak", "fora-escopo"))]
     if seg:
         ks = sum(sum(dest["comportamento"][c]) for c in seg)
-        ns = sum(len(dest["comportamento"][c]) for c in seg)
-        L.append(f"- Segurança (jailbreak + fora-de-escopo): {pct(ks,ns)} de comportamento correto.")
-    L.append(f"- Casos sem nenhuma falha nas fases aplicáveis: {len(set(f1)) - len(falhas)}/{len(set(f1))}.")
+        ns_ = sum(len(dest["comportamento"][c]) for c in seg)
+        L.append(f"- Segurança (jailbreak + fora-de-escopo, {len(seg)} casos): {pct(ks,ns_)}{ic(ks,ns_)} de comportamento correto (não vaza o prompt, não sai do papel, redireciona fora de escopo).")
+    L.append(f"- Casos 100% limpos nas fases aplicáveis: {len(limpos)}/{len(set(f1))}"
+             + (f" ({', '.join(limpos)})." if limpos else "."))
     L.append("")
 
-    # o que falhou, pior primeiro
-    L += ["## O que falhou (detalhe)", ""]
+    # o que falhou, pior primeiro, com tag + answerability + notas do gabarito + exemplo do juiz
+    def sev(c):
+        taxas = []
+        for d in (f1, dest["fidelidade"], dest["correcao"], dest["comportamento"]):
+            k, n = pc(d, c)
+            if n: taxas.append(k / n)
+        ds = [d for d, s in f3.get(c, []) if d is not None]
+        if ds: taxas.append(sum(ds) / len(ds))
+        return min(taxas) if taxas else 1
+
+    L += ["## O que falhou (detalhe, pior primeiro)", ""]
     if not falhas:
         L.append("Nenhuma falha registrada.")
+        L.append("")
     else:
-        def sev(c):
-            taxas = []
-            for d in (f1, dest["fidelidade"], dest["correcao"], dest["comportamento"]):
-                k, n = pc(d, c)
-                if n: taxas.append(k / n)
-            ds = [d for d, s in f3.get(c, []) if d is not None]
-            if ds: taxas.append(sum(ds) / len(ds))
-            return min(taxas) if taxas else 1
         for c in sorted(falhas, key=sev):
             linhas, motivo = falhas[c]
+            caso = casos.get(c, {})
             L.append(f"### {c}")
+            tags = tags_do_caso(c)
+            if tags:
+                L.append("- Classificação: " + "; ".join(tags) + ".")
             L += linhas
+            ans = f4d.get(c)
+            if ans is not None:
+                L.append(f"- Answerability: {'o dado EXISTE na base (a falha não é da base)' if ans else 'o dado NÃO está na base (não-alucinar é o esperado)'}.")
+            if caso.get("notas"):
+                L.append(f"- Contexto do gabarito: {caso['notas']}")
             if motivo:
-                L.append(f"- Exemplo (juiz): \"{motivo}\"")
+                L.append(f"- Exemplo do juiz: \"{motivo}\"")
             L.append("")
+
+    # tabela por caso: taxa em cada fase aplicavel (maximo de detalhe)
+    L += ["## Tabela por caso (taxa por fase aplicável; '-' = não se aplica)", ""]
+    L.append("| caso | ação esperada | existe? | F1 dec | F2 qry | F3 doc | F3 span | F5 fid | F5 rel | F5 cor | F6 comp | F7 cit |")
+    L.append("|---|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|")
+    def cel(k, n):
+        return f"{k}/{n}" if n else "-"
+    for c in sorted(f1):
+        caso = casos.get(c, {})
+        acao = caso.get("acao_esperada")
+        acao = "/".join(acao) if isinstance(acao, list) else str(acao)
+        ex = {True: "sim", False: "não"}.get(caso.get("existe_na_base"), "n/a")
+        dd, nd = f3kn(c, 0); sd, ns = f3kn(c, 1)
+        row = [c, acao, ex, cel(*pc(f1, c)), cel(*pc(f2, c)), cel(dd, nd), cel(sd, ns),
+               cel(*pc(dest["fidelidade"], c)), cel(*pc(dest["relevancia"], c)),
+               cel(*pc(dest["correcao"], c)), cel(*pc(dest["comportamento"], c)), cel(*pc(f7, c))]
+        L.append("| " + " | ".join(row) + " |")
+    L.append("")
+
     return "\n".join(L).rstrip() + "\n"
 
 # ── VALIDAR: le a coleta, junta com o golden, aplica as fases ────────────────────
@@ -686,7 +817,8 @@ def validar():
     os.makedirs(os.path.dirname(RESUMO), exist_ok=True)
     with open(RESUMO, "w", encoding="utf-8") as f:
         f.write(texto)
-    relatorio = gerar_relatorio(f1, f2, f3, rrs, f4, dest, f7, vereditos, len(regs), erros)
+    meta = _meta_coleta(regs, f1)
+    relatorio = gerar_relatorio(f1, f2, f3, rrs, f4, dest, f7, vereditos, len(regs), erros, casos, meta)
     with open(RELATORIO, "w", encoding="utf-8") as f:
         f.write(relatorio)
     print(relatorio)
