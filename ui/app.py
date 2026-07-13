@@ -51,7 +51,11 @@ def chat():
 
     # histórico chega pronto do cliente, servidor não guarda estado
     history = sanitize_history(data.get("history"))
-    session_id = data.get("session_id") if isinstance(data.get("session_id"), str) else None
+    # identidade anonima vinda do cliente (telemetria): teto de tamanho para nao virar bomba
+    session_id = data.get("session_id")
+    session_id = session_id[:64] if isinstance(session_id, str) else None
+    user_id = data.get("user_id")
+    user_id = user_id[:64] if isinstance(user_id, str) else None
 
     # roda o agente com trace e envia a telemetria do turno (Langfuse); a telemetria é
     # opcional e protegida, e o try garante que uma falha do ask vire 500 limpo (e fique
@@ -62,7 +66,7 @@ def chat():
     except Exception as e:
         erro = f"{type(e).__name__}: {str(e)[:200]}"
     latencia_ms = int((time.time() - inicio) * 1000)
-    registrar_chat(query, history, trace, response, latencia_ms, erro=erro, session_id=session_id)
+    registrar_chat(query, history, trace, response, latencia_ms, erro=erro, session_id=session_id, user_id=user_id)
 
     if erro is not None:
         return jsonify({"error": "erro ao processar a pergunta"}), 500

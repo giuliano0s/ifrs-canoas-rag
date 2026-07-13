@@ -29,7 +29,7 @@ def _cliente():
 # versao viva do prompt: perguntas reais viram candidatas a caso de golden depois da curadoria.
 # payload LEVE: guarda os ids dos chunks (url#i), nao o texto cru; o harvest reconstroi o texto
 # localmente com index.fetch(ids). tudo dentro de try: falha de telemetria nunca afeta a resposta.
-def registrar_chat(query, history, trace, resposta, latencia_ms, erro=None, session_id=None):
+def registrar_chat(query, history, trace, resposta, latencia_ms, erro=None, session_id=None, user_id=None):
     cli = _cliente()
     if cli is None:
         return
@@ -51,9 +51,10 @@ def registrar_chat(query, history, trace, resposta, latencia_ms, erro=None, sess
             "history_len": len(history or []),
             "latencia_ms": latencia_ms,
             "session_id": session_id,
+            "user_id": user_id,
             "origem": "producao",
         })
-        cli.trace(name="chat", input=query, output=resposta, session_id=session_id, metadata=rec)
+        cli.trace(name="chat", input=query, output=resposta, session_id=session_id, user_id=user_id, metadata=rec)
         cli.flush()
     except Exception:
         pass

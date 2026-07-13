@@ -86,7 +86,7 @@ def harvest(limite=500):
                 "acao_real": m.get("acao_real"), "resposta": m.get("resposta"),
                 "buscas": buscas,
                 "modelo": m.get("modelo"), "prompt_versao": m.get("prompt_versao"),
-                "ts": m.get("ts"), "session_id": m.get("session_id"), "origem": "producao",
+                "ts": m.get("ts"), "session_id": m.get("session_id"), "user_id": m.get("user_id"), "origem": "producao",
             }
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
             n += 1

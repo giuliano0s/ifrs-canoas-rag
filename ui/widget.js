@@ -193,6 +193,24 @@
   // historico apenas em memoria, comeca vazio a cada carregamento
   let history = [];
 
+  // identidade anonima para telemetria: userId opaco por dispositivo (persiste no localStorage,
+  // sobrevive ao F5), e sessionId por carregamento de pagina (mesma vida do historico, zera no reload)
+  let userId = null;
+  try {
+    userId = localStorage.getItem("ifrs_chat_uid");
+    if (!userId) {
+      userId = (window.crypto && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : String(Date.now()) + Math.random().toString(16).slice(2);
+      localStorage.setItem("ifrs_chat_uid", userId);
+    }
+  } catch (e) {
+    userId = null; // localStorage indisponivel (ex: modo restrito): segue sem identificar
+  }
+  const sessionId = (window.crypto && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : String(Date.now()) + Math.random().toString(16).slice(2);
+
   // transforma URLs do texto em links clicaveis, preservando o resto como texto
   function linkify(text) {
     const frag = document.createDocumentFragment();
@@ -270,7 +288,7 @@
       const res = await fetch(CHAT_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query, history })
+          body: JSON.stringify({ query, history, user_id: userId, session_id: sessionId })
       });
       typing.remove();
 
