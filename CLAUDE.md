@@ -67,7 +67,7 @@ Telemetria (opcional, `rag/telemetry.py`): cada turno do `/chat` é registrado n
 
 ### Servidor sem estado (decisão central)
 
-O servidor NÃO guarda histórico de conversa, sessão, nem cookie. O histórico vive no cliente (`ui/widget.js`, variável em memória) e é enviado inteiro no corpo de cada `POST /chat`. O servidor sanitiza (`sanitize_history`, teto de `MAX_HISTORY_MESSAGES`) e repassa ao `ask`. Isso é o que torna o app compatível com o serverless do Vercel (instâncias efêmeras que não compartilham memória). Ao recarregar a página o histórico zera de propósito (vive em memória, não em `localStorage`), para contexto antigo não poluir uma nova conversa. O `localStorage` guarda só um id anônimo de dispositivo para a telemetria (`user_id`), que persiste no F5 mas NÃO repopula o histórico. O contexto multi-turno funciona durante a sessão ativa porque o array em memória acumula e vai junto em cada chamada.
+O servidor NÃO guarda histórico de conversa, sessão, nem cookie. O histórico vive no cliente (`ui/widget.js`, variável em memória) e é enviado inteiro no corpo de cada `POST /chat`. O servidor sanitiza e aplica tetos anti-abuso (`sanitize_history` limita quantidade e tamanho do histórico; `MAX_QUERY_CHARS` limita a query; `check_global_budget` limita o volume diário) e repassa ao `ask`. Isso é o que torna o app compatível com o serverless do Vercel (instâncias efêmeras que não compartilham memória). Ao recarregar a página o histórico zera de propósito (vive em memória, não em `localStorage`), para contexto antigo não poluir uma nova conversa. O `localStorage` guarda só um id anônimo de dispositivo para a telemetria (`user_id`), que persiste no F5 mas NÃO repopula o histórico. O contexto multi-turno funciona durante a sessão ativa porque o array em memória acumula e vai junto em cada chamada.
 
 ### Página servida estaticamente
 
@@ -92,7 +92,7 @@ Entrypoint em `api/index.py` (reexpõe `from ui.app import app`); o preset Flask
 ## Próximos passos
 
 Em aberto, nesta ordem de prioridade (a bateria das Fases 1-7 já está implementada e rodando; ver "Achados atuais" e "Pontos fracos atuais"):
-1. Endurecer a produção para uso público (os bloqueadores de "Pontos fracos atuais"): teto de tamanho de query e de histórico + teto global de gasto; corrigir o rate limit (hoje confia no `X-Forwarded-For`, spoofável); tratamento de erro em `ask`/Gemini/Upstash/Redis; parar de servir o fonte (`/app.py`); avaliar injeção indireta via documentos/planilhas. Sem isso, serve só piloto supervisionado, não público aberto.
+1. Endurecer a produção para uso público: FEITO os caps de tamanho (query + histórico por chars) + teto global de volume no dia (`GLOBAL_DAILY_MAX`), o rate limit com IP real do Vercel (não o `X-Forwarded-For` spoofável) e o fim do fonte servido (`/app.py` -> 404 por whitelist). ABERTO, baixa prioridade no piloto: tratamento de erro no caminho do Redis (rate limit), injeção indireta via documentos/planilhas, e aviso/redação de PII na telemetria (LGPD).
 2. Calibrar o juiz contra rótulo humano: rotular à mão uma amostra (~30-50 julgamentos) e medir concordância (kappa); só então tratar as Fases 5/6 como régua, não só sinal. Junto: re-julgar tudo numa passada consistente ao mudar juiz/rubrica (não misturar severidades). Mecanismo planejado: uma página HTML interativa de curadoria (sobre o harvest de produção) onde o humano marca concordo/discordo do juiz e dá score/correção manual; isso gera os rótulos humanos (fecha a calibração) e de quebra cura perguntas reais em casos de golden. Não-circularidade: o gold vem do CONTEÚDO da base, nunca da resposta que o agente deu em produção.
 3. Fechar os erros de comportamento abertos via prompt, medindo no eval: `curso-inexistente` (flagrar o curso inexistente + não inventar cifras fora do contexto) e `mensalidade` (corrigir a premissa de cobrança); e A/B de temperatura (0.2 vs 0.7) contra a flakiness de 1-em-15.
 4. Escalar o golden set (25 -> 100-150), adensando segurança (hoje só 6 casos): **geração sintética validada** (um LLM gera candidatas dos próprios documentos, humano/juiz valida, mantendo a não-circularidade) + **telemetria de produção** (perguntas reais viram novos casos); leva de prova-de-conceito a suíte de regressão.
@@ -108,12 +108,13 @@ Nota de contexto (jul/2026): as notícias institucionais do site respondem HTTP 
 
 O que ainda está aberto, por área (motiva os "Próximos passos"):
 
-Produção / uso público (o maior buraco, quase intocado; bloqueia abrir ao público geral):
-- Custo/abuso: sem teto de tamanho de query nem de histórico (só limita a QUANTIDADE de mensagens, não o tamanho) e sem teto global de gasto -> bomba de tokens no Gemini.
-- Rate limit burlável: `gatekeeper` usa o primeiro `X-Forwarded-For`, controlado pelo cliente -> spoof rotativo fura o limite de 20/min.
-- Sem tratamento de erro em `ask`/Gemini/Upstash/Redis: um hiccup vira 500, e Redis fora derruba o serviço inteiro.
-- Injeção indireta: documento recuperado entra no contexto sem sanitização; planilhas Google são editáveis por terceiros e poderiam sequestrar a resposta (o hardening de segurança cobre só o input do usuário, não o conteúdo recuperado).
-- Rota catch-all serve o código-fonte (`GET /app.py`).
+Produção / uso público (parte endurecida; resta o espinhoso e o de baixa prioridade):
+- Custo/abuso: FEITO. Teto de tamanho de query (`MAX_QUERY_CHARS`) e de histórico por chars (`MAX_MSG_CHARS`/`MAX_HISTORY_CHARS`, não só a quantidade) + teto global de volume no dia (`GLOBAL_DAILY_MAX`, contador no Redis, proxy de gasto que devolve 503 ao estourar).
+- Rate limit: FEITO. `client_ip` usa o `X-Real-IP` (borda do Vercel) ou o ÚLTIMO `X-Forwarded-For`, nunca o primeiro (que o cliente spoofa).
+- Fonte exposto: FEITO. A rota estática só serve um whitelist (`widget.js`/`index.html`); `/app.py` e afins viram 404.
+- Tratamento de erro: PARCIAL. O `ask` é envolvido em try no `/chat` (500 limpo + registrado no Langfuse) e o `check_global_budget` é fail-open. FALTA o caminho do rate limit (Redis fora ainda derruba o request). Baixa prioridade no piloto.
+- Injeção indireta: ABERTO (baixa prioridade). Documento/planilha recuperado entra no contexto sem sanitização; o hardening cobre só o input do usuário. Na prática só quem tem acesso às planilhas do campus exploraria.
+- Privacidade/LGPD: ABERTO (adiado, fase de testes). A telemetria loga pergunta/resposta reais; falta aviso e redação de PII.
 
 Eval / metodologia:
 - Juiz não calibrado contra rótulo humano: as Fases 5/6 são sinal, não régua.

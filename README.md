@@ -13,7 +13,8 @@ O projeto realiza:
 - Indexação vetorial no Upstash
 - Recuperação semântica de contexto
 - Geração de respostas com Gemini
-- Proteção contra abuso com rate limit por IP
+- Proteção contra abuso: rate limit por IP (resistente a spoof), tetos de tamanho de entrada e teto global de uso diário
+- Telemetria opcional de produção com Langfuse (perguntas reais viram novos casos de teste)
 - Backend stateless pronto para deploy serverless no Vercel
 
 <br>
@@ -29,6 +30,7 @@ O projeto realiza:
 - Upstash Vector
 - Upstash Redis
 - Google Gemini API
+- Langfuse (telemetria de produção)
 - BeautifulSoup
 - PyMuPDF
 - Vercel
@@ -39,7 +41,9 @@ O projeto realiza:
 
 ```txt
 .
+├── api/                  # Entrypoint serverless (Vercel)
 ├── data/                 # Dados brutos e processados
+├── eval/                 # Bateria de testes (golden set + validador)
 ├── notebooks/            # Notebooks do pipeline
 ├── pipelines/            # Scripts principais de ingestão
 ├── rag/                  # Lógica RAG
@@ -94,7 +98,7 @@ Quando o usuário faz uma pergunta:
 4. Envia o contexto ao modelo Gemini
 5. Retorna uma resposta baseada nos documentos recuperados
 
-Se nenhum chunk atinge o score mínimo, há um fallback de busca na internet via Gemini, priorizando fontes do IFRS.
+Se nenhum chunk atinge o score mínimo, o modelo é informado disso e responde honestamente que não encontrou, sem inventar e sem buscar na internet.
 
 ## 7. Rate limit e sessão
 
@@ -152,6 +156,11 @@ UPSTASH_API_KEY=token_read_only
 UPSTASH_WRITE_API_KEY=token_read_write
 UPSTASH_REDIS_ENDPOINT=https://SEU_REDIS.upstash.io
 UPSTASH_REDIS_API_KEY=token_redis
+
+# Telemetria (opcional): sem estas chaves a telemetria fica desligada (no-op)
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_SECRET_KEY=sk-lf-...
+LANGFUSE_HOST=https://us.cloud.langfuse.com
 ```
 
 ---
@@ -253,8 +262,10 @@ Cadastre no painel do Vercel as variáveis de ambiente, usando o token read-only
 - `UPSTASH_REDIS_API_KEY`
 - `UPSTASH_REDIS_ENDPOINT`
 - `GEMINI_API_KEY_T1`
+- `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST` (opcionais; ligam a telemetria em produção)
+- `GLOBAL_DAILY_MAX` (opcional; teto de requisições por dia, default 5000)
 
-Não cadastre `UPSTASH_WRITE_API_KEY` no Vercel. Ela é usada apenas na ingestão local.
+Não cadastre `UPSTASH_WRITE_API_KEY` no Vercel. Ela é usada apenas na ingestão local. Diferente dela, as chaves do Langfuse VÃO no Vercel, pois a telemetria roda em produção.
 
 ---
 
@@ -273,7 +284,7 @@ Recuperação de chunks relevantes
    ↓
 Construção do contexto
    ↓
-Gemini gera resposta (ou fallback de internet)
+Gemini gera resposta (ou informa que não encontrou)
    ↓
 Resposta final
 ```

@@ -301,6 +301,16 @@
       }
 
       const data = await res.json();
+
+      // erros tratados pelo servidor (pergunta longa, limite diario, falha): mostra a mensagem
+      // e nao acumula no historico
+      if (!res.ok) {
+        addMessage(data.error || "Não consegui responder agora. Tente novamente em instantes.", "bot");
+        sendBtn.disabled = false;
+        input.focus();
+        return;
+      }
+
       addMessage(data.response, "bot");
 
       // acumula contexto da conversa ativa, descartado ao recarregar

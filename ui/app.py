@@ -1,15 +1,20 @@
 import os
 import time
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, abort
 from rag.chain import ask
-from rag.gatekeeper import check_rate_limit
+from rag.gatekeeper import check_rate_limit, check_global_budget
 from rag.telemetry import registrar_chat
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__)
 
-# limite de trocas aceitas no histórico enviado pelo cliente
+# tetos anti-abuso/custo do input: quantidade E tamanho (nao so a contagem de mensagens)
 MAX_HISTORY_MESSAGES = 20
+MAX_QUERY_CHARS = 2000       # uma pergunta
+MAX_MSG_CHARS = 4000         # cada mensagem do historico
+MAX_HISTORY_CHARS = 12000    # historico inteiro (soma), corta as mais antigas
+# arquivos que a rota estatica pode servir; qualquer outro caminho vira 404 (nao vaza o fonte)
+ALLOWED_STATIC = {"widget.js", "index.html"}
 
 
 # serve o snapshot estatico gerado pela pipeline de ingestao
@@ -19,6 +24,9 @@ def index():
 
 @app.route("/<path:filename>")
 def static_files(filename):
+    # so serve o whitelist; qualquer outro caminho (ex: /app.py) vira 404, sem vazar o fonte
+    if filename not in ALLOWED_STATIC:
+        abort(404)
     return send_from_directory(BASE_DIR, filename)
 
 
@@ -32,8 +40,17 @@ def sanitize_history(raw):
         role = msg.get("role")
         content = msg.get("content")
         if role in ("user", "assistant") and isinstance(content, str):
-            cleaned.append({"role": role, "content": content})
-    return cleaned[-MAX_HISTORY_MESSAGES:]
+            cleaned.append({"role": role, "content": content[:MAX_MSG_CHARS]})
+    cleaned = cleaned[-MAX_HISTORY_MESSAGES:]
+    # teto de tamanho total: mantem as mais recentes ate encher o orcamento de chars
+    total, limitado = 0, []
+    for msg in reversed(cleaned):
+        total += len(msg["content"])
+        if total > MAX_HISTORY_CHARS:
+            break
+        limitado.append(msg)
+    limitado.reverse()
+    return limitado
 
 
 @app.route("/chat", methods=["POST"])
@@ -48,6 +65,12 @@ def chat():
 
     if not query:
         return jsonify({"error": "query vazia"}), 400
+    if len(query) > MAX_QUERY_CHARS:
+        return jsonify({"error": "pergunta muito longa, resuma um pouco"}), 413
+
+    # teto global de volume no dia (proxy de gasto); protege o custo do Gemini
+    if not check_global_budget():
+        return jsonify({"error": "o assistente atingiu o limite de uso de hoje, tente novamente amanha"}), 503
 
     # histórico chega pronto do cliente, servidor não guarda estado
     history = sanitize_history(data.get("history"))
