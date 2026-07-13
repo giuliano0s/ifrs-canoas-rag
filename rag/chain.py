@@ -25,10 +25,13 @@ MODEL = "gemini-2.5-flash"
 index = Index(url=UPSTASH_ENDPOINT, token=UPSTASH_API_KEY)
 google_client = google_genai.Client(api_key=GEMINI_API_KEY_T1)
 
-# carrega prompt do agente
+# carrega prompt do agente + carimbo de versao (hash do conteudo, igual ao do eval): identifica
+# em cada registro/telemetria qual versao do prompt gerou aquela resposta
+import hashlib
 _prompt_path = os.path.join(os.path.dirname(__file__), f"../data/info/{AGENT_NAME}.txt")
 with open(_prompt_path, "r", encoding="utf-8") as f:
     agent_prompt = f.read()
+PROMPT_VERSAO = hashlib.sha256(agent_prompt.encode("utf-8")).hexdigest()[:12]
 
 # lista de cursos atuais, injetada no prompt: o agente corrige "curso inexistente" -> curso real
 import json
@@ -153,12 +156,13 @@ def _executar_busca(search_query, trace=None):
         trace.setdefault("buscas", []).append({
             "query": search_query,
             "hits": [
-                {"url": h.metadata.get("source_url"), "score": h.score,
+                {"id": h.id, "url": h.metadata.get("source_url"), "score": h.score,
                  "rank_sim": rank_sim.get(h.id), "rank_rerank": i,
                  "tipo": h.metadata.get("type"), "no_contexto": h.id in filtered_ids}
                 for i, h in enumerate(hits)
             ],
             "contexto_urls": [h.metadata.get("source_url") for h in filtered],
+            "contexto_ids": [h.id for h in filtered],
             "chunks_textos": [h.metadata.get("text", "") for h in filtered],
             "sources": dict(sources),
         })
@@ -185,6 +189,20 @@ def _executar_busca(search_query, trace=None):
         return None
     sources_text = "\n".join([f"[{i}] {url}" for i, url in sources.items()])
     return f"{context}\nFONTES:\n{sources_text}"
+
+
+def registro_de_trace(trace, query, resposta, erro=None):
+    # registro canonico de uma execucao a partir do trace: o MESMO schema da coleta do eval
+    # e da telemetria de producao (input, acao, buscas, resposta). quem chama acrescenta o
+    # que e proprio (case_id/run no eval; stamp/session_id na producao).
+    t = trace or {}
+    return {
+        "input": query,
+        "erro": erro,
+        "acao_real": t.get("acao"),
+        "resposta": resposta,
+        "buscas": t.get("buscas", []),
+    }
 
 
 def ask(query, history=None, max_steps=3, trace=None, data_atual=None):

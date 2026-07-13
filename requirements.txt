@@ -10,6 +10,9 @@ upstash-ratelimit==1.1.0
 # AI
 google-genai==2.6.0
 
+# Telemetria (Langfuse): opcional, no-op sem as chaves LANGFUSE_*
+langfuse==2.60.10
+
 # UI
 flask==3.1.3
 

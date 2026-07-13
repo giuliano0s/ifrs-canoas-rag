@@ -28,4 +28,5 @@ Thumbs.db
 # eval/runs: versiona a prova leve (relatorios + juiz_vereditos). Os pesados/derivados
 # (coleta bruta ~10MB e juiz_tarefas ~5MB, regenerados a cada run) ficam fora, para nao inflar o historico.
 eval/runs/coleta.jsonl
+eval/runs/coleta_producao.jsonl
 eval/runs/juiz_tarefas.jsonl

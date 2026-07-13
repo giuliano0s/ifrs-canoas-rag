@@ -69,7 +69,7 @@ def _executar(case_id, inp, run, data_referencia=None, stamp=None):
     # derruba a coleta). o registro guarda so a SAIDA; as expectativas vem do golden ao validar.
     # data_referencia (so casos temporais): sobrescreve a data de hoje do agente para o gold
     # temporal nao apodrecer com o tempo; sem ela, o ask usa a data real.
-    from rag.chain import ask
+    from rag.chain import ask, registro_de_trace
     trace, resposta, erro = {}, None, None
     for tent in range(3):
         try:
@@ -81,15 +81,9 @@ def _executar(case_id, inp, run, data_referencia=None, stamp=None):
         except Exception as e:
             erro = f"{type(e).__name__}: {str(e)[:120]}"
             time.sleep(8 * (tent + 1))
-    rec = {
-        "case_id":   case_id,
-        "input":     inp,
-        "run":       run,
-        "erro":      erro,
-        "acao_real": trace.get("acao"),
-        "resposta":  resposta,
-        "buscas":    trace.get("buscas", []),
-    }
+    # mesmo builder da telemetria de producao (schema unico de coleta); aqui somamos o que e
+    # proprio do eval: case_id, run e o stamp de versao
+    rec = {"case_id": case_id, "run": run, **registro_de_trace(trace, inp, resposta, erro)}
     if stamp:
         rec.update(stamp)  # modelo, prompt_versao, ts: versao do agente que gerou o registro
     return rec

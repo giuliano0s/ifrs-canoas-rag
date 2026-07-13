@@ -1,7 +1,9 @@
 import os
+import time
 from flask import Flask, request, jsonify, send_from_directory
 from rag.chain import ask
 from rag.gatekeeper import check_rate_limit
+from rag.telemetry import registrar_chat
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__)
@@ -49,8 +51,21 @@ def chat():
 
     # histórico chega pronto do cliente, servidor não guarda estado
     history = sanitize_history(data.get("history"))
+    session_id = data.get("session_id") if isinstance(data.get("session_id"), str) else None
 
-    response = ask(query, history=history)
+    # roda o agente com trace e envia a telemetria do turno (Langfuse); a telemetria é
+    # opcional e protegida, e o try garante que uma falha do ask vire 500 limpo (e fique
+    # registrada) em vez de estourar sem rastro
+    trace, inicio, erro, response = {}, time.time(), None, None
+    try:
+        response = ask(query, history=history, trace=trace)
+    except Exception as e:
+        erro = f"{type(e).__name__}: {str(e)[:200]}"
+    latencia_ms = int((time.time() - inicio) * 1000)
+    registrar_chat(query, history, trace, response, latencia_ms, erro=erro, session_id=session_id)
+
+    if erro is not None:
+        return jsonify({"error": "erro ao processar a pergunta"}), 500
     return jsonify({"response": response})
 
 if __name__ == "__main__":
