@@ -19,7 +19,7 @@ ratelimit = Ratelimit(
 
 
 # teto global de requisicoes por dia (proxy simples de teto de gasto no piloto); override por env
-GLOBAL_DAILY_MAX = int(os.getenv("GLOBAL_DAILY_MAX", "5000"))
+GLOBAL_DAILY_MAX = int(os.getenv("GLOBAL_DAILY_MAX", "2000"))
 
 
 def client_ip(request):
@@ -44,7 +44,7 @@ def check_rate_limit(request):
 def check_global_budget():
     # circuit breaker de custo: conta as requisicoes do dia (UTC) numa chave que expira sozinha.
     # cada request ja tem custo limitado pelos caps de tamanho; isto poe um teto no volume total.
-    # fail-open: se o Redis falhar, deixa passar em vez de derrubar o servico.
+    # fail-closed: se o Redis falhar, NEGA (nao serve sem a protecao) em vez de liberar sem teto.
     from datetime import datetime, timezone
     dia = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     chave = f"ifrs-canoas-chat:global:{dia}"
@@ -54,4 +54,4 @@ def check_global_budget():
             redis.expire(chave, 90000)
         return n <= GLOBAL_DAILY_MAX
     except Exception:
-        return True
+        return False

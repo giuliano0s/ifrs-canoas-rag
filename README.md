@@ -44,7 +44,6 @@ O projeto realiza:
 ├── api/                  # Entrypoint serverless (Vercel)
 ├── data/                 # Dados brutos e processados
 ├── eval/                 # Bateria de testes (golden set + validador)
-├── notebooks/            # Notebooks do pipeline
 ├── pipelines/            # Scripts principais de ingestão
 ├── rag/                  # Lógica RAG
 ├── ui/                   # Interface web
@@ -156,8 +155,6 @@ UPSTASH_API_KEY=token_read_only
 UPSTASH_WRITE_API_KEY=token_read_write
 UPSTASH_REDIS_ENDPOINT=https://SEU_REDIS.upstash.io
 UPSTASH_REDIS_API_KEY=token_redis
-
-# Telemetria (opcional): sem estas chaves a telemetria fica desligada (no-op)
 LANGFUSE_PUBLIC_KEY=pk-lf-...
 LANGFUSE_SECRET_KEY=sk-lf-...
 LANGFUSE_HOST=https://us.cloud.langfuse.com
@@ -177,7 +174,7 @@ A busca em produção usa o token read-only (`UPSTASH_API_KEY`). A ingestão usa
 
 # Pipeline de ingestão
 
-Execute o script ou os notebooks responsáveis por:
+Execute o script responsável por:
 
 1. Crawling
 2. Parsing
@@ -189,12 +186,6 @@ O script de pipeline está na pasta:
 
 ```txt
 pipelines/
-```
-
-Os notebooks estão na pasta:
-
-```txt
-notebooks/
 ```
 
 ---
@@ -263,7 +254,7 @@ Cadastre no painel do Vercel as variáveis de ambiente, usando o token read-only
 - `UPSTASH_REDIS_ENDPOINT`
 - `GEMINI_API_KEY_T1`
 - `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST` (opcionais; ligam a telemetria em produção)
-- `GLOBAL_DAILY_MAX` (opcional; teto de requisições por dia, default 5000)
+- `GLOBAL_DAILY_MAX` (opcional; teto de requisições por dia, default 2000)
 
 Não cadastre `UPSTASH_WRITE_API_KEY` no Vercel. Ela é usada apenas na ingestão local. Diferente dela, as chaves do Langfuse VÃO no Vercel, pois a telemetria roda em produção.
 
@@ -293,5 +284,7 @@ Resposta final
 
 # Licença
 
-Projeto desenvolvido para fins acadêmicos e educacionais.
+O código deste projeto (crawler, pipeline de ingestão, RAG, widget e avaliação) está sob a licença **MIT**, copyright de **giuliano0s**, ver o arquivo [LICENSE](LICENSE). Na prática: qualquer um pode usar, copiar, modificar e redistribuir, **desde que mantenha o aviso de copyright e a licença** (ou seja, o crédito a giuliano0s) em todas as cópias.
+
+A licença cobre apenas este código. O conteúdo do IFRS Campus Canoas (páginas, PDFs, textos e a identidade visual do site espelhado) pertence ao IFRS e **não** é licenciado aqui; o projeto é um ambiente de teste não oficial, desenvolvido para fins acadêmicos e educacionais.
 

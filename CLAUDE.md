@@ -13,7 +13,7 @@ Ambiente (Windows, PowerShell):
 .venv\Scripts\activate
 pip install -r requirements-dev.txt
 ```
-`requirements.txt` é SÓ a produção (o que a função serverless no Vercel instala; o Vercel resolve com `uv lock`, então dependência de dev ali quebra o deploy). `requirements-dev.txt` inclui a produção e soma ingestão, avaliação e notebooks.
+`requirements.txt` é SÓ a produção (o que a função serverless no Vercel instala; o Vercel resolve com `uv lock`, então dependência de dev ali quebra o deploy). `requirements-dev.txt` inclui a produção e soma ingestão e avaliação.
 
 Rodar o app local (Flask). A porta 5000 costuma estar ocupada por um túnel SSH na máquina de dev, use outra via `PORT`:
 ```powershell
@@ -54,7 +54,7 @@ O `validar` sempre regenera `eval/runs/relatorio.md` e `eval/runs/ultimo_resumo.
 Duas metades independentes que só se encontram na base vetorial Upstash:
 
 **1. Ingestão (offline, roda na máquina do dev)** — `pipelines/ingest_pipeline.py`
-Pipeline sequencial: crawler varre `ifrs.edu.br/canoas`, parser HTML e parser PDF extraem texto (PDFs de horário passam por gemini-2.5-flash-lite para estruturar; datas de publicação inferidas pelo mesmo modelo), parser de planilhas baixa Google Sheets publicados (links `docs.google.com/spreadsheets` achados no site) como CSV e estrutura em frases via LLM (`type: "sheet"` no metadata), chunker fatia em pedaços, ingest embeda com Gemini e faz upsert no Upstash, e o snapshot regenera o `ui/index.html` (via `clone_page`) que o app serve estático. Os notebooks `01_crawler` a `05_rag` são a versão exploratória das mesmas fases; o `.py` é a versão de produção consolidada. Os dados intermediários (`data/raw/`, `data/parsed/`, `data/chunks/`) estão no `.gitignore` e não trafegam pelo Git — só o Upstash (nuvem) é compartilhado entre máquinas.
+Pipeline sequencial: crawler varre `ifrs.edu.br/canoas`, parser HTML e parser PDF extraem texto (PDFs de horário passam por gemini-2.5-flash-lite para estruturar; datas de publicação inferidas pelo mesmo modelo), parser de planilhas baixa Google Sheets publicados (links `docs.google.com/spreadsheets` achados no site) como CSV e estrutura em frases via LLM (`type: "sheet"` no metadata), chunker fatia em pedaços, ingest embeda com Gemini e faz upsert no Upstash, e o snapshot regenera o `ui/index.html` (via `clone_page`) que o app serve estático. Os dados intermediários (`data/raw/`, `data/parsed/`, `data/chunks/`) estão no `.gitignore` e não trafegam pelo Git — só o Upstash (nuvem) é compartilhado entre máquinas.
 
 Detecção de mudança (`source_hash`, `pipelines/hashing.py`): o crawler carrega do Upstash o estado por URL (`source_hash` + ids dos chunks), baixa cada recurso e hasheia o conteúdo bruto ANTES de qualquer parse (HTML: texto extraído do `main`, estável entre fetches; PDF: bytes; planilha: CSV). Hash igual = inalterada, nem chega ao parser (zero LLM, zero embed); hash diferente ou URL nova = segue no fluxo, e a mudada tem os chunks antigos deletados no ingest (replace). Cada chunk tem id determinístico `url#i` e grava o `source_hash` no metadata, fechando o ciclo para o run seguinte. Dedup por conteúdo entre URLs (`_duplicata`): se o `source_hash` de um recurso já pertence a OUTRA URL (na base ou vista antes no mesmo run), o crawler pula (nem parseia nem ingere), tratando como duplicata; a 1ª URL de cada conteúdo é a dona. É o caso do re-upload `-1` do WordPress (mesmo arquivo byte-a-byte, URL nova), que inflava o contexto do retrieval com o documento repetido. Hashear o HTML cru não funciona: toda página carrega um nonce anti-bot (`__uzdbm_1`, Radware) que muda a cada request; por isso o hash do HTML é do texto extraído, com a extração fatorada em `extract_page_content` e compartilhada entre crawler e parser. O parser usa `raise_for_status()`, então página com erro HTTP (ex: 451) é pulada sem sobrescrever o conteúdo bom que já está na base. O `run_ingest` só deleta o antigo de uma URL mudada que produziu chunk novo (`urls_mudadas & por_url`): se o parse do conteúdo novo falha, o antigo é preservado (nunca deleta sem repor).
 
@@ -77,7 +77,7 @@ A rota `/` serve o `ui/index.html` já pronto (via `send_from_directory`); o app
 
 O Vector tem dois tokens, controlados por variável de ambiente distinta:
 - `UPSTASH_API_KEY` (read-only) — usado pelo `chain.py` em produção (só consulta). É o único Vector token cadastrado no Vercel.
-- `UPSTASH_WRITE_API_KEY` (read+write) — usado pela ingestão (`ingest_pipeline.py`, notebook 04, delete no `test.ipynb`). Fica só na máquina local, NUNCA no Vercel.
+- `UPSTASH_WRITE_API_KEY` (read+write) — usado pela ingestão (`ingest_pipeline.py`). Fica só na máquina local, NUNCA no Vercel.
 
 O Redis (`UPSTASH_REDIS_*`) usa o token padrão com escrita, pois o rate limiter incrementa contador a cada request. Read-only não serve ali.
 
@@ -92,7 +92,7 @@ Entrypoint em `api/index.py` (reexpõe `from ui.app import app`); o preset Flask
 ## Próximos passos
 
 Em aberto, nesta ordem de prioridade (a bateria das Fases 1-7 já está implementada e rodando; ver "Achados atuais" e "Pontos fracos atuais"):
-1. Endurecer a produção para uso público: FEITO os caps de tamanho (query + histórico por chars) + teto global de volume no dia (`GLOBAL_DAILY_MAX`), o rate limit com IP real do Vercel (não o `X-Forwarded-For` spoofável) e o fim do fonte servido (`/app.py` -> 404 por whitelist). ABERTO, baixa prioridade no piloto: tratamento de erro no caminho do Redis (rate limit), injeção indireta via documentos/planilhas, e aviso/redação de PII na telemetria (LGPD).
+1. Endurecer a produção para uso público: FEITO os caps de tamanho (query + histórico por chars) + teto global de volume no dia (`GLOBAL_DAILY_MAX`), o rate limit com IP real do Vercel (não o `X-Forwarded-For` spoofável), o fim do fonte servido (`/app.py` -> 404 por whitelist) e o fail-closed controlado no caminho do Redis (503 limpo em vez de 500). ABERTO: um guard de saída (2a barreira no output) e aviso/redação de PII na telemetria (LGPD, adiado na fase de testes). Fora de escopo do app: injeção indireta (governança de conteúdo do campus) e DDoS/abuso distribuído (borda do Vercel).
 2. Calibrar o juiz contra rótulo humano: rotular à mão uma amostra (~30-50 julgamentos) e medir concordância (kappa); só então tratar as Fases 5/6 como régua, não só sinal. Junto: re-julgar tudo numa passada consistente ao mudar juiz/rubrica (não misturar severidades). Mecanismo planejado: uma página HTML interativa de curadoria (sobre o harvest de produção) onde o humano marca concordo/discordo do juiz e dá score/correção manual; isso gera os rótulos humanos (fecha a calibração) e de quebra cura perguntas reais em casos de golden. Não-circularidade: o gold vem do CONTEÚDO da base, nunca da resposta que o agente deu em produção.
 3. Fechar os erros de comportamento abertos via prompt, medindo no eval: `curso-inexistente` (flagrar o curso inexistente + não inventar cifras fora do contexto) e `mensalidade` (corrigir a premissa de cobrança); e A/B de temperatura (0.2 vs 0.7) contra a flakiness de 1-em-15.
 4. Escalar o golden set (25 -> 100-150), adensando segurança (hoje só 6 casos): **geração sintética validada** (um LLM gera candidatas dos próprios documentos, humano/juiz valida, mantendo a não-circularidade) + **telemetria de produção** (perguntas reais viram novos casos); leva de prova-de-conceito a suíte de regressão.
@@ -112,8 +112,10 @@ Produção / uso público (parte endurecida; resta o espinhoso e o de baixa prio
 - Custo/abuso: FEITO. Teto de tamanho de query (`MAX_QUERY_CHARS`) e de histórico por chars (`MAX_MSG_CHARS`/`MAX_HISTORY_CHARS`, não só a quantidade) + teto global de volume no dia (`GLOBAL_DAILY_MAX`, contador no Redis, proxy de gasto que devolve 503 ao estourar).
 - Rate limit: FEITO. `client_ip` usa o `X-Real-IP` (borda do Vercel) ou o ÚLTIMO `X-Forwarded-For`, nunca o primeiro (que o cliente spoofa).
 - Fonte exposto: FEITO. A rota estática só serve um whitelist (`widget.js`/`index.html`); `/app.py` e afins viram 404.
-- Tratamento de erro: PARCIAL. O `ask` é envolvido em try no `/chat` (500 limpo + registrado no Langfuse) e o `check_global_budget` é fail-open. FALTA o caminho do rate limit (Redis fora ainda derruba o request). Baixa prioridade no piloto.
-- Injeção indireta: ABERTO (baixa prioridade). Documento/planilha recuperado entra no contexto sem sanitização; o hardening cobre só o input do usuário. Na prática só quem tem acesso às planilhas do campus exploraria.
+- Tratamento de erro: FEITO no caminho do Redis. Rate limit e teto de gasto são fail-CLOSED e controlados: Redis fora devolve 503 limpo ("indisponível"), não um 500 cru nem serve sem proteção. O `ask` segue em try no `/chat` (500 limpo + registrado no Langfuse). Resta só retry/mensagem fina em hiccup de Gemini/Upstash (baixa).
+- Injeção indireta: FORA DE ESCOPO do app. O conteúdo recuperado (páginas/planilhas) não é sanitizado, mas isso é governança de conteúdo (responsabilidade de quem alimenta o site/planilhas do campus); o hardening do assistente cobre o input do usuário.
+- Abuso distribuído (botnet/DDoS): coberto pela proteção de borda automática do Vercel + o teto global diário; não é item de código.
+- Guard de saída: ABERTO (manter no radar). Não há segunda barreira filtrando a resposta antes de entregá-la; se um jailbreak/injeção passar, a saída não é checada.
 - Privacidade/LGPD: ABERTO (adiado, fase de testes). A telemetria loga pergunta/resposta reais; falta aviso e redação de PII.
 
 Eval / metodologia:

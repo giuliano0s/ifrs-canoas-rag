@@ -55,8 +55,12 @@ def sanitize_history(raw):
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    # bloqueia excesso de requisições por ip antes de tocar na llm
-    allowed, reset = check_rate_limit(request)
+    # rate limit por IP antes de tocar na llm; depende do Redis, entao se ele falhar, fail-closed
+    # com 503 LIMPO (nao servir sem a protecao) em vez de estourar um 500 sem controle
+    try:
+        allowed, reset = check_rate_limit(request)
+    except Exception:
+        return jsonify({"error": "servico temporariamente indisponivel, tente em instantes"}), 503
     if not allowed:
         return jsonify({"error": "muitas requisicoes, tente novamente em instantes"}), 429
 

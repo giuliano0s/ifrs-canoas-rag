@@ -1,4 +1,4 @@
-# Dev (maquina local): ingestao, avaliacao e notebooks; inclui a producao
+# Dev (maquina local): ingestao e avaliacao; inclui a producao
 -r requirements.txt
 
 # Crawler
@@ -16,7 +16,6 @@ langchain-google-genai==2.0.4
 
 # Utilitários
 tiktoken==0.8.0
-notebook==7.2.2
 
 # Avaliação
 deepeval==4.0.7
