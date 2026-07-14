@@ -1,0 +1,65 @@
+# Ingest incremental automatizado. Roda a pipeline (crawler + parsers + chunker + ingest + snapshot)
+# de forma incremental (so o que mudou no site paga LLM/embed), atualiza o Upstash e commita de
+# volta o snapshot da pagina, o que dispara o redeploy do Vercel. Nao usa o read key nem o Redis.
+name: Ingest incremental
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"    # toda segunda 06:00 UTC (03:00 BRT), horario de baixo trafego
+  workflow_dispatch: {}     # gatilho manual (usado para testar o anti-bot no runner)
+
+# nunca deixa duas ingestoes rodando ao mesmo tempo
+concurrency:
+  group: ingest
+  cancel-in-progress: false
+
+# necessario para o job commitar o snapshot regenerado de volta no repo
+permissions:
+  contents: write
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      UPSTASH_ENDPOINT: ${{ secrets.UPSTASH_ENDPOINT }}
+      UPSTASH_WRITE_API_KEY: ${{ secrets.UPSTASH_WRITE_API_KEY }}
+      UPSTASH_API_KEY: ${{ secrets.UPSTASH_API_KEY }}
+      GEMINI_API_KEY_T1: ${{ secrets.GEMINI_API_KEY_T1 }}
+      ANOS_VALIDOS: "2023,2024,2025,2026"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      # registros locais de PDFs escaneados/com erro: persistem entre execucoes para nao
+      # re-baixar os ~1300 escaneados toda vez (a 1a execucao, sem cache, e mais pesada)
+      - name: Cache dos registros de PDFs
+        uses: actions/cache@v4
+        with:
+          path: |
+            data/parsed/pdfs_scanned.json
+            data/parsed/pdfs_format_errors.json
+          key: pdf-registros-${{ github.run_id }}
+          restore-keys: pdf-registros-
+
+      - name: Instala dependencias
+        run: pip install -r requirements-dev.txt
+
+      - name: Roda o ingest incremental
+        run: python pipelines/ingest_pipeline.py
+
+      - name: Commita o snapshot se mudou (dispara o redeploy do Vercel)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ui/index.html data/info/cursos_atuais.json
+          if git diff --cached --quiet; then
+            echo "Snapshot sem mudanca; nada a commitar."
+          else
+            git commit -m "ingest automatizado: atualiza snapshot + cursos"
+            git push
+          fi
