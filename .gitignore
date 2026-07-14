@@ -5,7 +5,10 @@
 # dados gerados (exceto prompts do agente)
 data/raw/
 data/chunks/
-data/parsed/
+data/parsed/*
+# registros leves versionados: semeiam o CI para ele nao re-baixar os ~1359 escaneados
+!data/parsed/pdfs_scanned.json
+!data/parsed/pdfs_format_errors.json
 
 # jupyter
 .ipynb_checkpoints/

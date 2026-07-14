@@ -20,13 +20,14 @@ permissions:
 jobs:
   ingest:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       UPSTASH_ENDPOINT: ${{ secrets.UPSTASH_ENDPOINT }}
       UPSTASH_WRITE_API_KEY: ${{ secrets.UPSTASH_WRITE_API_KEY }}
       UPSTASH_API_KEY: ${{ secrets.UPSTASH_API_KEY }}
       GEMINI_API_KEY_T1: ${{ secrets.GEMINI_API_KEY_T1 }}
       ANOS_VALIDOS: "2023,2024,2025,2026"
+      PYTHONUNBUFFERED: "1"
     steps:
       - uses: actions/checkout@v4
 
@@ -34,17 +35,6 @@ jobs:
         with:
           python-version: "3.12"
           cache: "pip"
-
-      # registros locais de PDFs escaneados/com erro: persistem entre execucoes para nao
-      # re-baixar os ~1300 escaneados toda vez (a 1a execucao, sem cache, e mais pesada)
-      - name: Cache dos registros de PDFs
-        uses: actions/cache@v4
-        with:
-          path: |
-            data/parsed/pdfs_scanned.json
-            data/parsed/pdfs_format_errors.json
-          key: pdf-registros-${{ github.run_id }}
-          restore-keys: pdf-registros-
 
       - name: Instala dependencias
         run: pip install -r requirements-dev.txt
@@ -56,7 +46,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add ui/index.html data/info/cursos_atuais.json
+          git add ui/index.html data/info/cursos_atuais.json data/parsed/pdfs_scanned.json data/parsed/pdfs_format_errors.json
           if git diff --cached --quiet; then
             echo "Snapshot sem mudanca; nada a commitar."
           else
