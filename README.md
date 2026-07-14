@@ -41,6 +41,7 @@ O projeto realiza:
 
 ```txt
 .
+├── .github/workflows/    # CI: ingest semanal (GitHub Actions)
 ├── api/                  # Entrypoint serverless (Vercel)
 ├── data/                 # Dados brutos e processados
 ├── eval/                 # Bateria de testes (golden set + validador)
@@ -187,6 +188,8 @@ O script de pipeline está na pasta:
 ```txt
 pipelines/
 ```
+
+A ingestão também roda **automaticamente toda semana** via GitHub Actions (`.github/workflows/ingest.yml`, incremental): atualiza a base no Upstash e commita o snapshot da página de volta, o que dispara o redeploy no Vercel. Roda o mesmo `pipelines/ingest_pipeline.py`; dá pra disparar na mão pela aba Actions ("Run workflow").
 
 ---
 
