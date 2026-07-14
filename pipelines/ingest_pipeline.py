@@ -79,6 +79,31 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 }
 
+# sessao HTTP persistente: o site tem o anti-bot Radware, que na 1a visita "sem cookie" responde
+# uma pagina de captcha (HTTP 200) no lugar do conteudo e SETA cookies (__uzm*). guardando esses
+# cookies na sessao, a requisicao seguinte passa e vem o conteudo real (como faz um navegador).
+# sem isso, cada requests.get e uma 1a visita -> sempre captcha -> o crawl nao acha links e colapsa.
+SESSION = requests.Session()
+SESSION.headers.update(HEADERS)
+
+
+def _e_desafio(resp):
+    # pagina de desafio do anti-bot (Radware/captcha) que volta com HTTP 200 no lugar do conteudo
+    corpo = resp.text or ""
+    return "Radware" in corpo or "captcha" in corpo.lower()
+
+
+def fetch(url, timeout=10, headers=None):
+    # busca guardando os cookies do anti-bot na SESSION; se vier a pagina de desafio, repete na
+    # mesma sessao (agora ja com o cookie), que e o que faz passar. ate 2 tentativas extras.
+    resp = SESSION.get(url, timeout=timeout, headers=headers)
+    for _ in range(2):
+        if not (getattr(resp, "ok", False) and _e_desafio(resp)):
+            break
+        time.sleep(0.5)
+        resp = SESSION.get(url, timeout=timeout, headers=headers)
+    return resp
+
 # padrão de anos válidos gerado dinamicamente
 _anos_str = "|".join(str(a) for a in ANOS_VALIDOS)
 VALID_YEAR_PATTERN = re.compile(rf"({_anos_str})")
@@ -228,7 +253,7 @@ def run_crawler(estado):
             print(f"  visitadas {len(visited)} | fila {len(queue)} | dirty {len(pages_dirty)+len(pdfs_dirty)} | erros {n_erro+n_bloq}")
 
         try:
-            response = requests.get(url, timeout=10, headers=HEADERS)
+            response = fetch(url, timeout=10)
             response.raise_for_status()
             if "Radware" in response.text or "captcha" in response.text.lower():
                 n_bloq += 1
@@ -433,7 +458,7 @@ def extract_page_content(soup):
 def parse_html_page(url, headers):
     # baixa e extrai UMA pagina (usado pelo resolve_sheet_date para inferir a data do pai)
     try:
-        response = requests.get(url, timeout=10, headers=headers)
+        response = fetch(url, timeout=10, headers=headers)
         response.raise_for_status()
     except Exception as e:
         print(f"  ERRO: {e}")
@@ -510,7 +535,7 @@ def download_pdf_bytes(url, headers):
         finally:
             os.remove(tmp_path)
     try:
-        response = requests.get(url, timeout=30, headers=headers)
+        response = fetch(url, timeout=30, headers=headers)
         response.raise_for_status()
         return response.content
     except Exception as e:
@@ -716,7 +741,7 @@ def run_pdf_parser(pdfs_dirty, estado):
 
 def download_sheet_csv(url):
     try:
-        response = requests.get(gsheet_csv_url(url), timeout=30, headers=HEADERS)
+        response = fetch(gsheet_csv_url(url), timeout=30)
         response.raise_for_status()
         response.encoding = "utf-8"
         return response.text
