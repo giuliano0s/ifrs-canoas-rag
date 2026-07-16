@@ -107,14 +107,14 @@
     "nao_deve_conter": []
    },
    "existe_na_base": "parcial",
-   "resposta_esperada": "Pelos documentos (calendário acadêmico 2026), a Festa Junina consta em 27 de julho de 2026 (sábado letivo); responder isso é fiel às fontes e correto pela base. RESSALVA (lacuna conhecida): a data real pode ter mudado e o anúncio atual sai só no Instagram, que a base não acompanha.",
+   "resposta_esperada": "Pelo calendário acadêmico 2026 do campus, a Festa Junina consta em 27 de junho de 2026 (sábado letivo); responder essa data é fiel às fontes. Como 27/06/2026 já passou em relação à data atual, o esperado é apresentá-la como a última edição registrada (já ocorrida), não como próxima. RESSALVA (lacuna conhecida): a edição atual pode ter mudado de data e o anúncio sair só no Instagram, que a base não acompanha. NÃO confundir com 27/07/2026, que no calendário é o Início das aulas do 2º semestre, não a festa.",
    "gold_urls": [
-    "https://ifrs.edu.br/canoas/wp-content/uploads/sites/6/2025/11/RESOLUCAO-No-17-2025-SCC-CAN-Aprova-o-Calendario-Academico-2026-do-Campus-Canoas.pdf"
+    "https://ifrs.edu.br/canoas/wp-content/uploads/sites/6/2025/11/2026-Calendario-2026-Campus-Canoas.pdf"
    ],
    "answer_spans": [
-    "Festa Junina do Campus Canoas: 27 de julho de 2026"
+    "Festa Junina do Campus Canoas (Sábado letivo): 27 de junho de 2026"
    ],
-   "notas": "CORRIGIDO após revisão: a base TEM a data pelo calendário 2026 (RESOLUCAO 17/2025): 'Festa Junina do Campus Canoas: 27 de julho de 2026 (sábado letivo)' — o calendário ainda traz uma linha conflitante de 27/06 (inconsistência da fonte). A nota anterior dizia erradamente que a base não tinha 2026. A LACUNA real é o Instagram: a data efetiva foi alterada e anunciada só lá, fora da base. Caso mantido para EVIDENCIAR a lacuna do Instagram (roadmap item 3): o agente acerta pelos docs (27/07); a divergência com a realidade é a lacuna, não erro do agente."
+   "notas": "CORRIGIDO (bateria jul/2026): a base traz a Festa Junina em 27/06/2026 pelo calendário real (2026-Calendario-2026-Campus-Canoas.pdf); 27/07/2026 é o Início das aulas do 2º semestre, NÃO a festa. O gold anterior fixava 27/07 por ter sido curado a partir de um PDF de resolução que ALUCINAVA datas (a resolução só APROVA o calendário; o parser de calendário inventava as datas do corpo). Esse chunk-fantasma foi removido e o is_calendar_pdf passou a exigir >=8 datas no corpo, impedindo recriá-lo. A LACUNA real segue no Instagram (data efetiva da edição atual anunciada só lá). O agente acerta pelos docs (27/06); a divergência com a realidade é a lacuna, não erro do agente."
   },
   {
    "id": "auxilio-estudantil",

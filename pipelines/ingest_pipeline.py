@@ -604,8 +604,16 @@ def classify_campus_scope(title, text, url=""):
     return None
 
 def is_calendar_pdf(url, text):
-    # detecta o calendario academico pela URL ou pelo cabecalho do conteudo
-    return "calendario" in url.lower() or "CALENDÁRIO ACADÊMICO" in text[:200].upper() or "CALENDARIO ACADEMICO" in text[:200].upper()
+    # calendario academico: exige CONTEUDO de calendario (muitas datas), nao so a palavra no URL.
+    # uma resolucao que apenas APROVA o calendario (sem as datas em anexo) tem ~0 datas no corpo; se
+    # fosse tratada como calendario, o structure_calendar_text (LLM) ALUCINA datas que nao existem no
+    # PDF (foi a origem do "03 de agosto"/"Festa Junina 27 de julho" fantasmas nas resolucoes).
+    marcador = ("calendario" in url.lower()
+                or "CALENDÁRIO ACADÊMICO" in (text or "")[:300].upper()
+                or "CALENDARIO ACADEMICO" in (text or "")[:300].upper())
+    n_datas = len(re.findall(r"\b\d{1,2}/\d{1,2}/20\d{2}\b|\b\d{1,2}\s+de\s+[a-zç]+\s+de\s+20\d{2}\b",
+                             (text or "").lower()))
+    return marcador and n_datas >= 8
 
 _MESES = ("JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO",
           "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO")
