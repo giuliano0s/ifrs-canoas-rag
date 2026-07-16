@@ -17,8 +17,15 @@ AGENT_NAME = "agente-ifrs"
 ALPHA = 0.7 # score personalizado
 MIN_YEAR = 2020
 MIN_SCORE = 0.60 # score minimo do upstash para um chunk entrar no contexto
-FETCH_K = 30 # chunks coletados do upstash por similaridade (pool do rerank)
+FETCH_K = 60 # chunks coletados do upstash por similaridade (pool do rerank). 60 (nao 30) para o
+             # rerank por campus/data alcancar docs de Canoas que ficam alem do top-30 quando docs
+             # institucionais do IFRS (ex: PDI multi-campus) dominam a similaridade crua da query.
 CONTEXT_K = 15 # chunks que de fato vao ao contexto do modelo, apos o rerank
+# escopo de campus: sem ancorar a query (o anchor "IFRS Campus Canoas" inflava docs institucionais
+# e enterrava a resposta certa em queries de professor); o rerank penaliza docs de fora de Canoas
+CAMPUS_PENALTY = 0.35 # penalidade no rerank para chunks fora de Canoas (metadata campus_scope="outro");
+                      # 0.35 (nao 0.20) para excluir do contexto o institucional que domina o pool
+                      # (o PDI vazava 1 chunk a 0.20 numa query de salas; a 0.30+ some)
 MODEL = "gemini-2.5-flash"
 
 # clientes
@@ -128,15 +135,23 @@ def _date_score(hit):
         return 0.5
     try:
         year = int(raw)
-        return (year - MIN_YEAR) / (max_year - MIN_YEAR)
+        # piso 0: um doc antigo (ano < MIN_YEAR) fica neutro, nunca com score NEGATIVO (que o
+        # empurraria para baixo de forma artificial). recencia vira contribuicao em [0, 1].
+        return max(0.0, (year - MIN_YEAR) / (max_year - MIN_YEAR))
     except (ValueError, TypeError):
         return 0.5
 
 
+def _campus_penalty(hit):
+    # docs institucionais do IFRS ou de outro campus (metadata campus_scope="outro", ex: o PDI
+    # IFRS 2024-2028) sao despriorizados: a base e do Campus Canoas, entao conteudo de outro campus
+    # nao deve responder como se fosse daqui. Ausencia de campus_scope = neutro (0), nao penaliza.
+    return CAMPUS_PENALTY if (hit.metadata.get("campus_scope") == "outro") else 0.0
+
 def rerank_by_date(hits):
     return sorted(
         hits,
-        key=lambda h: ALPHA * h.score + (1 - ALPHA) * _date_score(h),
+        key=lambda h: ALPHA * h.score + (1 - ALPHA) * _date_score(h) - _campus_penalty(h),
         reverse=True
     )
 

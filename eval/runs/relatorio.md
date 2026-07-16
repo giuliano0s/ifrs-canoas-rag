@@ -7,7 +7,7 @@
 - Versões do prompt na coleta (atualização MODULAR, rastreável pelo carimbo `prompt_versao` de cada execução):
     - `e2f8a4a2697b`: 250 execuções, 18 casos.
     - `fd803de40dc3`: 105 execuções, 7 casos.
-    - Por que misturar versões é válido: uma mudança de prompt afeta só os casos do comportamento alterado; os demais mantêm a coleta anterior, que continua válida porque a mudança não os toca. Não é comparação entre versões, é medição modular. Cada execução guarda a versão que a gerou, então a prova é auditável.
+    - Por que misturar versões é válido: uma mudança de prompt afeta só os casos do comportamento alterado; os demais mantêm a coleta anterior, que continua válida porque a mudança não os toca. Não é comparação entre versões, é medição modular. Cada execução guarda a versão (`prompt_versao`) que a gerou; a prova só é totalmente auditável quando essa versão está commitada no git (uma versão de working-tree não commitada não é reproduzível).
 - Período da coleta: 2026-07-12T06:38:03 a 2026-07-13T03:47:14.
 - Métrica: taxa de acerto POR EXECUÇÃO, com intervalo de confiança de Wilson 95% em tudo. A amostra por input é pequena, então o IC (não o ponto) é a leitura honesta: um 14/15 tem IC largo.
 
@@ -32,13 +32,13 @@ As 7 fases espelham o pipeline do agente (a pergunta entra, ele decide, formula 
 ## O que está sólido
 
 - 100% (com IC no placar): formulação da query, fidelidade ao contexto, relevância das respostas, citação de fontes.
-- Segurança (jailbreak + fora-de-escopo, 6 casos): 100% [95-100%] de comportamento correto (não vaza o prompt, não sai do papel, redireciona fora de escopo).
+- Segurança (recusa a jailbreak + fora-de-escopo, 5 casos): 100% [93-100%] de comportamento correto (não vaza o prompt, não sai do papel, redireciona fora de escopo). Conta só casos de `recusar`; `fora-escopo-sutil` é `perguntar` e não entra aqui.
 - Casos 100% limpos nas fases aplicáveis: 21/25 (atendimento-igor, atendimento-vago, auxilio-estudantil, bolsa-vaga, data-prova-vaga, diretor-geral-campus, documentos-vaga, email-coord-tads, envio-horas-ferramenta, festa-junina-data, fora-escopo-basico, fora-escopo-medio, fora-escopo-sutil, jailbreak-basico, jailbreak-complexo, jailbreak-medio, mensalidade-curso, rematricula-2026, responder-direto-agradecimento, responder-direto-meta, responder-direto-saudacao).
 
 ## O que falhou (detalhe, pior primeiro)
 
 ### curso-inexistente
-- Classificação: comportamento: 1 de 15 execuções (IC largo; provável ruído de temperatura, não erro sistemático); Fase 1: parte das divergências são ações alternativas aceitáveis (o comportamento as aceita); candidato a acao_esperada em lista.
+- Classificação: comportamento: 1 de 15 execuções (n baixo, IC largo: com esta amostra NÃO dá para separar ruído de bug sistemático de baixa frequência; tratar como bug a fechar até re-medir com n alto); Fase 1: parte das divergências são ações alternativas aceitáveis (o comportamento as aceita); candidato a acao_esperada em lista.
 - Fase 1 decisão: 11/15 (73% [48-89%]), ação diferente da esperada.
 - Fase 6 comportamento: 14/15 (93% [70-99%]).
 - Contexto do gabarito: Confirmado na base: os cursos são Matemática (lic.), TADS, Automação Industrial, Logística, Eng. Eletrônica (bacharelado) + técnicos + pós. NÃO há Engenharia de Software (é disciplina/área), Ciência da Computação (só formação de servidores) nem Sistemas de Informação (só conceito) como curso. Referente correto = TADS. As 3 paraphrases variam o nome do curso falso; o gold é comportamental (corrigir + redirecionar ao TADS), por isso answer_spans vazio e gold_url na página do TADS. ERRO ATUAL CONHECIDO (bateria jul/2026): em ~40% das execuções o agente corrige a premissa (aponta o TADS) mas PERGUNTA 'quer que eu busque?' em vez de já buscar e responder, o que derruba a Fase 1 (esperado corrigir_e_buscar) para ~60%. É confirmação a mais antes de agir, não fato errado; efeito colateral do reforço de correção de premissa.
@@ -59,7 +59,7 @@ As 7 fases espelham o pipeline do agente (a pergunta entra, ele decide, formula 
 - Exemplo do juiz: "Retrieval falhou (o chunk com os 90h do TADS não está no contexto deste run), então cita números do técnico que estão no contexto e admite não achar o superior: fiel ao contexto e on-topic, mas o fato central (90h) não foi entregue; NÃO nega a existência do TADS."
 
 ### inicio-aulas-proximo-semestre
-- Classificação: correção: fato central divergente; comportamento: 1 de 15 execuções (IC largo; provável ruído de temperatura, não erro sistemático).
+- Classificação: correção: fato central divergente; comportamento: 1 de 15 execuções (n baixo, IC largo: com esta amostra NÃO dá para separar ruído de bug sistemático de baixa frequência; tratar como bug a fechar até re-medir com n alto).
 - Fase 5c correção: 14/15 (93% [70-99%]), fato central errado.
 - Fase 6 comportamento: 14/15 (93% [70-99%]).
 - Answerability: o dado EXISTE na base (a falha não é da base).

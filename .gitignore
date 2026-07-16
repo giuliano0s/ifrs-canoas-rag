@@ -24,6 +24,9 @@ __pycache__/
 Thumbs.db
 .vercel
 
+# backups do Upstash (vetores crus, grandes) gerados antes de reescrever a base de forma modular
+backups/
+
 # avaliacao (eval): config/cache do deepeval e traces brutos
 .deepeval/
 .deepeval-cache.json

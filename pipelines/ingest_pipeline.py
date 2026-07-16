@@ -34,6 +34,7 @@ import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from google import genai as google_genai
+from google.genai import types
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from upstash_vector import Index
 from urllib.parse import urljoin
@@ -387,6 +388,20 @@ def extract_date_from_url(url):
     match = DATE_URL_PATTERN.search(url)
     return match.group(1) if match else None
 
+def extract_date_from_filename(url):
+    # ano no NOME do arquivo (nao na pasta /YYYY/MM/, que e a data de UPLOAD do WordPress).
+    # o nome costuma carregar o ano de referencia do doc (ex: Campus-Canoas_2019.pdf -> 2019).
+    # SO para arquivos reais (PDF/doc/planilha): o "nome" de uma pagina HTML e o SLUG da
+    # manchete, que traz o ano de um EVENTO (ex: .../processo-seletivo-2026/) e nao a data de
+    # publicacao; datar HTML pelo slug jogaria noticia velha para o futuro no rerank temporal.
+    base = url.rstrip("/").split("/")[-1]
+    if not re.search(r"\.(pdf|docx?|xlsx?|pptx?|odt|ods)$", base, re.IGNORECASE):
+        return None
+    # lookaround de digito (nao \b): "_" e caractere de palavra, entao \b nao casa em "_2019".
+    # so aceita se houver UM unico ano no nome; nomes com anos conflitantes caem pro conteudo.
+    anos = set(re.findall(r"(?<![0-9])(20[0-3]\d)(?![0-9])", base))
+    return anos.pop() if len(anos) == 1 else None
+
 def extract_date_from_text(text):
     truncated = text[:MAX_CHARS_INICIO] + "\n...\n" + text[-MAX_CHARS_FIM:]
     prompt = f"Qual é o ano de publicação deste documento? Responda APENAS com o ano no formato YYYY. Se não encontrar, responda exatamente: None\n\n{truncated}"
@@ -408,16 +423,19 @@ def extract_date_from_text(text):
     return None
 
 def get_published_at(doc, max_retries=10, parent_dates=None):
-    # datacao do proprio documento primeiro: url propria, depois llm no texto proprio
-    date = extract_date_from_url(doc["source_url"])
+    # data do PROPRIO documento primeiro (nome do arquivo -> conteudo), depois fallbacks.
+    # ORDEM E CRITICA: a pasta /YYYY/MM/ da URL e a data de UPLOAD, nao a do doc; tentar a URL
+    # primeiro fazia todo doc antigo re-upado herdar o ano errado (ex: relatorio de 2019 numa
+    # pasta /2025/03/ virava published_at=2025, e o rerank temporal o tratava como novo).
+    date = extract_date_from_filename(doc["source_url"])
     if date:
-        return date, "url"
+        return date, "nome_arquivo"
 
     text = doc.get("text", "")
     if text:
         for attempt in range(max_retries):
             try:
-                date = extract_date_from_text(text)
+                date = extract_date_from_text(text)  # LLM no conteudo: desempata proposta vs vigencia
                 break
             except Exception as e:
                 wait = 10 * (attempt + 1)
@@ -426,9 +444,12 @@ def get_published_at(doc, max_retries=10, parent_dates=None):
         else:
             raise Exception(f"Rate limit persistente após {max_retries} tentativas: {doc['source_url']}")
         if date:
-            return date, "llm"
+            return date, "conteudo"
 
-    # ultimo recurso: herda a data da pagina pai (lookup no que ja foi datado, sem fetch)
+    # fallbacks: a pasta de upload da URL, depois a data herdada da pagina pai
+    date = extract_date_from_url(doc["source_url"])
+    if date:
+        return date, "url_upload"
     parent = doc.get("parent", "")
     if parent:
         date = extract_date_from_url(parent) or (parent_dates or {}).get(parent)
@@ -542,8 +563,41 @@ def download_pdf_bytes(url, headers):
         print(f"  ERRO download: {e}")
         return None
 
-def is_schedule_pdf(title):
-    return "Horários_" in title or "Horarios_" in title
+def is_schedule_pdf(title, text=""):
+    # deteccao ROBUSTA da grade, em 3 redes (qualquer uma dispara), para NENHUMA grade escapar:
+    #  1) titulo "Horarios_..." (pega as 12 grades atuais); 2) assinatura do exportador "aSc
+    #  TimeTables" no conteudo (checagem EXATA, nao substring "asc", que casaria em "basico" etc.);
+    #  3) rede estrutural para grade nao-aSc: >=3 dias da semana em coluna + cabecalho de criacao +
+    #  >=3 faixas de horario. Grades sem "Horarios_" no titulo (que antes viravam texto cru e
+    #  published_at=None) agora sao pegas e passam pela visao (pixelrag).
+    t = text or ""
+    if "Horários_" in title or "Horarios_" in title or "aSc TimeTables" in t[:1500]:
+        return True
+    head = t[:2500]
+    dias = sum(1 for d in ("Seg", "Ter", "Qua", "Qui", "Sex") if d in head)
+    return dias >= 3 and "criado" in head.lower() and len(re.findall(r"\d{1,2}:\d{2}", head)) >= 3
+
+_CAMPI_IFRS = ("Alvorada", "Bento Gon", "Caxias", "Erechim", "Farroupilha", "Feliz", "Ibirub",
+               "Osório", "Osorio", "Porto Alegre", "Restinga", "Rio Grande", "Rolante", "Sertão",
+               "Sertao", "Vacaria", "Veranó", "Verano", "Viamão", "Viamao")
+
+def classify_campus_scope(title, text, url=""):
+    # campus_scope="outro" (doc institucional/multi-campus -> penalizado no rerank) SO com marcador
+    # EXPLICITO; default None (neutro). ALTA PRECISAO por decisao: um doc de Canoas tagueado errado
+    # como "outro" leva -CAMPUS_PENALTY e some do top-15, entao na duvida deixa neutro.
+    # 1) NUNCA tagueia doc do site do campus (/canoas/): e Canoas-especifico mesmo que cite a rede
+    #    (ex: o relatorio CPA de Canoas menciona varios campi; sem isso ele virava "outro" errado).
+    if "/canoas/" in (url or ""):
+        return None
+    # 2) fora do /canoas/: pega o PDI (titulo "PDI" ou "Plano de Desenvolvimento Institucional") e
+    #    docs que enumeram varios campi do IFRS (planos de acao institucionais, etc.).
+    t = (title or "").lower()
+    head = (text or "")[:3000]
+    if t.startswith("pdi") or "plano de desenvolvimento institucional" in head.lower():
+        return "outro"
+    if sum(1 for c in _CAMPI_IFRS if c in head) >= 4:
+        return "outro"
+    return None
 
 def is_calendar_pdf(url, text):
     # detecta o calendario academico pela URL ou pelo cabecalho do conteudo
@@ -641,6 +695,71 @@ def structure_schedule_text(text):
             time.sleep(wait)
     return text
 
+_SCHED_VISION_PROMPT = (
+    "Esta imagem é a grade de horário semanal de uma turma do IFRS Campus Canoas (formato aSc "
+    "TimeTables: colunas = dias Seg a Sex; linhas = faixas de horário; cada célula preenchida traz a "
+    "DISCIPLINA, o PROFESSOR e a SALA). Leia o cabeçalho da imagem para o curso/turma/turno e o ano/semestre.\n\n"
+    "Extraia TODAS as aulas e agrupe POR PROFESSOR. Uma linha por professor, no formato EXATO:\n"
+    "Disciplinas do professor NOME (curso/turma T, ANO/SEM): DISCIPLINA (DIA HH:MM-HH:MM, sala SALA); OUTRA (...).\n"
+    "Regras: DIA por extenso (Segunda a Sexta); use o horário e a sala da célula; nomes de professor são "
+    "pessoas; se uma aula não tiver professor identificável, omita-a. Não escreva nada além das linhas."
+)
+
+def _norm_conteudo(s):
+    return re.sub(r"\s+", "", (s or "").lower())
+
+def _grade_ano_raw(raw_text, title):
+    # ano do RAW, DETERMINISTICO (mais confiavel que regex sobre a saida da visao, que pode alucinar):
+    # "Horario criado:DD/MM/AAAA" no cabecalho, ou o ano no titulo "Horarios_AAAA_S".
+    m = re.search(r"criado:\s*\d{2}/\d{2}/(20[0-3]\d)", raw_text or "")
+    if m:
+        return m.group(1)
+    m = re.search(r"(20[0-3]\d)", title or "")
+    return m.group(1) if m else None
+
+def structure_schedule_vision(doc, max_pages=14):
+    # PIXELRAG: renderiza cada pagina da grade e extrai por VISAO (Gemini multimodal), agregando por
+    # professor. O layout 2D da grade aSc derrota a extracao de texto (a celula transborda a linha e a
+    # coluna funde); a visao le o grid como um humano. GATE anti-alucinacao: horarios/salas emitidos
+    # tem que existir no raw da pagina, senao a pagina e DESCARTADA (nao entra fato inventado na base).
+    # Retorna (texto_estruturado, flags) com contadores de paginas puladas/suspeitas/truncagem.
+    linhas, puladas, suspeitas = [], 0, 0
+    truncado = doc.page_count > max_pages
+    for i, pg in enumerate(doc):
+        if i >= max_pages:
+            break
+        raw_pg = pg.get_text()
+        try:
+            png = pg.get_pixmap(dpi=200).tobytes("png")
+        except Exception as e:
+            print(f"  ERRO render grade pag {i}: {e}"); puladas += 1; continue
+        out = None
+        for attempt in range(3):
+            try:
+                r = google_client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=[types.Part.from_bytes(data=png, mime_type="image/png"), _SCHED_VISION_PROMPT],
+                    config={"temperature": 0.1},
+                )
+                out = (r.text or "").strip(); break
+            except Exception as e:
+                wait = 20 * (attempt + 1)
+                print(f"  ERRO visao grade pag {i} (tentativa {attempt+1}/3): {e}; aguardando {wait}s")
+                time.sleep(wait)
+        if not out:
+            puladas += 1; continue
+        # GATE: os horarios (HH:MM) e codigos de sala (LAB X, F04...) da saida devem estar no raw
+        raw_n = _norm_conteudo(raw_pg)
+        toks = re.findall(r"\d{1,2}:\d{2}|LAB\s*[A-Z]?\s*\d+|\b[A-Z]{1,3}\d{2,3}\b", out)
+        if toks:
+            ok = sum(1 for t in toks if _norm_conteudo(t) in raw_n)
+            if ok / len(toks) < 0.75:
+                print(f"  grade pag {i}: {100 - ok/len(toks)*100:.0f}% dos tokens da visao fora do raw; DESCARTADA (suspeita de alucinacao)")
+                suspeitas += 1; continue
+        linhas.append(out)
+    return "\n".join(linhas), {"paginas": min(doc.page_count, max_pages), "puladas": puladas,
+                               "suspeitas": suspeitas, "truncado": truncado}
+
 def parse_pdf(pdf_info, content):
     # recebe os bytes ja baixados (o download e o source_hash acontecem no run_pdf_parser)
     url = pdf_info["url"]
@@ -653,32 +772,43 @@ def parse_pdf(pdf_info, content):
         text  = ""
         for page in doc:
             text += page.get_text()
-        # calendario: reextrai por blocos posicionais para amarrar evento ao mes correto
-        eh_calendario = is_calendar_pdf(url, text)
-        calendar_text = extract_calendar_text(doc) if eh_calendario else None
+        is_scanned = len(text.strip()) < MIN_CHARS
+        resultado = {
+            "source_url": url,
+            "title":      title,
+            "is_scanned": is_scanned,
+            "size_kb":    pdf_info["size_kb"],
+            "parent":     pdf_info.get("parent", ""),
+        }
+        # grade de horario -> visao (pixelrag); calendario -> reextracao posicional. Ambos com o doc
+        # ainda ABERTO (a visao precisa renderizar as paginas).
+        if not is_scanned and is_schedule_pdf(title, text):
+            resultado["is_schedule"] = True
+            ano = _grade_ano_raw(text, title)   # ano deterministico do raw (nao da saida da visao)
+            vis_text, flags = structure_schedule_vision(doc)
+            if vis_text:
+                text = vis_text
+                resultado["schedule_source"] = ("visao_parcial"
+                    if (flags["puladas"] or flags["suspeitas"] or flags["truncado"]) else "visao")
+            else:
+                text = structure_schedule_text(text)  # fallback se a visao nao retornar nada
+                resultado["schedule_source"] = "fallback_texto"
+            if ano:
+                resultado["published_at"] = ano
+                resultado["date_source"]  = "conteudo_grade"
+            print(f"  [GRADE] {url} -> {resultado['schedule_source']} | ano={ano}"
+                  + (f" | {flags}" if vis_text else ""))
+        elif not is_scanned and is_calendar_pdf(url, text):
+            # calendario: reextrai por blocos posicionais para amarrar evento ao mes correto
+            text = structure_calendar_text(extract_calendar_text(doc))
+            ano = extract_date_from_text(text)
+            if ano:
+                resultado["published_at"] = ano
+                resultado["date_source"]  = "conteudo_calendario"
         doc.close()
     except Exception as e:
         print(f"  ERRO parse: {e}")
         return None
-
-    is_scanned = len(text.strip()) < MIN_CHARS
-    resultado = {
-        "source_url": url,
-        "title":      title,
-        "is_scanned": is_scanned,
-        "size_kb":    pdf_info["size_kb"],
-        "parent":     pdf_info.get("parent", "")
-    }
-
-    if not is_scanned and is_schedule_pdf(title):
-        text = structure_schedule_text(text)
-    elif not is_scanned and eh_calendario:
-        text = structure_calendar_text(calendar_text)
-        # o ano de vigencia do calendario vem do conteudo (URL tem so o mes de publicacao)
-        ano = extract_date_from_text(text)
-        if ano:
-            resultado["published_at"] = ano
-            resultado["date_source"]  = "conteudo_calendario"
 
     resultado["text"] = text.strip() if not is_scanned else ""
     return resultado
@@ -829,7 +959,12 @@ splitter = RecursiveCharacterTextSplitter(
     length_function=len,
 )
 
-def chunk_document(text, metadata):
+def chunk_document(text, metadata, por_linha=False):
+    # por_linha: grade de horario -> UM chunk por linha (um professor por chunk). Preserva a
+    # granularidade que o retrieval por professor precisa; o chunker por tamanho re-densificaria
+    # (varios professores num chunk), que foi justamente o gargalo do recall das grades.
+    if por_linha:
+        return [{"text": ln.strip(), **metadata} for ln in text.split("\n") if ln.strip()]
     if len(text) <= CHUNK_SIZE:
         return [{"text": text, **metadata}]
     parts = splitter.split_text(text)
@@ -858,6 +993,7 @@ def run_chunker(pages_parsed, pdfs_parsed, sheets_parsed):
             "type":         "html",
             "published_at": page.get("published_at"),
             "source_hash":  page.get("source_hash"),
+            "campus_scope": classify_campus_scope(page["title"], page["text"], page["source_url"]),
         }
         chunks.extend(chunk_document(page["text"], metadata))
 
@@ -871,8 +1007,9 @@ def run_chunker(pages_parsed, pdfs_parsed, sheets_parsed):
             "type":         "pdf",
             "published_at": pdf.get("published_at"),
             "source_hash":  pdf.get("source_hash"),
+            "campus_scope": classify_campus_scope(pdf["title"], pdf["text"], to_drive_view_url(pdf["source_url"])),
         }
-        chunks.extend(chunk_document(pdf["text"], metadata))
+        chunks.extend(chunk_document(pdf["text"], metadata, por_linha=pdf.get("is_schedule", False)))
 
     # processa planilhas (Google Sheets estruturados em frases)
     for sheet in sheets_parsed:
@@ -882,6 +1019,7 @@ def run_chunker(pages_parsed, pdfs_parsed, sheets_parsed):
             "type":         "sheet",
             "published_at": sheet.get("published_at"),
             "source_hash":  sheet.get("source_hash"),
+            "campus_scope": classify_campus_scope(sheet.get("title", ""), sheet["text"], sheet["source_url"]),
         }
         chunks.extend(chunk_document(sheet["text"], metadata))
 
@@ -954,6 +1092,7 @@ def ingest_chunks(chunks, batch_size=100):
                     "type":         chunk["type"],
                     "published_at": chunk.get("published_at"),
                     "source_hash":  chunk.get("source_hash"),
+                    "campus_scope": chunk.get("campus_scope"),
                 }
             ))
 

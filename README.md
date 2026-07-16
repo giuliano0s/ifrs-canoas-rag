@@ -137,9 +137,13 @@ source .venv/bin/activate
 
 ## 3. Instale as dependências
 
+Para desenvolvimento local (ingestão, avaliação e rodar o app), use as dependências de dev, que já incluem a produção:
+
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
+
+`requirements.txt` é só a produção (o que a função serverless do Vercel instala): roda o serviço de chat, mas não tem o crawler, o parser de PDF, o chunker nem a avaliação. Use-o apenas se for rodar exclusivamente o app.
 
 ---
 

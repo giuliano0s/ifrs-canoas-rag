@@ -555,7 +555,8 @@ def gerar_relatorio(f1, f2, f3, rrs, f4d, dest, f7, vereditos, n_exec, n_erros, 
             L.append(f"    - `{v}`: {n} execuções, {meta['casos_por_versao'].get(v, 0)} casos.")
         L.append("    - Por que misturar versões é válido: uma mudança de prompt afeta só os casos do comportamento alterado; "
                  "os demais mantêm a coleta anterior, que continua válida porque a mudança não os toca. Não é comparação entre "
-                 "versões, é medição modular. Cada execução guarda a versão que a gerou, então a prova é auditável.")
+                 "versões, é medição modular. Cada execução guarda a versão (`prompt_versao`) que a gerou; a prova só é totalmente "
+                 "auditável quando essa versão está commitada no git (uma versão de working-tree não commitada não é reproduzível).")
     if meta["ts_min"]:
         L.append(f"- Período da coleta: {meta['ts_min']} a {meta['ts_max']}.")
     L.append("- Métrica: taxa de acerto POR EXECUÇÃO, com intervalo de confiança de Wilson 95% em tudo. "
@@ -645,7 +646,7 @@ def gerar_relatorio(f1, f2, f3, rrs, f4d, dest, f7, vereditos, n_exec, n_erros, 
         if n6x and k6x < n6x:
             faltam = n6x - k6x
             if faltam <= 1:
-                tags.append(f"comportamento: {faltam} de {n6x} execuções (IC largo; provável ruído de temperatura, não erro sistemático)")
+                tags.append(f"comportamento: {faltam} de {n6x} execuções (n baixo, IC largo: com esta amostra NÃO dá para separar ruído de bug sistemático de baixa frequência; tratar como bug a fechar até re-medir com n alto)")
             else:
                 tags.append(f"comportamento: {faltam} de {n6x} execuções (recorrente; candidato a ajuste de prompt)")
         k1x, n1x = pc(f1, c)
@@ -663,11 +664,16 @@ def gerar_relatorio(f1, f2, f3, rrs, f4d, dest, f7, vereditos, n_exec, n_erros, 
     if n7 and k7 == n7: cem.append("citação de fontes")
     if cem:
         L.append(f"- 100% (com IC no placar): {', '.join(cem)}.")
-    seg = [c for c in dest["comportamento"] if c.startswith(("jailbreak", "fora-escopo"))]
+    # bucket de seguranca = so casos de RECUSA (pela acao_esperada, nao pelo prefixo do id):
+    # fora-escopo-sutil comeca com "fora-escopo" mas e "perguntar" (recomendacao de curso), nao recusa.
+    def _eh_recusa(c):
+        a = casos.get(c, {}).get("acao_esperada")
+        return "recusar" in (a if isinstance(a, list) else [a])
+    seg = [c for c in dest["comportamento"] if _eh_recusa(c)]
     if seg:
         ks = sum(sum(dest["comportamento"][c]) for c in seg)
         ns_ = sum(len(dest["comportamento"][c]) for c in seg)
-        L.append(f"- Segurança (jailbreak + fora-de-escopo, {len(seg)} casos): {pct(ks,ns_)}{ic(ks,ns_)} de comportamento correto (não vaza o prompt, não sai do papel, redireciona fora de escopo).")
+        L.append(f"- Segurança (recusa a jailbreak + fora-de-escopo, {len(seg)} casos): {pct(ks,ns_)}{ic(ks,ns_)} de comportamento correto (não vaza o prompt, não sai do papel, redireciona fora de escopo). Conta só casos de `recusar`; `fora-escopo-sutil` é `perguntar` e não entra aqui.")
     L.append(f"- Casos 100% limpos nas fases aplicáveis: {len(limpos)}/{len(set(f1))}"
              + (f" ({', '.join(limpos)})." if limpos else "."))
     L.append("")
