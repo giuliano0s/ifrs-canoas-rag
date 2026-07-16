@@ -565,17 +565,21 @@ def download_pdf_bytes(url, headers):
 
 def is_schedule_pdf(title, text=""):
     # deteccao ROBUSTA da grade, em 3 redes (qualquer uma dispara), para NENHUMA grade escapar:
-    #  1) titulo "Horarios_..." (pega as 12 grades atuais); 2) assinatura do exportador "aSc
-    #  TimeTables" no conteudo (checagem EXATA, nao substring "asc", que casaria em "basico" etc.);
-    #  3) rede estrutural para grade nao-aSc: >=3 dias da semana em coluna + cabecalho de criacao +
-    #  >=3 faixas de horario. Grades sem "Horarios_" no titulo (que antes viravam texto cru e
-    #  published_at=None) agora sao pegas e passam pela visao (pixelrag).
+    #  1) titulo "Horarios_..." (o padrao das grades exportadas do aSc); 2) assinatura do exportador
+    #  "aSc TimeTables" no conteudo (checagem EXATA, nao substring "asc", que casaria em "basico" etc.);
+    #  3) rede estrutural para grade nao-aSc (detalhe logo abaixo). Grade sem "Horarios_" no titulo
+    #  (que antes virava texto cru e published_at=None) e pega e passa pela visao (pixelrag).
     t = text or ""
     if "Horários_" in title or "Horarios_" in title or "aSc TimeTables" in t[:1500]:
         return True
+    # rede estrutural (grade sem titulo/assinatura aSc): dias da semana por TOKEN, nao por substring
+    # (substring casava "Ter" em "Território", "Qui" em "Aqui" e dava falso-positivo, disparando a
+    # visao multimodal a toa); o marcador de criacao no formato exato da grade ("criado:"); e >=3
+    # faixas de horario HH:MM. Os tres juntos + o teto de paginas evitam a visao num doc mal-detectado.
     head = t[:2500]
-    dias = sum(1 for d in ("Seg", "Ter", "Qua", "Qui", "Sex") if d in head)
-    return dias >= 3 and "criado" in head.lower() and len(re.findall(r"\d{1,2}:\d{2}", head)) >= 3
+    dias = len(re.findall(r"\b(Seg|Ter|Qua|Qui|Sex|Segunda|Terça|Quarta|Quinta|Sexta)\b", head))
+    tem_criado = bool(re.search(r"criado\s*:", head, re.IGNORECASE))
+    return dias >= 3 and tem_criado and len(re.findall(r"\d{1,2}:\d{2}", head)) >= 3
 
 _CAMPI_IFRS = ("Alvorada", "Bento Gon", "Caxias", "Erechim", "Farroupilha", "Feliz", "Ibirub",
                "Osório", "Osorio", "Porto Alegre", "Restinga", "Rio Grande", "Rolante", "Sertão",
@@ -717,11 +721,14 @@ def _grade_ano_raw(raw_text, title):
     m = re.search(r"(20[0-3]\d)", title or "")
     return m.group(1) if m else None
 
-def structure_schedule_vision(doc, max_pages=14):
+def structure_schedule_vision(doc, max_pages=30):
     # PIXELRAG: renderiza cada pagina da grade e extrai por VISAO (Gemini multimodal), agregando por
     # professor. O layout 2D da grade aSc derrota a extracao de texto (a celula transborda a linha e a
     # coluna funde); a visao le o grid como um humano. GATE anti-alucinacao: horarios/salas emitidos
     # tem que existir no raw da pagina, senao a pagina e DESCARTADA (nao entra fato inventado na base).
+    # max_pages=30: as grades reais observadas tem <=10 paginas (margem 3x); e o teto so protege contra
+    # um PDF patologico mal-detectado. Se um dia uma grade legitima exceder, o excedente NAO some em
+    # silencio: truncado=True marca a grade como visao_parcial (schedule_source, agora persistido).
     # Retorna (texto_estruturado, flags) com contadores de paginas puladas/suspeitas/truncagem.
     linhas, puladas, suspeitas = [], 0, 0
     truncado = doc.page_count > max_pages
@@ -1009,6 +1016,13 @@ def run_chunker(pages_parsed, pdfs_parsed, sheets_parsed):
             "source_hash":  pdf.get("source_hash"),
             "campus_scope": classify_campus_scope(pdf["title"], pdf["text"], to_drive_view_url(pdf["source_url"])),
         }
+        # grade de horario: leva os marcadores para o metadata (persistidos no upsert). nao e so o
+        # switch de parse: na base, is_schedule permite auditar/filtrar as grades e schedule_source
+        # (visao/visao_parcial/fallback_texto) sinaliza grade incompleta ou degradada, o que o texto
+        # do chunk sozinho nao revela (uma grade parcial parece completa, so com menos professores).
+        if pdf.get("is_schedule"):
+            metadata["is_schedule"]     = True
+            metadata["schedule_source"] = pdf.get("schedule_source")
         chunks.extend(chunk_document(pdf["text"], metadata, por_linha=pdf.get("is_schedule", False)))
 
     # processa planilhas (Google Sheets estruturados em frases)
@@ -1082,19 +1096,20 @@ def ingest_chunks(chunks, batch_size=100):
 
         vectors = []
         for chunk, embedding in zip(batch, result.embeddings):
-            vectors.append((
-                chunk["id"],
-                embedding.values,
-                {
-                    "text":         chunk["text"],
-                    "source_url":   chunk["source_url"],
-                    "title":        chunk["title"],
-                    "type":         chunk["type"],
-                    "published_at": chunk.get("published_at"),
-                    "source_hash":  chunk.get("source_hash"),
-                    "campus_scope": chunk.get("campus_scope"),
-                }
-            ))
+            meta = {
+                "text":         chunk["text"],
+                "source_url":   chunk["source_url"],
+                "title":        chunk["title"],
+                "type":         chunk["type"],
+                "published_at": chunk.get("published_at"),
+                "source_hash":  chunk.get("source_hash"),
+                "campus_scope": chunk.get("campus_scope"),
+            }
+            # marcadores de grade so nos chunks de grade; a chave ausente nos demais mantem o metadata enxuto
+            if chunk.get("is_schedule"):
+                meta["is_schedule"]     = True
+                meta["schedule_source"] = chunk.get("schedule_source")
+            vectors.append((chunk["id"], embedding.values, meta))
 
         index.upsert(vectors=vectors)
         print(f"Inseridos {min(i + batch_size, total)}/{total} chunks")

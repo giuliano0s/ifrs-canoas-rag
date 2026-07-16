@@ -4,6 +4,8 @@ Plano de desenvolvimento e arquitetura do validador que roda o golden set contra
 pipeline real e mede as 7 fases. A estratégia (o "o quê") está no `CLAUDE.md`, seção
 "Bateria de testes"; aqui está o "como".
 
+> **Nota de estado (jul/2026):** este é o plano ORIGINAL; a implementação real divergiu e vale o que está no CLAUDE.md (seções "Bateria de testes" e "Achados atuais"). O eval roda em `eval/run_eval.py` (custom, dois passos `coletar`/`validar`, fases em Python puro), com o juiz das Fases 5/6 via switch `EVAL_JUDGE` (Claude Code por subagente, ou Gemini inline), e NÃO via DeepEval-como-runner + datasets do Langfuse como desenhado abaixo. O Langfuse cobre a telemetria de PRODUÇÃO, não o dataset do eval; o DeepEval está instalado mas é opcional. O texto abaixo fica como registro do desenho inicial.
+
 **Princípio de construção: não reinventar.** Usar ferramentas consagradas do mercado
 para tudo que já existe pronto (tracing, armazenamento, dashboards, agregação, métricas
 de avaliação de RAG, LLM-as-judge). Escrever à mão SÓ a lógica específica do nosso

@@ -69,7 +69,7 @@ O sistema percorre páginas do IFRS Canoas automaticamente e coleta:
 O conteúdo coletado é convertido em texto estruturado.
 
 PDFs são processados utilizando PyMuPDF.
-Documentos tabelas de horários são reprocessados para melhor performance em embedding.
+Tabelas de horário (grades) são lidas por visão multimodal (a imagem de cada página), porque a extração de texto embaralha a tabela 2D; o conteúdo é reorganizado por professor.
 Extração de datas como metadados com gemini-2.5-flash-lite usando cabeçalhos e rodapés de documentos.
 
 ## 3. Chunking
