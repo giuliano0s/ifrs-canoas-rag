@@ -409,6 +409,28 @@ def _garantir_fontes(resposta, sources):
         return resposta
     return resposta.rstrip() + "\n\nFontes:\n" + "\n".join(linhas)
 
+def _fontes_ao_fim(resposta):
+    # o widget corta a mensagem em "Fontes:" e joga tudo que vem DEPOIS para dentro do "Ver fontes".
+    # Se um disclaimer (ex: ressalva de dado antigo, "confirme na fonte") vier apos o bloco de fontes,
+    # ele some da mensagem principal. Aqui o bloco "Fontes:" e forcado a ser o ULTIMO elemento: as
+    # linhas "[n] url" ficam no fim e qualquer texto que estava depois delas sobe para o corpo. Vale
+    # para QUALQUER disclaimer, nao so o temporal. Fail-safe: sem bloco de fontes, devolve intacto.
+    m = re.search(r"\n*Fontes:\s*\n", resposta)
+    if not m:
+        return resposta
+    head = resposta[:m.start()]
+    linhas = resposta[m.end():].split("\n")
+    fontes, i = [], 0
+    while i < len(linhas) and (not linhas[i].strip() or re.match(r"^\s*\[\d+\]", linhas[i])):
+        if linhas[i].strip():
+            fontes.append(linhas[i].strip())
+        i += 1
+    cauda = "\n".join(linhas[i:]).strip()  # texto apos as fontes (ex: disclaimer) -> volta ao corpo
+    if not fontes:
+        return resposta
+    corpo = head.rstrip() + ("\n\n" + cauda if cauda else "")
+    return corpo + "\n\nFontes:\n" + "\n".join(fontes)
+
 def ask(query, history=None, max_steps=3, trace=None, data_atual=None):
     history = history or []
 
@@ -456,6 +478,7 @@ def ask(query, history=None, max_steps=3, trace=None, data_atual=None):
             resposta = (response.text or "").strip()
             resposta = _aplicar_guards(resposta, query, fontes_anos, contexto_acumulado, data_atual)
             resposta = _garantir_fontes(resposta, sources_map)
+            resposta = _fontes_ao_fim(resposta)
             if trace is not None:
                 trace["resposta"] = resposta
             return resposta
@@ -486,6 +509,7 @@ def ask(query, history=None, max_steps=3, trace=None, data_atual=None):
     resposta = (response.text or "").strip()
     resposta = _aplicar_guards(resposta, query, fontes_anos, contexto_acumulado, data_atual)
     resposta = _garantir_fontes(resposta, sources_map)
+    resposta = _fontes_ao_fim(resposta)
     if trace is not None:
         trace["resposta"] = resposta
     return resposta
