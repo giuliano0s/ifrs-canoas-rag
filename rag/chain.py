@@ -228,8 +228,9 @@ def _executar_busca(search_query, trace=None):
         return None, {}
     sources_text = "\n".join([f"[{i}] {url}" for i, url in sources.items()])
     retorno = f"{context}\nFONTES:\n{sources_text}"
-    # info consumida pelo guard de saida no ask (anos das fontes citaveis + o contexto cru)
-    info = {"source_years": source_years, "contexto": context}
+    # info consumida no ask: anos das fontes (guard de data), contexto cru (guard) e o mapa
+    # {n: url} das fontes (backfill do bloco "Fontes:" quando o modelo cita [n] mas nao lista)
+    info = {"source_years": source_years, "contexto": context, "sources": dict(sources)}
     return retorno, info
 
 
@@ -386,6 +387,28 @@ def _aplicar_guards(resposta, query, fontes_anos, contexto, data_atual):
     return resposta
 
 
+def _garantir_fontes(resposta, sources):
+    # backfill deterministico do bloco "Fontes:": a temperatura faz o modelo, as vezes, citar [n]
+    # no texto mas esquecer de listar as fontes ao final, deixando os [n] orfaos e o widget sem a
+    # secao clicavel. Aqui, se ha [n] no texto e NAO ha bloco "Fontes:", monta a lista a partir do
+    # mapa {n: url} da ultima busca. Fail-safe: so age com [n] validos e sem bloco ja escrito, nunca
+    # altera o texto existente nem inventa fonte (ignora [n] que nao esteja no mapa).
+    if not sources or "Fontes:" in resposta:
+        return resposta
+    citados = []
+    for grupo in re.findall(r"\[([0-9,\s]+)\]", resposta):
+        for n in re.split(r"[,\s]+", grupo.strip()):
+            if n.isdigit():
+                citados.append(int(n))
+    vistos, linhas = set(), []
+    for n in citados:
+        if n in sources and n not in vistos:
+            vistos.add(n)
+            linhas.append(f"[{n}] {sources[n]}")
+    if not linhas:
+        return resposta
+    return resposta.rstrip() + "\n\nFontes:\n" + "\n".join(linhas)
+
 def ask(query, history=None, max_steps=3, trace=None, data_atual=None):
     history = history or []
 
@@ -413,8 +436,9 @@ def ask(query, history=None, max_steps=3, trace=None, data_atual=None):
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )
 
-    # acumuladores para o guard de saida: anos das fontes citaveis e o contexto recuperado
-    fontes_anos, contexto_acumulado = {}, ""
+    # acumuladores: anos das fontes e contexto cru (guard de data) + o mapa {n: url} da ultima
+    # busca (backfill do bloco "Fontes:" via _garantir_fontes)
+    fontes_anos, contexto_acumulado, sources_map = {}, "", {}
 
     # loop de investigacao: o modelo pergunta, busca ou responde ate produzir texto
     for _ in range(max_steps):
@@ -431,6 +455,7 @@ def ask(query, history=None, max_steps=3, trace=None, data_atual=None):
         if not fc:
             resposta = (response.text or "").strip()
             resposta = _aplicar_guards(resposta, query, fontes_anos, contexto_acumulado, data_atual)
+            resposta = _garantir_fontes(resposta, sources_map)
             if trace is not None:
                 trace["resposta"] = resposta
             return resposta
@@ -449,6 +474,7 @@ def ask(query, history=None, max_steps=3, trace=None, data_atual=None):
             # colisao de numeracao entre buscas); o contexto acumula para o guard de data futura
             fontes_anos = info.get("source_years") or {}
             contexto_acumulado += info.get("contexto") or ""
+            sources_map = info.get("sources") or {}
 
         contents.append(cand)
         contents.append(types.Content(role="user", parts=[
@@ -459,6 +485,7 @@ def ask(query, history=None, max_steps=3, trace=None, data_atual=None):
     response = google_client.models.generate_content(model=MODEL, contents=contents, config=config)
     resposta = (response.text or "").strip()
     resposta = _aplicar_guards(resposta, query, fontes_anos, contexto_acumulado, data_atual)
+    resposta = _garantir_fontes(resposta, sources_map)
     if trace is not None:
         trace["resposta"] = resposta
     return resposta
