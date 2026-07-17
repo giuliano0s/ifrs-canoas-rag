@@ -10,7 +10,9 @@ ALERT_BANNER = """
 <div style="position:fixed;top:0;left:0;right:0;z-index:99999;background:#9a3412;color:#fff;
 text-align:center;font:600 13px/1.4 'Segoe UI',sans-serif;padding:8px 12px;">
 Ambiente de teste não oficial. Esta página não é o site do IFRS Campus Canoas e serve apenas para
-demonstração de um assistente de IA.</div>
+demonstração de um assistente de IA. Desenvolvido por
+<a href="https://github.com/giuliano0s" target="_blank" rel="noopener"
+style="color:#fff;text-decoration:underline;">giuliano0s</a>.</div>
 <div style="height:34px;"></div>
 """
 
