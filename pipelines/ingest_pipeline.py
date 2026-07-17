@@ -603,69 +603,12 @@ def classify_campus_scope(title, text, url=""):
         return "outro"
     return None
 
-# refino POR CHUNK do campus_scope: um doc institucional ("outro") como o PDI tem secoes dedicadas
-# a cada campus (ex: "Quadro 5.3 - ... - Campus Canoas", "5.1.3. Canoas", "2.4 Campus Canoas").
-# O refino detecta esses cabecalhos, acompanha a "secao em vigor" ao longo dos chunks e LIBERA do
-# "outro" os que tocam uma secao de Canoas: conteudo Canoas-especifico (ex: o quadro de vagas do
-# campus no PDI) volta a ser elegivel ao contexto, sem soltar o resto do doc (texto de rede e de
-# outros campi seguem penalizados/capados). Deterministico, zero LLM, so roda nos docs "outro".
-_CAMPI_SECAO = ("Alvorada", "Bento Gonçalves", "Bento Goncalves", "Canoas", "Caxias do Sul",
-                "Erechim", "Farroupilha", "Feliz", "Ibirubá", "Ibiruba", "Osório", "Osorio",
-                "Porto Alegre", "Restinga", "Rio Grande", "Rolante", "Sertão", "Sertao",
-                "Vacaria", "Veranópolis", "Veranopolis", "Viamão", "Viamao")
-_NOME_CAMPUS = "|".join(re.escape(c) for c in sorted(_CAMPI_SECAO, key=len, reverse=True))
-_PREFIXO_CAMPUS = r"Campus(?:\s+Avan[çc]ado)?"
-
-# cabecalhos que transicionam a secao: legenda de quadro/tabela/figura com "Campus <nome>" (T1),
-# heading numerado "5.1.3. Canoas"/"2.4 Campus Canoas" (T2), linha isolada "Campus <nome>" (T3;
-# prefixo "Campus" obrigatorio, pois celula de tabela que lista campi costuma ser so o nome).
-# Heading numerado TODO em maiusculas (capitulo institucional) devolve a secao para "rede".
-_SECAO_T1 = re.compile(rf"^(?:Quadro|Tabela|Figura|Gr[áa]fico)\s+\d+[^\n]*?{_PREFIXO_CAMPUS}\s+({_NOME_CAMPUS})\s*$")
-_SECAO_T2 = re.compile(rf"^\d+(?:\.\d+)*\.?\s+(?:{_PREFIXO_CAMPUS}\s+)?({_NOME_CAMPUS})\s*$")
-_SECAO_T3 = re.compile(rf"^{_PREFIXO_CAMPUS}\s+({_NOME_CAMPUS})\s*$")
-_SECAO_REDE = re.compile(r"^\d+(?:\.\d+)*\.?\s+[A-ZÀ-Ü][A-ZÀ-Ü0-9\s\-–,()/]{3,90}$")
-_LINHA_TOC = re.compile(r"\.{5,}")
-_LINHA_PCT = re.compile(r"^\d+(?:[.,]\d+)?\s*%$")
-
-def _eventos_secao(texto):
-    # (indice_da_linha, campus|"rede") para cada cabecalho de secao, na ordem das linhas.
-    # anti-falso-positivo: linha de sumario (leader de pontos na propria linha OU na seguinte,
-    # para entrada de sumario quebrada em duas linhas) e "Campus X" como celula de tabela-resumo
-    # (vizinho imediato e um percentual "N%").
-    linhas = [ln.strip() for ln in texto.splitlines()]
-    evs = []
-    for li, s in enumerate(linhas):
-        if not s or _LINHA_TOC.search(s):
-            continue
-        prox = next((x for x in linhas[li+1:li+3] if x), "")
-        if _LINHA_TOC.search(prox):
-            continue
-        m = _SECAO_T1.match(s) or _SECAO_T2.match(s)
-        if not m:
-            m = _SECAO_T3.match(s)
-            if m:
-                antes = next((x for x in reversed(linhas[:li]) if x), "")
-                if _LINHA_PCT.match(antes) or _LINHA_PCT.match(prox):
-                    m = None
-        if m:
-            evs.append((li, m.group(1).lower()))
-        elif _SECAO_REDE.match(s):
-            evs.append((li, "rede"))
-    return evs
-
-def refinar_campus_scope(chunks_do_doc):
-    # percorre os chunks NA ORDEM do documento carregando a "secao em vigor"; um chunk que toca a
-    # secao de Canoas (estado ao entrar nele, ou cabecalho de Canoas dentro dele) perde o "outro"
-    # e fica neutro, como um doc de Canoas. O overlap do splitter re-ve o mesmo cabecalho na
-    # emenda de dois chunks consecutivos, o que apenas repete a mesma transicao (inofensivo).
-    estado = "rede"
-    for c in chunks_do_doc:
-        evs = _eventos_secao(c["text"])
-        if estado == "canoas" or any(e == "canoas" for _, e in evs):
-            c["campus_scope"] = None
-        if evs:
-            estado = evs[-1][1]
-    return chunks_do_doc
+# NOTA: aqui existiu um "refino POR CHUNK do campus_scope" (refinar_campus_scope) que liberava do
+# "outro" os chunks de secoes de Canoas dentro de docs institucionais (ex: o Quadro 5.3 de vagas do
+# PDI). Foi REMOVIDO em jul/2026 por ter um unico consumidor vivo (recuperar o Quadro 5.3 para o caso
+# total-vagas-campus) e um bug de fronteira (chunk com a cauda do campus anterior liberado como
+# Canoas, vazando o subtotal de Bento Gonçalves). Detalhes e como reintroduzir em CLAUDE.md, secao
+# "Solucoes removidas". O escopo de campus hoje e so o doc-nivel (classify_campus_scope) + o cap.
 
 def is_calendar_pdf(url, text):
     # calendario academico: exige CONTEUDO de calendario (muitas datas), nao so a palavra no URL.
@@ -1045,14 +988,9 @@ def chunk_document(text, metadata, por_linha=False):
     if por_linha:
         return [{"text": ln.strip(), **metadata} for ln in text.split("\n") if ln.strip()]
     if len(text) <= CHUNK_SIZE:
-        out = [{"text": text, **metadata}]
-    else:
-        out = [{"text": part, **metadata} for part in splitter.split_text(text)]
-
-    # doc institucional ("outro"): refina o escopo POR CHUNK, liberando as secoes de Canoas
-    if metadata.get("campus_scope") == "outro":
-        refinar_campus_scope(out)
-    return out
+        return [{"text": text, **metadata}]
+    parts = splitter.split_text(text)
+    return [{"text": part, **metadata} for part in parts]
 
 def to_drive_view_url(url):
     if "drive.google.com/uc" in url:
