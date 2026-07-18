@@ -9,13 +9,5 @@ gdown==6.0.0
 # PDF parsing
 pymupdf==1.24.9
 
-# LangChain (chunker)
-langchain==0.3.7
-langchain-community==0.3.7
-langchain-google-genai==2.0.4
-
-# Utilitários
-tiktoken==0.8.0
-
-# Avaliação
-deepeval==4.0.7
+# Chunker (splitter recursivo; pacote standalone, sem carregar o framework LangChain inteiro)
+langchain-text-splitters==0.3.8

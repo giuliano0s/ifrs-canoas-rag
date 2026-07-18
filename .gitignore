@@ -24,6 +24,9 @@ __pycache__/
 Thumbs.db
 .vercel
 
+# padrao de codigo/arquitetura: guia de desenvolvimento local, fora do versionamento
+PADROES.md
+
 # backups do Upstash (vetores crus, grandes) gerados antes de reescrever a base de forma modular
 backups/
 

@@ -26,7 +26,7 @@ O projeto realiza:
 
 - Python 3.12+
 - Flask
-- LangChain
+- langchain-text-splitters (chunker)
 - Upstash Vector
 - Upstash Redis
 - Google Gemini API
@@ -45,7 +45,7 @@ O projeto realiza:
 ├── api/                  # Entrypoint serverless (Vercel)
 ├── data/                 # Dados brutos e processados
 ├── eval/                 # Bateria de testes (golden set + validador)
-├── pipelines/            # Scripts principais de ingestão
+├── pipelines/            # Ingestão modular (config, crawler, parsers, chunker, ingest + orquestrador)
 ├── rag/                  # Lógica RAG
 ├── ui/                   # Interface web
 ├── requirements.txt

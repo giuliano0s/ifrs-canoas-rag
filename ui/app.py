@@ -100,5 +100,11 @@ def chat():
     return jsonify({"response": response})
 
 if __name__ == "__main__":
+    # execucao local de dev: liga o dump de retrieval (DEBUG do pacote rag) no console.
+    # no serverless este bloco nao roda e nenhum handler e configurado, entao so WARNING+
+    # chega ao log da plataforma (a pergunta do usuario nao vai ao log de funcao).
+    import logging
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    logging.getLogger("rag").setLevel(logging.DEBUG)
     port = int(os.getenv("PORT", "5000"))
     app.run(debug=True, port=port, threaded=True)

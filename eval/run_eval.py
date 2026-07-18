@@ -10,7 +10,7 @@
 Uso:  python -m eval.run_eval coletar    (usa EVAL_N, EVAL_THROTTLE)
       python -m eval.run_eval validar
 """
-import os, sys, io, re, json, time, unicodedata, contextlib, hashlib
+import os, sys, re, json, time, unicodedata, hashlib
 from datetime import datetime
 
 # console em UTF-8 (Windows cp1252 quebra acento/emoji)
@@ -56,14 +56,6 @@ def inputs_do_caso(caso):
 
 # ── COLETA: roda o agente e salva o trace (uma execucao por linha) ───────────────
 
-@contextlib.contextmanager
-def _silencia_log():
-    buf = io.StringIO(); antigo = sys.stdout; sys.stdout = buf
-    try:
-        yield
-    finally:
-        sys.stdout = antigo
-
 def _executar(case_id, inp, run, data_referencia=None, stamp=None):
     # roda o ask real com retry; erro transitorio de API vira ERRO da execucao (nunca
     # derruba a coleta). o registro guarda so a SAIDA; as expectativas vem do golden ao validar.
@@ -74,8 +66,9 @@ def _executar(case_id, inp, run, data_referencia=None, stamp=None):
     for tent in range(3):
         try:
             trace = {}
-            with _silencia_log():
-                resposta = ask(inp, trace=trace, data_atual=data_referencia)
+            # o dump de retrieval do chain sai em nivel DEBUG e o eval nao configura logging,
+            # entao a coleta roda silenciosa por padrao (so WARNING+ apareceria)
+            resposta = ask(inp, trace=trace, data_atual=data_referencia)
             erro = None
             break
         except Exception as e:
