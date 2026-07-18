@@ -99,7 +99,11 @@ def run_chunker(pages_parsed, pdfs_parsed, sheets_parsed):
             metadata["schedule_source"] = pdf.get("schedule_source")
         chunks.extend(chunk_document(pdf["text"], metadata, por_linha=pdf.get("is_schedule", False)))
 
-    # processa planilhas (Google Sheets estruturados em frases)
+    # processa planilhas (Google Sheets estruturados em frases). por_linha=True: a planilha e uma
+    # LISTA DE REGISTROS (o structure_sheet_text produz uma frase por linha, um por professor/setor),
+    # entao cada registro vira seu proprio chunk. Sem isso, o splitter por tamanho empacota ~20
+    # registros num chunk de 4000 chars, e uma consulta a UM registro ("contato do professor X")
+    # disputa dentro do blocao e o dado certo nao chega ao contexto (mesmo motivo do por_linha da grade).
     for sheet in sheets_parsed:
         metadata = {
             "source_url":   sheet["source_url"],
@@ -109,7 +113,7 @@ def run_chunker(pages_parsed, pdfs_parsed, sheets_parsed):
             "source_hash":  sheet.get("source_hash"),
             "campus_scope": classify_campus_scope(sheet.get("title", ""), sheet["text"], sheet["source_url"]),
         }
-        chunks.extend(chunk_document(sheet["text"], metadata))
+        chunks.extend(chunk_document(sheet["text"], metadata, por_linha=True))
 
     CHUNKS_PATH.write_text(json.dumps(chunks, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Total de chunks: {len(chunks)}")
