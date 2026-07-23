@@ -6,7 +6,7 @@ Funções puras (sem rede); usadas pelo crawler, pelos parsers e pelo chunker.
 
 import re
 
-from pipelines.config import ANOS_VALIDOS, BASE_URL, DRIVE_DOWNLOAD
+from pipelines.config import ANOS_VALIDOS, BASE_URL, DRIVE_DOWNLOAD, INGRESSO_URL
 
 # extensões ignoradas pelo crawler
 IGNORED_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".webp",
@@ -19,7 +19,8 @@ IGNORE_KEYWORDS = ["/10anos/", "covid", "apnps", "retornoseguro", "vacina",
 
 
 def is_valid_page(url):
-    return url.startswith(BASE_URL)
+    # o site do campus (BASE_URL) e o portal de ingresso (INGRESSO_URL) sao dominios validos de crawl
+    return url.startswith(BASE_URL) or url.startswith(INGRESSO_URL)
 
 def is_pdf_by_extension(url):
     return url.lower().endswith(".pdf")
@@ -69,9 +70,13 @@ def should_ignore(url):
     url_lower = url.lower()
     if any(url_lower.endswith(ext) for ext in IGNORED_EXTENSIONS):
         return True
-    # ignora URLs que contenham anos fora do range válido
+    # ignora URLs que contenham anos fora do range válido (pasta de upload /YYYY/)
     year_match = re.search(r"/(\d{4})/", url)
     if year_match and int(year_match.group(1)) not in ANOS_VALIDOS:
+        return True
+    # periodo do processo seletivo /AAAA-S/ (ingresso): dropa periodos fora dos anos válidos
+    per_match = re.search(r"/(\d{4})-\d/", url)
+    if per_match and int(per_match.group(1)) not in ANOS_VALIDOS:
         return True
     if any(k in url_lower for k in IGNORE_KEYWORDS):
         return True

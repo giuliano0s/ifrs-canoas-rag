@@ -72,6 +72,7 @@ def ingest_chunks(chunks, batch_size=100):
                 "published_at": chunk.get("published_at"),
                 "source_hash":  chunk.get("source_hash"),
                 "campus_scope": chunk.get("campus_scope"),
+                "curso_escopo": chunk.get("curso_escopo"),
             }
             # marcadores de grade so nos chunks de grade; a chave ausente nos demais mantem o metadata enxuto
             if chunk.get("is_schedule"):

@@ -1,1 +1,3 @@
 https://ifrs.edu.br/canoas/wp-content/uploads/sites/6/2022/05/complementares_tads.pdf
+# portal de ingresso: semente para o crawler descobrir o periodo corrente (redireciona para /AAAA-S/)
+https://ingresso.ifrs.edu.br/

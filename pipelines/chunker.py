@@ -11,6 +11,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from pipelines.config import CHUNK_SIZE, CHUNKS_DIR, CHUNKS_PATH
 from pipelines.urls import to_drive_view_url
+from rag.cursos_escopo import classify_curso_escopo  # fonte unica do escopo de curso (ingestao + serving)
 
 _CAMPI_IFRS = ("Alvorada", "Bento Gon", "Caxias", "Erechim", "Farroupilha", "Feliz", "Ibirub",
                "Osório", "Osorio", "Porto Alegre", "Restinga", "Rio Grande", "Rolante", "Sertão",
@@ -75,6 +76,7 @@ def run_chunker(pages_parsed, pdfs_parsed, sheets_parsed):
             "published_at": page.get("published_at"),
             "source_hash":  page.get("source_hash"),
             "campus_scope": classify_campus_scope(page["title"], page["text"], page["source_url"]),
+            "curso_escopo": classify_curso_escopo(page["title"], page["text"], page["source_url"]),
         }
         chunks.extend(chunk_document(page["text"], metadata))
 
@@ -82,14 +84,29 @@ def run_chunker(pages_parsed, pdfs_parsed, sheets_parsed):
     for pdf in pdfs_parsed:
         if pdf["is_scanned"]:
             continue
-        metadata = {
-            "source_url":   to_drive_view_url(pdf["source_url"]),
+        url = to_drive_view_url(pdf["source_url"])
+        base_meta = {
+            "source_url":   url,
             "title":        pdf["title"],
             "type":         "pdf",
             "published_at": pdf.get("published_at"),
             "source_hash":  pdf.get("source_hash"),
-            "campus_scope": classify_campus_scope(pdf["title"], pdf["text"], to_drive_view_url(pdf["source_url"])),
         }
+        # quadro de vagas: um chunk por curso, com campus_scope POR REGISTRO (o curso de Canoas fica
+        # None e sobrevive ao cap; os outros campi ficam "outro" e sao despriorizados). o campus esta
+        # EXPLICITO em cada linha e cada chunk e um curso atomico, entao nao ha bug de fronteira (o que
+        # derrubou o antigo refino por chunk). o structurer ja emitiu uma linha por curso.
+        if pdf.get("is_vagas"):
+            for ln in pdf["text"].split("\n"):
+                ln = ln.strip()
+                if not ln:
+                    continue
+                chunks.append({**base_meta, "text": ln,
+                               "campus_scope": None if "canoas" in ln.lower() else "outro"})
+            continue
+        metadata = {**base_meta,
+                    "campus_scope": classify_campus_scope(pdf["title"], pdf["text"], url),
+                    "curso_escopo": classify_curso_escopo(pdf["title"], pdf["text"], url)}
         # grade de horario: leva os marcadores para o metadata (persistidos no upsert). nao e so o
         # switch de parse: na base, is_schedule permite auditar/filtrar as grades e schedule_source
         # (visao/visao_parcial/fallback_texto) sinaliza grade incompleta ou degradada, o que o texto
@@ -112,6 +129,7 @@ def run_chunker(pages_parsed, pdfs_parsed, sheets_parsed):
             "published_at": sheet.get("published_at"),
             "source_hash":  sheet.get("source_hash"),
             "campus_scope": classify_campus_scope(sheet.get("title", ""), sheet["text"], sheet["source_url"]),
+            "curso_escopo": classify_curso_escopo(sheet.get("title", ""), sheet["text"], sheet["source_url"]),
         }
         chunks.extend(chunk_document(sheet["text"], metadata, por_linha=True))
 

@@ -207,6 +207,88 @@ def structure_schedule_vision(doc, max_pages=30):
     return "\n".join(linhas), {"paginas": min(doc.page_count, max_pages), "puladas": puladas,
                                "suspeitas": suspeitas, "truncado": truncado}
 
+# ── gate de PII e quadro de vagas de processo seletivo ───────────────────────────
+_INSCR_RX = re.compile(r"\b\d{6,9}\b")
+_SEP_WS = re.compile(r"\s+")
+
+def _norm_ws(s):
+    return _SEP_WS.sub(" ", (s or "").lower())
+
+def is_pii_nominal_list(text, url="", title=""):
+    # gate de PII FAIL-CLOSED: barra lista nominal de candidatos (ensalamento, homologados,
+    # classificados). sinal robusto = densidade de numero de inscricao (6-9 digitos): listas reais
+    # tem dezenas a centenas; editais 1-2; provas 0-2 (vao vazio na faixa 3-7, medido no corpus).
+    # deteccao por CONTEUDO, nao por nome de arquivo, que engana (Campus-Canoas.pdf era ensalamento).
+    n_inscr = len(set(_INSCR_RX.findall(text or "")))
+    if n_inscr >= 8:
+        return True
+    marc = re.search(r"homologad|classificad|ensalament|inscri\w* aceitas|resultado|lista|convocac",
+                     (url + " " + title).lower())
+    return bool(marc) and n_inscr >= 3
+
+def is_vagas_table(title, text, url):
+    # quadro de vagas de processo seletivo: marcador "quadro de vagas" na URL/titulo + corpo com
+    # secoes de campus e coluna de vagas. GATED como is_schedule_pdf/is_calendar_pdf.
+    marc = re.search(r"quadros?[-_ ]de[-_ ]vagas?", (url + " " + title).lower())
+    corpo = (text or "")[:6000].lower()
+    tem = ("vagas ofertadas" in corpo or "total de vagas" in corpo
+           or ("vagas prova" in corpo and "vagas enem" in corpo) or corpo.count("campus ") >= 2)
+    return bool(marc) and tem
+
+def _periodo_from_url(url):
+    # periodo do processo seletivo = segmento logo APOS o dominio do ingresso (/AAAA-S/ ou /AAAA/),
+    # nao a pasta de upload interna (/wp-content/uploads/sites/N/YYYY/MM/, que e data de upload).
+    # retorna "AAAA/S" quando ha semestre, "AAAA" quando so ha o ano, ou None. Fallback preserva o
+    # comportamento antigo (qualquer /AAAA-S/ na URL) para nao quebrar quem dependia dele.
+    u = url or ""
+    m = re.search(r"ingresso\.ifrs\.edu\.br/(20\d{2})(?:-(\d))?/", u)
+    if m:
+        return f"{m.group(1)}/{m.group(2)}" if m.group(2) else m.group(1)
+    m = re.search(r"/(20\d{2})-(\d)/", u)
+    return f"{m.group(1)}/{m.group(2)}" if m else None
+
+def structure_vagas_table(text, periodo):
+    # estrutura o quadro em UMA linha por curso, amarrando cada curso ao campus da sua secao e
+    # incluindo o detalhamento completo (total + prova/ENEM por cota). GATE anti-alucinacao: a
+    # linha so sobrevive se o par (curso, total) co-ocorrer numa janela do raw (barra numero
+    # atribuido ao campus errado, o erro-classe "611 de Bento").
+    per = periodo or "atual"
+    prompt = f"""Você recebe o texto extraído de um QUADRO DE VAGAS de processo seletivo do IFRS. A tabela 2D foi achatada na extração, mas o texto tem seções por campus ("Campus X:") e, após cada tabela, uma descrição em prosa por curso com o total de vagas e a distribuição por cota.
+
+Para CADA curso, emita UMA ÚNICA linha (sem quebra de linha interna), no formato:
+Campus <CAMPUS> - <Curso> (<turno>, <duração>): <TOTAL> vagas ofertadas no Processo Seletivo {per}. Distribuição: <detalhamento completo de vagas por prova e por ENEM, por cota, como está no texto>.
+
+Regras:
+- O <CAMPUS> é o da seção onde o curso aparece. NUNCA troque o campus de um curso.
+- <TOTAL> é o número total de vagas do curso.
+- Inclua o detalhamento completo (vagas por prova e por ENEM, por cota) exatamente como no texto.
+- NÃO invente cursos, campi ou números. Uma linha por curso, sem texto adicional.
+
+TEXTO:
+{text}"""
+    out = ""
+    for _ in range(3):
+        try:
+            r = google_client.models.generate_content(
+                model="gemini-2.5-flash-lite", contents=prompt, config={"temperature": 0.0})
+            out = (r.text or "").strip(); break
+        except Exception as e:
+            print(f"  ERRO structure vagas: {e}"); time.sleep(20)
+    raw_n = _norm_ws(text)
+    linhas_ok = []
+    for ln in out.split("\n"):
+        ln = ln.strip()
+        m = re.match(r"campus\s+(.+?)\s*-\s*(.+?)\s*\(.*?\):\s*(\d+)\s*vagas", ln, re.IGNORECASE)
+        if not m:
+            continue
+        curso_n, total = _norm_ws(m.group(2)), m.group(3)
+        toks = [t for t in curso_n.split() if len(t) > 3][:3]
+        ok = any(total in raw_n[p.start():p.start() + 400] and all(t in raw_n[p.start():p.start() + 400] for t in toks)
+                 for p in re.finditer(re.escape(toks[0]), raw_n)) if toks else False
+        if ok:
+            linhas_ok.append(ln)
+    return "\n".join(linhas_ok)
+
 def parse_pdf(pdf_info, content):
     # recebe os bytes ja baixados (o download e o source_hash acontecem no crawler)
     url = pdf_info["url"]
@@ -227,8 +309,16 @@ def parse_pdf(pdf_info, content):
             "size_kb":    pdf_info["size_kb"],
             "parent":     pdf_info.get("parent", ""),
         }
-        # grade de horario -> visao (pixelrag); calendario -> reextracao posicional. Ambos com o doc
-        # ainda ABERTO (a visao precisa renderizar as paginas).
+        # gate de PII (fail-closed): lista nominal de candidatos NUNCA entra na base; o texto e
+        # descartado (nem fica no resultado). qualquer incerteza pende para barrar, nao para vazar.
+        if not is_scanned and is_pii_nominal_list(text, url, title):
+            resultado["pii_blocked"] = True
+            resultado["text"] = ""
+            doc.close()
+            return resultado
+
+        # grade de horario -> visao (pixelrag); quadro de vagas -> structurer por registro;
+        # calendario -> reextracao posicional. Todos com o doc ainda ABERTO (a visao renderiza paginas).
         if not is_scanned and is_schedule_pdf(title, text):
             resultado["is_schedule"] = True
             ano = _grade_ano_raw(text, title)   # ano deterministico do raw (nao da saida da visao)
@@ -245,6 +335,15 @@ def parse_pdf(pdf_info, content):
                 resultado["date_source"]  = "conteudo_grade"
             print(f"  [GRADE] {url} -> {resultado['schedule_source']} | ano={ano}"
                   + (f" | {flags}" if vis_text else ""))
+        elif not is_scanned and is_vagas_table(title, text, url):
+            # quadro de vagas: um registro por curso, amarrado ao campus da secao (gate anti-alucinacao)
+            resultado["is_vagas"] = True
+            periodo = _periodo_from_url(url)
+            text = structure_vagas_table(text, periodo)
+            if periodo:
+                resultado["published_at"] = periodo.split("/")[0]
+                resultado["date_source"]  = "periodo_ingresso"
+            print(f"  [VAGAS] {url} -> {len(text.splitlines())} cursos | periodo={periodo}")
         elif not is_scanned and is_calendar_pdf(url, text):
             # calendario: reextrai por blocos posicionais para amarrar evento ao mes correto
             text = structure_calendar_text(extract_calendar_text(doc))
@@ -270,7 +369,7 @@ def run_pdf_parser(pdfs_dirty, estado):
     scanned       = set(json.loads(SCANNED_PATH.read_text(encoding="utf-8"))) if SCANNED_PATH.exists() else set()
     print(f"PDFs a processar (novo+mudado): {len(pdfs_dirty)}")
 
-    results, pdf_errors, n_scan = [], [], 0
+    results, pdf_errors, n_scan, n_pii = [], [], 0, 0
     for i, rec in enumerate(pdfs_dirty):
         url = rec["url"]
         result = parse_pdf(rec, rec["content"])
@@ -278,6 +377,9 @@ def run_pdf_parser(pdfs_dirty, estado):
             pdf_errors.append(url); continue
         if result.get("format_error"):
             format_errors.add(url); continue
+        if result.get("pii_blocked"):
+            # lista nominal de candidatos barrada pelo gate de PII; nao entra na base
+            n_pii += 1; continue
         if result.get("is_scanned"):
             # sem texto extraivel: registra para o crawler pular o download nos proximos runs
             scanned.add(to_drive_view_url(url)); n_scan += 1; continue
@@ -290,7 +392,7 @@ def run_pdf_parser(pdfs_dirty, estado):
     # (list(set) reordenava o json a cada run e sujava o commit semanal do CI com diff falso)
     FORMAT_ERRORS_PATH.write_text(json.dumps(sorted(format_errors), ensure_ascii=False, indent=2), encoding="utf-8")
     SCANNED_PATH.write_text(json.dumps(sorted(scanned), ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"\nParsed: {len(results)} PDFs | Erros: {len(pdf_errors)} | Escaneados registrados: {n_scan}")
+    print(f"\nParsed: {len(results)} PDFs | Erros: {len(pdf_errors)} | Escaneados: {n_scan} | PII barrados: {n_pii}")
 
     # enriquecimento de datas (so nos PDFs dirty, nao escaneados)
     print("\nEnriquecendo datas dos PDFs...")

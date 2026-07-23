@@ -9,6 +9,7 @@ from upstash_vector import Index
 from google import genai as google_genai
 from google.genai import errors as genai_errors
 from google.genai import types
+from rag.cursos_escopo import curso_da_query, nome_curso
 import time
 from datetime import datetime, date
 
@@ -40,6 +41,10 @@ CAMPUS_OUTRO_MAX = 0  # teto de chunks campus_scope="outro" (institucional/multi
                       # contexto final. a penalidade so REBAIXA o "outro"; ele ainda sobrava no top-15
                       # e vazava (Torre Norte etc.) em parte das respostas de salas. este cap o EXPULSA
                       # do contexto (0 = nenhum): a base e toda de Canoas, institucional nao responde daqui.
+CURSO_PENALTY = 0.20  # penalidade no rerank para chunk de curso DIFERENTE do citado na pergunta
+                      # (metadata curso_escopo). SUAVE (0.20 < CAMPUS_PENALTY 0.35) e SEM cap: doc de
+                      # outro curso pode ser pertinente, entao so desce, nao e expulso. fecha o erro de
+                      # aplicar regra de um curso a outro (ex: regulamento de TCC da GPI dado como TADS).
 MODEL = "gemini-2.5-flash"
 
 # clientes
@@ -153,7 +158,12 @@ def build_context(hits, min_score=MIN_SCORE, top_n=CONTEXT_K):
 
         source_num = seen_urls[url]
         published_at = h.metadata.get("published_at") or "data desconhecida"
-        context += f"[{source_num}] Fonte: {url} | Data: {published_at}\n"
+        # rotula o curso do doc (quando curso-especifico) no MESMO cabecalho do trecho, junto do
+        # Data:, para o agente atribuir a regra ao curso certo (ex: nao apresentar regra de TCC da
+        # GPI como se fosse do TADS). doc neutro (sem curso_escopo) nao ganha rotulo.
+        curso = h.metadata.get("curso_escopo")
+        rotulo_curso = f" | Curso: {nome_curso(curso)}" if curso else ""
+        context += f"[{source_num}] Fonte: {url} | Data: {published_at}{rotulo_curso}\n"
         context += h.metadata["text"] + "\n\n"
 
     return context, filtered, sources, source_years
@@ -179,19 +189,31 @@ def _campus_penalty(hit):
     # nao deve responder como se fosse daqui. Ausencia de campus_scope = neutro (0), nao penaliza.
     return CAMPUS_PENALTY if (hit.metadata.get("campus_scope") == "outro") else 0.0
 
-def rerank_by_date(hits):
+def _curso_penalty(hit, curso_query):
+    # quando a pergunta nomeia UM curso, despriorioza (suave) chunk de curso DIFERENTE. par do
+    # _campus_penalty, mas SEM cap duro: doc de outro curso pode ser pertinente, entao so desce.
+    # doc neutro (sem curso_escopo) e doc do mesmo curso nunca sao penalizados.
+    if not curso_query:
+        return 0.0
+    escopo = hit.metadata.get("curso_escopo")
+    return CURSO_PENALTY if (escopo and escopo != curso_query) else 0.0
+
+def rerank_by_date(hits, curso_query=None):
+    # UMA formula de rerank: similaridade + recencia - (penalidade de campus) - (penalidade de curso).
     return sorted(
         hits,
-        key=lambda h: ALPHA * h.score + (1 - ALPHA) * _date_score(h) - _campus_penalty(h),
+        key=lambda h: ALPHA * h.score + (1 - ALPHA) * _date_score(h)
+                      - _campus_penalty(h) - _curso_penalty(h, curso_query),
         reverse=True
     )
 
 
 def _executar_busca(search_query, trace=None):
-    # coleta um pool grande por similaridade, reordena por data e corta para o contexto
+    # coleta um pool grande por similaridade, reordena por data e corta para o contexto. se a query
+    # nomeia um curso, o rerank desprioriza doc de curso diferente (curso_da_query -> _curso_penalty).
     hits = search(search_query, top_k=FETCH_K)
     rank_sim = {h.id: i for i, h in enumerate(hits)}  # posicao por similaridade, antes do rerank
-    hits = rerank_by_date(hits)
+    hits = rerank_by_date(hits, curso_da_query(search_query))
     context, filtered, sources, source_years = build_context(hits)
 
     # log de depuracao: pool coletado, reordenado, e quais chunks entraram no contexto final

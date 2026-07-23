@@ -38,6 +38,10 @@ INCLUDE_SCANNED = _flag_env("INCLUDE_SCANNED", False)
 
 # configurações gerais
 BASE_URL        = "https://ifrs.edu.br/canoas/"
+# portal de ingresso do IFRS: fonte-de-registro das vagas OFERTADAS (que o site do campus nao tem).
+# entra no crawl como dominio valido (is_valid_page) semeado pela whitelist; o gate de PII barra as
+# listas nominais de candidatos e o filtro de ano limita ao periodo corrente (/AAAA-S/).
+INGRESSO_URL    = "https://ingresso.ifrs.edu.br/"
 DRIVE_DOWNLOAD  = "https://drive.google.com/uc?export=download&id="
 CHUNK_SIZE      = 4000
 MIN_CHARS       = 150 # minimo de caracteres que um PDF "não-scan" possui
