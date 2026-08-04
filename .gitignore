@@ -6,9 +6,11 @@
 data/raw/
 data/chunks/
 data/parsed/*
-# registros leves versionados: semeiam o CI para ele nao re-baixar os ~1359 escaneados
+# registros leves versionados: semeiam o CI para ele nao re-baixar os escaneados nem as listas
+# barradas pelo gate de PII (guardam SO a URL publica do documento, nunca conteudo)
 !data/parsed/pdfs_scanned.json
 !data/parsed/pdfs_format_errors.json
+!data/parsed/pdfs_pii.json
 
 # jupyter
 .ipynb_checkpoints/

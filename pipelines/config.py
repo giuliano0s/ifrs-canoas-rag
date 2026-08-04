@@ -35,6 +35,11 @@ REINGEST = _flag_env("REINGEST", False)
 # baixar PDFs escaneados (sem texto). False = pula os ja registrados como escaneados,
 # evitando o re-download recorrente; deixar True quando houver OCR/pixelrag.
 INCLUDE_SCANNED = _flag_env("INCLUDE_SCANNED", False)
+# re-checar PDFs já barrados pelo gate de PII (lista nominal de candidatos). False (default) = pula o
+# download dos já registrados, como faz com os escaneados; um doc barrado por PII nunca gera chunk,
+# então nunca ganha source_hash na base e sem o registro voltaria como "novo" a cada run (medido:
+# 1132 re-downloads por execução). True = re-avalia todos, para quando o gate mudar de critério.
+RECHECK_PII = _flag_env("RECHECK_PII", False)
 
 # configurações gerais
 BASE_URL        = "https://ifrs.edu.br/canoas/"
@@ -95,6 +100,7 @@ PDFS_PARSED_PATH  = PARSED_DIR / "pdfs_parsed.json"
 SHEETS_PARSED_PATH = PARSED_DIR / "sheets_parsed.json"
 FORMAT_ERRORS_PATH = PARSED_DIR / "pdfs_format_errors.json"
 SCANNED_PATH       = PARSED_DIR / "pdfs_scanned.json"
+PII_PATH           = PARSED_DIR / "pdfs_pii.json"
 CHUNKS_PATH       = CHUNKS_DIR / "chunks.json"
 WHITELIST_PATH    = INFO_DIR / "whitelist.txt"
 

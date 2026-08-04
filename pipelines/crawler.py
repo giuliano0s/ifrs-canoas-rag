@@ -16,7 +16,7 @@ import gdown
 from bs4 import BeautifulSoup
 
 from pipelines.config import (HEADERS, BASE_URL, INCLUDE_SCANNED, PAGES_PATH, PDFS_PATH,
-                              RAW_DIR, REINGEST, REPARSE, SCANNED_PATH, SHEETS_FALHAS,
+                              PII_PATH, RAW_DIR, RECHECK_PII, REINGEST, REPARSE, SCANNED_PATH, SHEETS_FALHAS,
                               SHEETS_PATH, WHITELIST_PATH, fetch)
 from pipelines.hashing import source_hash
 from pipelines.parser_html import extract_page_content
@@ -121,6 +121,18 @@ def run_crawler(estado):
     if not INCLUDE_SCANNED and scanned_conhecidos:
         print(f"Escaneados conhecidos (pulados sem baixar): {len(scanned_conhecidos)}")
 
+    # PDFs ja barrados pelo gate de PII (lista nominal de candidatos): mesmo tratamento dos
+    # escaneados, pois tambem nunca geram chunk e voltariam como "novos" a cada run.
+    pii_conhecidos = set(json.loads(PII_PATH.read_text(encoding="utf-8"))) if PII_PATH.exists() else set()
+    if not RECHECK_PII and pii_conhecidos:
+        print(f"PII conhecidos (pulados sem baixar): {len(pii_conhecidos)}")
+
+    def _pular_download(u):
+        # True se a URL ja e conhecida como escaneada ou como lista de PII (nao vale re-baixar)
+        chave = to_drive_view_url(u)
+        return ((not INCLUDE_SCANNED and chave in scanned_conhecidos)
+                or (not RECHECK_PII and chave in pii_conhecidos))
+
     # BFS: baixa cada URL, segue os links (acha filhos novos) e classifica HTML e PDF direto ali mesmo
     n_erro = n_bloq = 0
     while queue:
@@ -196,7 +208,7 @@ def run_crawler(estado):
                 download_url = build_download_url(full_url)
                 if download_url not in queued:
                     drive_cands.append({"url": download_url, "parent": url}); queued.add(download_url); novos += 1
-            elif is_pdf_by_extension(full_url) and (INCLUDE_SCANNED or full_url in whitelist or to_drive_view_url(full_url) not in scanned_conhecidos):
+            elif is_pdf_by_extension(full_url) and (full_url in whitelist or not _pular_download(full_url)):
                 queue.append(full_url); queued.add(full_url); novos += 1
         time.sleep(0.3)
 
@@ -209,7 +221,7 @@ def run_crawler(estado):
     st_pdf = {"nova": 0, "mudada": 0, "inalterada": 0}
     for cand in drive_cands:
         url, parent = cand["url"], cand["parent"]
-        if not INCLUDE_SCANNED and to_drive_view_url(url) in scanned_conhecidos:
+        if _pular_download(url):
             continue
         pdfs_all.append({"url": url, "parent": parent})
         content = download_pdf_bytes(url, HEADERS)

@@ -11,7 +11,7 @@ import fitz
 from google.genai import types
 
 from pipelines.config import (FORMAT_ERRORS_PATH, MIN_CHARS, PAGES_PARSED_PATH,
-                              PARSED_DIR, PDFS_PARSED_PATH, SAVE_INTERVAL, SCANNED_PATH,
+                              PARSED_DIR, PDFS_PARSED_PATH, PII_PATH, SAVE_INTERVAL, SCANNED_PATH,
                               google_client)
 from pipelines.dates import extract_date_from_text, get_published_at
 from pipelines.urls import to_drive_view_url
@@ -367,6 +367,7 @@ def run_pdf_parser(pdfs_dirty, estado):
     PARSED_DIR.mkdir(parents=True, exist_ok=True)
     format_errors = set(json.loads(FORMAT_ERRORS_PATH.read_text(encoding="utf-8"))) if FORMAT_ERRORS_PATH.exists() else set()
     scanned       = set(json.loads(SCANNED_PATH.read_text(encoding="utf-8"))) if SCANNED_PATH.exists() else set()
+    pii_conhecidos = set(json.loads(PII_PATH.read_text(encoding="utf-8"))) if PII_PATH.exists() else set()
     print(f"PDFs a processar (novo+mudado): {len(pdfs_dirty)}")
 
     results, pdf_errors, n_scan, n_fmt, pii_urls = [], [], 0, 0, []
@@ -378,8 +379,10 @@ def run_pdf_parser(pdfs_dirty, estado):
         if result.get("format_error"):
             format_errors.add(url); n_fmt += 1; continue
         if result.get("pii_blocked"):
-            # lista nominal de candidatos barrada pelo gate de PII; nao entra na base
-            pii_urls.append(url); continue
+            # lista nominal de candidatos barrada pelo gate de PII: nao entra na base e e REGISTRADA
+            # para o crawler pular o download nos proximos runs (sem chunk, ela nunca ganha
+            # source_hash e voltaria como "nova" sempre). o registro guarda so a URL publica.
+            pii_urls.append(url); pii_conhecidos.add(to_drive_view_url(url)); continue
         if result.get("is_scanned"):
             # sem texto extraivel: registra para o crawler pular o download nos proximos runs
             scanned.add(to_drive_view_url(url)); n_scan += 1; continue
@@ -388,10 +391,11 @@ def run_pdf_parser(pdfs_dirty, estado):
         if (i + 1) % 100 == 0:
             print(f"  parseados {i+1}/{len(pdfs_dirty)}")
 
-    # ambos os registros sao versionados no git: escrever ORDENADO os torna deterministicos
+    # os tres registros sao versionados no git: escrever ORDENADO os torna deterministicos
     # (list(set) reordenava o json a cada run e sujava o commit semanal do CI com diff falso)
     FORMAT_ERRORS_PATH.write_text(json.dumps(sorted(format_errors), ensure_ascii=False, indent=2), encoding="utf-8")
     SCANNED_PATH.write_text(json.dumps(sorted(scanned), ensure_ascii=False, indent=2), encoding="utf-8")
+    PII_PATH.write_text(json.dumps(sorted(pii_conhecidos), ensure_ascii=False, indent=2), encoding="utf-8")
 
     # RELATORIO DE PARSING (numeros + motivos): torna VISIVEL o que NAO entrou e por que. os motivos
     # transitorios (PII barrado, erro de download/parse) nao ficavam persistidos; agora ficam, com
