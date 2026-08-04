@@ -55,16 +55,25 @@ def sanitize_history(raw):
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    # rate limit por IP antes de tocar na llm; depende do Redis, entao se ele falhar, fail-closed
-    # com 503 LIMPO (nao servir sem a protecao) em vez de estourar um 500 sem controle
+    # le o corpo ANTES do rate limit apenas para extrair o user_id (parse de JSON e barato e nao
+    # toca na llm); o limite por dispositivo depende dele, senao o NAT do wifi do campus faria uma
+    # turma inteira compartilhar a cota de um IP.
+    data = request.get_json(silent=True) or {}
+    # identidade anonima vinda do cliente (rate limit + telemetria): teto de tamanho para nao virar bomba
+    session_id = data.get("session_id")
+    session_id = session_id[:64] if isinstance(session_id, str) else None
+    user_id = data.get("user_id")
+    user_id = user_id[:64] if isinstance(user_id, str) else None
+
+    # rate limit por dispositivo (com teto de IP por tras) antes de tocar na llm; depende do Redis,
+    # entao se ele falhar, fail-closed com 503 LIMPO em vez de estourar um 500 sem controle
     try:
-        allowed, reset = check_rate_limit(request)
+        allowed, reset = check_rate_limit(request, user_id=user_id)
     except Exception:
         return jsonify({"error": "servico temporariamente indisponivel, tente em instantes"}), 503
     if not allowed:
         return jsonify({"error": "muitas requisicoes, tente novamente em instantes"}), 429
 
-    data = request.get_json(silent=True) or {}
     query = data.get("query", "").strip()
 
     if not query:
@@ -78,11 +87,6 @@ def chat():
 
     # histórico chega pronto do cliente, servidor não guarda estado
     history = sanitize_history(data.get("history"))
-    # identidade anonima vinda do cliente (telemetria): teto de tamanho para nao virar bomba
-    session_id = data.get("session_id")
-    session_id = session_id[:64] if isinstance(session_id, str) else None
-    user_id = data.get("user_id")
-    user_id = user_id[:64] if isinstance(user_id, str) else None
 
     # roda o agente com trace e envia a telemetria do turno (Langfuse); a telemetria é
     # opcional e protegida, e o try garante que uma falha do ask vire 500 limpo (e fique

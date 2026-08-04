@@ -5,21 +5,32 @@ from upstash_ratelimit import Ratelimit, SlidingWindow
 
 load_dotenv()
 
-# cliente redis e limitador de 20 requisições por minuto por identificador
 redis = Redis(
     url=os.getenv("UPSTASH_REDIS_ENDPOINT"),
     token=os.getenv("UPSTASH_REDIS_API_KEY")
 )
 
+# DOIS limitadores, porque o wifi do campus faz NAT: dezenas de alunos compartilham um IP, e um
+# teto por IP sozinho bloquearia a turma inteira junto (numa aula/demonstracao, o 1o aluno consome
+# a cota de todos). O limite normal e por DISPOSITIVO (user_id anonimo do localStorage, que o
+# widget ja envia); o IP fica como teto secundario, folgado, contra abuso de um unico host.
 ratelimit = Ratelimit(
     redis=redis,
     limiter=SlidingWindow(max_requests=20, window=60),
     prefix="ifrs-canoas-chat"
 )
 
+ratelimit_ip = Ratelimit(
+    redis=redis,
+    limiter=SlidingWindow(max_requests=120, window=60),
+    prefix="ifrs-canoas-chat-ip"
+)
 
-# teto global de requisicoes por dia (proxy simples de teto de gasto no piloto); override por env
-GLOBAL_DAILY_MAX = int(os.getenv("GLOBAL_DAILY_MAX", "2000"))
+
+# teto global de requisicoes por dia (proxy simples de teto de gasto no piloto); override por env.
+# 6000 (nao 2000) para o teste publico: 2000 era atingivel num dia de divulgacao e a recusa
+# ("limite de uso de hoje") atinge todos os usuarios de uma vez.
+GLOBAL_DAILY_MAX = int(os.getenv("GLOBAL_DAILY_MAX", "6000"))
 
 
 def client_ip(request):
@@ -35,9 +46,15 @@ def client_ip(request):
     return request.remote_addr or "desconhecido"
 
 
-def check_rate_limit(request):
-    identifier = client_ip(request)
-    result = ratelimit.limit(identifier)
+def check_rate_limit(request, user_id=None):
+    # limite por DISPOSITIVO quando o widget manda o user_id (evita punir a turma que compartilha o
+    # IP do wifi); sem user_id (chamada direta a API), cai no IP com o mesmo teto estrito.
+    # O teto por IP roda SEMPRE, folgado, para um host abusivo nao escapar trocando de user_id.
+    ip = client_ip(request)
+    por_ip = ratelimit_ip.limit(ip)
+    if not por_ip.allowed:
+        return False, por_ip.reset
+    result = ratelimit.limit(user_id or ip)
     return result.allowed, result.reset
 
 
