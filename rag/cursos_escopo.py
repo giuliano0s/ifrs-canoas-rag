@@ -16,15 +16,16 @@ import re
 # padrões TIGHT para não sobrepor (ex: TADS "análise e desenvolvimento" != Técnico "desenvolvimento
 # de sistemas"). ordem: os mais específicos primeiro.
 CURSOS = [
-    ("gpi",                 r"gest[ãa]o de projetos e inova[çc]"),
+    ("gpi",                 r"gest[ãa]o de projetos e inova[çc]|\bgpi\b"),
     ("esp-educacao",        r"especializa[çc][ãa]o em educa[çc][ãa]o|integra[çc][ãa]o de saberes"),
-    ("esp-linguagens",      r"linguagens contempor[âa]neas"),
-    ("tads",                r"an[áa]lise e desenvolvimento de sistemas|\btads\b"),
-    ("tec-desenv-sistemas", r"t[ée]cnico em desenvolvimento de sistemas"),
+    ("esp-linguagens",      r"linguagens contempor[âa]neas|\blce\b"),
+    ("tads",                r"an[áa]lise e desenvolvimento de sistemas|\btads\b|\bads\b"),
+    ("tec-desenv-sistemas", r"t[ée]cnico em desenvolvimento de sistemas|\btds\b"),
+    ("tec-manutencao-informatica", r"manuten[çc][ãa]o e suporte em inform[áa]tica"),
     ("tec-admin",           r"t[ée]cnico em administra[çc][ãa]o"),
     ("tec-eletronica",      r"t[ée]cnico em eletr[ôo]nica"),
     ("tec-comercio",        r"t[ée]cnico em com[ée]rcio"),
-    ("logistica",           r"tecnologia em log[íi]stica"),
+    ("logistica",           r"tecnologia em log[íi]stica|curso[s]?\s+(?:superior\s+)?d[eo]\s+log[íi]stica"),
     ("automacao",           r"automa[çc][ãa]o industrial"),
     ("matematica",          r"licenciatura em matem[áa]tica"),
     ("eng-eletronica",      r"engenharia eletr[ôo]nica"),
@@ -32,6 +33,13 @@ CURSOS = [
     ("operador-computador", r"operador de computador"),
     ("assistente-adm",      r"assistente administrativo"),
 ]
+# As SIGLAS (ADS/TDS/GPI/LCE, além do TADS que já existia) e a variante "curso de Logística" foram
+# levantadas minerando a base (jul/2026): docs reais usam só a sigla ou o nome curto. Elas não mudaram
+# nenhuma tag da base atual (medido: 0 docs), então são rede para doc futuro; e ajudam a PRECISÃO,
+# pois um doc que cita dois cursos passa a dar 2 matches e cai para neutro, em vez de herdar o único
+# nome que o regex reconhecia. `tec-manutencao-informatica` era um curso AUSENTE da lista com PPC
+# próprio de Canoas (PROEJA, 63 chunks): sem ele, um doc desse curso que citasse "Técnico em Comércio"
+# de passagem era tagueado como Comércio.
 
 # marcador de documento que DEFINE um curso; separa PPC/regulamento (curso-específico) de
 # edital/notícia que só CITA cursos. sem isso, um edital que escreve o nome de um curso viraria
@@ -74,6 +82,7 @@ NOMES = {
     "esp-linguagens":      "Especialização em Linguagens Contemporâneas e Ensino",
     "tads":                "Tecnólogo em Análise e Desenvolvimento de Sistemas (TADS)",
     "tec-desenv-sistemas": "Técnico em Desenvolvimento de Sistemas",
+    "tec-manutencao-informatica": "Técnico em Manutenção e Suporte em Informática (PROEJA)",
     "tec-admin":           "Técnico em Administração",
     "tec-eletronica":      "Técnico em Eletrônica",
     "tec-comercio":        "Técnico em Comércio",

@@ -369,17 +369,17 @@ def run_pdf_parser(pdfs_dirty, estado):
     scanned       = set(json.loads(SCANNED_PATH.read_text(encoding="utf-8"))) if SCANNED_PATH.exists() else set()
     print(f"PDFs a processar (novo+mudado): {len(pdfs_dirty)}")
 
-    results, pdf_errors, n_scan, n_pii = [], [], 0, 0
+    results, pdf_errors, n_scan, n_fmt, pii_urls = [], [], 0, 0, []
     for i, rec in enumerate(pdfs_dirty):
         url = rec["url"]
         result = parse_pdf(rec, rec["content"])
         if not result:
             pdf_errors.append(url); continue
         if result.get("format_error"):
-            format_errors.add(url); continue
+            format_errors.add(url); n_fmt += 1; continue
         if result.get("pii_blocked"):
             # lista nominal de candidatos barrada pelo gate de PII; nao entra na base
-            n_pii += 1; continue
+            pii_urls.append(url); continue
         if result.get("is_scanned"):
             # sem texto extraivel: registra para o crawler pular o download nos proximos runs
             scanned.add(to_drive_view_url(url)); n_scan += 1; continue
@@ -392,7 +392,29 @@ def run_pdf_parser(pdfs_dirty, estado):
     # (list(set) reordenava o json a cada run e sujava o commit semanal do CI com diff falso)
     FORMAT_ERRORS_PATH.write_text(json.dumps(sorted(format_errors), ensure_ascii=False, indent=2), encoding="utf-8")
     SCANNED_PATH.write_text(json.dumps(sorted(scanned), ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"\nParsed: {len(results)} PDFs | Erros: {len(pdf_errors)} | Escaneados: {n_scan} | PII barrados: {n_pii}")
+
+    # RELATORIO DE PARSING (numeros + motivos): torna VISIVEL o que NAO entrou e por que. os motivos
+    # transitorios (PII barrado, erro de download/parse) nao ficavam persistidos; agora ficam, com
+    # amostras, para diagnosticar sem depender do log da run (fecha parte da "degradacao silenciosa").
+    por_estrut = {"vaga": 0, "grade": 0, "calendario": 0, "normal": 0}
+    for r in results:
+        if r.get("is_vagas"):                              por_estrut["vaga"] += 1
+        elif r.get("is_schedule"):                         por_estrut["grade"] += 1
+        elif r.get("date_source") == "conteudo_calendario": por_estrut["calendario"] += 1
+        else:                                              por_estrut["normal"] += 1
+    relatorio = {
+        "pdfs_processados": len(pdfs_dirty),
+        "parseados_ok": len(results),
+        "por_estruturacao": por_estrut,
+        "nao_entraram": {"escaneado": n_scan, "erro_formato": n_fmt,
+                         "pii_barrado": len(pii_urls), "erro_download_ou_parse": len(pdf_errors)},
+        "amostras": {"pii_barrado": pii_urls[:15], "erro_download_ou_parse": pdf_errors[:15]},
+    }
+    (PARSED_DIR / "pdfs_parse_report.json").write_text(
+        json.dumps(relatorio, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"\nParsed: {len(results)} PDFs {por_estrut} | NAO entraram: escaneado={n_scan} "
+          f"formato={n_fmt} PII={len(pii_urls)} download/parse={len(pdf_errors)}")
+    print(f"  relatorio em {(PARSED_DIR / 'pdfs_parse_report.json')}")
 
     # enriquecimento de datas (so nos PDFs dirty, nao escaneados)
     print("\nEnriquecendo datas dos PDFs...")
