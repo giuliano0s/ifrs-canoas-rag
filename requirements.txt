@@ -7,8 +7,11 @@ upstash-vector==0.8.0
 upstash-redis==1.7.0
 upstash-ratelimit==1.1.0
 
-# AI
+# AI: geracao via rag/llm.py (provedor por LLM_PROVIDER). O google-genai e obrigatorio (embedding
+# da base + provedor default); o openai so e usado com LLM_PROVIDER=openai, mas fica na producao
+# para o Vercel poder alternar por variavel de ambiente, sem redeploy de dependencia.
 google-genai==2.6.0
+openai==2.9.0
 
 # Telemetria (Langfuse): opcional, no-op sem as chaves LANGFUSE_*
 langfuse==2.60.10

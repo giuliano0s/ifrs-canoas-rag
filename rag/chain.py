@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from upstash_vector import Index
 from google import genai as google_genai
 from google.genai import errors as genai_errors
-from google.genai import types
+from rag import llm
 from rag.cursos_escopo import curso_da_query, nome_curso
 import time
 from datetime import datetime, date
@@ -45,9 +45,13 @@ CURSO_PENALTY = 0.20  # penalidade no rerank para chunk de curso DIFERENTE do ci
                       # (metadata curso_escopo). SUAVE (0.20 < CAMPUS_PENALTY 0.35) e SEM cap: doc de
                       # outro curso pode ser pertinente, entao so desce, nao e expulso. fecha o erro de
                       # aplicar regra de um curso a outro (ex: regulamento de TCC da GPI dado como TADS).
-MODEL = "gemini-2.5-flash"
+# modelo de GERAÇÃO em uso (Gemini ou OpenAI, conforme LLM_PROVIDER em rag/llm.py). Exposto aqui
+# porque o eval e a telemetria carimbam cada registro com o modelo que o gerou.
+MODEL = llm.modelo_ativo()
 
-# clientes
+# clientes: o index do Upstash e o cliente Gemini do EMBEDDING. O embedding NUNCA acompanha a troca
+# de provedor de geração (a base foi embeddada com gemini-embedding-001; outro espaço vetorial a
+# invalidaria). A geração passa pelo rag.llm.
 index = Index(url=UPSTASH_ENDPOINT, token=UPSTASH_API_KEY)
 google_client = google_genai.Client(api_key=GEMINI_API_KEY_T1)
 
@@ -73,27 +77,8 @@ def _safe(s):
     return str(s).encode(enc, errors="replace").decode(enc)
 
 
-# ferramenta de busca exposta ao modelo; ele decide quando e com qual query chamar
-buscar_documentos_tool = types.Tool(function_declarations=[
-    types.FunctionDeclaration(
-        name="buscar_documentos",
-        description=(
-            "Busca na base de documentos do IFRS Campus Canoas (paginas e PDFs do site). "
-            "Passe uma query especifica, no vocabulario da instituicao, com o discriminador "
-            "certo (curso, tipo de prova, etc)."
-        ),
-        parameters=types.Schema(
-            type="OBJECT",
-            properties={
-                "query": types.Schema(
-                    type="STRING",
-                    description="Consulta refinada para a busca vetorial, no vocabulario dos documentos do campus.",
-                )
-            },
-            required=["query"],
-        ),
-    )
-])
+# a ferramenta de busca exposta ao modelo vive em rag.llm (FERRAMENTA_BUSCA), descrita em JSON
+# Schema neutro, porque cada provedor a declara no formato dele.
 
 
 def search(query, top_k):
@@ -391,12 +376,11 @@ def _extrair_datas(texto):
 
 
 def _chamar_guard(prompt, fallback):
-    # chamada LLM focada e barata do guard (temp baixa); em erro/vazio, mantem a resposta original
+    # chamada LLM focada e barata do guard (temp baixa); em erro/vazio, mantem a resposta original.
+    # passa pelo mesmo provedor do agente (rag.llm), sem ferramenta.
     try:
-        r = google_client.models.generate_content(
-            model=MODEL, contents=prompt,
-            config=types.GenerateContentConfig(temperature=0.1))
-        return (r.text or "").strip() or fallback
+        r = llm.gerar([{"papel": "usuario", "texto": prompt}], temperatura=0.1)
+        return (r.texto or "").strip() or fallback
     except Exception as e:
         logger.warning(_safe(f"[GUARD] re-check falhou, mantendo resposta original: {e}"))
         return fallback
@@ -457,6 +441,33 @@ def _guard_data_futura(corpo, query, contexto, hoje):
     return _edicao_segura(corpo, _chamar_guard(prompt, corpo))
 
 
+_SOMA_RX = re.compile(
+    r"(totaliz\w*|somand\w*|ao todo|no total|um total de|total geral de)\D{0,40}?(\d+(?:\.\d{3})*)", re.I)
+
+
+def _guard_soma_propria(corpo, contexto):
+    # C: total calculado pelo modelo ("totalizando 112", "somando ... 66 vagas", "um total de 344")
+    # cujo numero nao existe no contexto. deterministico, frase a frase (ponto ou quebra de linha):
+    # corta a oracao da soma a partir da virgula que a introduz, mantendo as citacoes [n] dela, ou
+    # remove a frase quando ela e so a soma
+    numeros_ctx = set(re.findall(r"\d+", (contexto or "").replace(".", "")))
+    partes = re.split(r"((?<=[.!?])[ \t]+|\n+)", corpo)
+    saida, cortou = [], False
+    for frase in partes:
+        m = _SOMA_RX.search(frase)
+        if not m or m.group(2).replace(".", "") in numeros_ctx:
+            saida.append(frase)
+            continue
+        cortou = True
+        virgula = frase.rfind(",", 0, m.start())
+        if virgula >= 0:
+            citacoes = " ".join(re.findall(r"\[\d+\]", frase[virgula:]))
+            saida.append(frase[:virgula].rstrip() + (f" {citacoes}" if citacoes else "") + ".")
+    if not cortou:
+        return corpo
+    return re.sub(r"\n{3,}", "\n\n", "".join(saida)).strip()
+
+
 def _aplicar_guards(corpo, query, fontes_anos, contexto, data_atual):
     # orquestra as checagens pos-geracao sobre o corpo. fail-safe: qualquer erro devolve
     # o corpo original. no-op quando nao houve busca (sem fontes nem contexto).
@@ -467,6 +478,8 @@ def _aplicar_guards(corpo, query, fontes_anos, contexto, data_atual):
             hoje = datetime.strptime(data_atual, "%d/%m/%Y").date()
         except (ValueError, TypeError):
             hoje = datetime.now().date()
+        if contexto:
+            corpo = _guard_soma_propria(corpo, contexto)
         corpo = _guard_ressalva_temporal(corpo, fontes_anos, hoje.year)
         corpo = _guard_data_futura(corpo, query, contexto, hoje)
     except Exception as e:
@@ -489,25 +502,19 @@ def ask(query, history=None, max_steps=3, trace=None, data_atual=None):
     if trace is not None:
         trace.update({"input": query, "acao": "nao_buscar", "buscas": [], "resposta": None})
 
-    # monta a conversa como turnos (historico + pergunta atual) para o tool calling
-    contents = []
-    for msg in history:
-        role = "user" if msg["role"] == "user" else "model"
-        contents.append(types.Content(role=role, parts=[types.Part(text=msg["content"])]))
-    contents.append(types.Content(role="user", parts=[types.Part(text=query)]))
+    # monta a conversa no FORMATO NEUTRO (historico + pergunta atual); o adaptador do provedor
+    # ativo (rag.llm) traduz para o SDK dele, entao o loop nao conhece Gemini nem OpenAI
+    mensagens = [{"papel": "usuario" if msg["role"] == "user" else "modelo", "texto": msg["content"]}
+                 for msg in history]
+    mensagens.append({"papel": "usuario", "texto": query})
 
     # data por request (nao no import): instancia serverless quente nao congela a data.
     # override opcional: o eval fixa a data de referencia nos casos temporais; em producao
     # vem None e usa a data real de hoje.
     data_atual = data_atual or datetime.now().strftime("%d/%m/%Y")
 
-    # config com o prompt do agente como system_instruction e a ferramenta de busca
-    config = types.GenerateContentConfig(
-        system_instruction=agent_prompt.format(data_atual=data_atual, cursos=cursos_atuais),
-        tools=[buscar_documentos_tool],
-        temperature=float(os.getenv("AGENT_TEMP", "0.7")),
-        automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
-    )
+    sistema = agent_prompt.format(data_atual=data_atual, cursos=cursos_atuais)
+    temperatura = float(os.getenv("AGENT_TEMP", "0.7"))
 
     # acumuladores: anos das fontes e contexto cru (guard de data) + o mapa {n: url} da ultima
     # busca (backfill do bloco "Fontes:" via _backfill_fontes)
@@ -515,18 +522,12 @@ def ask(query, history=None, max_steps=3, trace=None, data_atual=None):
 
     # loop de investigacao: o modelo pergunta, busca ou responde ate produzir texto
     for _ in range(max_steps):
-        response = google_client.models.generate_content(model=MODEL, contents=contents, config=config)
-        cand = response.candidates[0].content
-
-        fc = None
-        for part in (cand.parts or []):
-            if getattr(part, "function_call", None):
-                fc = part.function_call
-                break
+        r = llm.gerar(mensagens, sistema=sistema, ferramentas=[llm.FERRAMENTA_BUSCA],
+                      temperatura=temperatura)
 
         # sem chamada de ferramenta: e uma pergunta de clarificacao ou resposta final
-        if not fc:
-            resposta = (response.text or "").strip()
+        if not r.chamada:
+            resposta = (r.texto or "").strip()
             resposta = _pos_processar(resposta, query, fontes_anos, contexto_acumulado, sources_map, data_atual)
             if trace is not None:
                 trace["resposta"] = resposta
@@ -535,7 +536,7 @@ def ask(query, history=None, max_steps=3, trace=None, data_atual=None):
         # o modelo pediu busca: executa e devolve o contexto
         if trace is not None:
             trace["acao"] = "buscar"
-        search_query = (fc.args or {}).get("query", query)
+        search_query = (r.chamada.get("args") or {}).get("query", query)
         context, info = _executar_busca(search_query, trace=trace)
         # sem resultado na base: informa o modelo e deixa ele responder honestamente que nao
         # encontrou (o prompt manda dizer isso); nao busca na internet nem inventa
@@ -548,14 +549,12 @@ def ask(query, history=None, max_steps=3, trace=None, data_atual=None):
             contexto_acumulado += info.get("contexto") or ""
             sources_map = info.get("sources") or {}
 
-        contents.append(cand)
-        contents.append(types.Content(role="user", parts=[
-            types.Part.from_function_response(name=fc.name, response={"documentos": context})
-        ]))
+        mensagens.append({"papel": "modelo", "chamada": r.chamada})
+        mensagens.append({"papel": "ferramenta", "nome": r.chamada["nome"], "resultado": context})
 
     # esgotou os passos: forca uma resposta final em texto
-    response = google_client.models.generate_content(model=MODEL, contents=contents, config=config)
-    resposta = (response.text or "").strip()
+    r = llm.gerar(mensagens, sistema=sistema, temperatura=temperatura)
+    resposta = (r.texto or "").strip()
     resposta = _pos_processar(resposta, query, fontes_anos, contexto_acumulado, sources_map, data_atual)
     if trace is not None:
         trace["resposta"] = resposta
