@@ -58,17 +58,13 @@
         ],
         "nao_deve_conter": []
       },
-      "existe_na_base": true,
-      "resposta_esperada": "Há dois professores Igor. O provável referente é o Prof. Ígor Lorenzato Almeida (coordenador do TADS), que atende às quintas das 18h às 20h e sextas das 13h às 15h, na sala F117; o outro é o Prof. Ígor Abrahão Paranhos (seg/ter das 17h às 19h, sala F124). O ideal é distinguir os dois. Atendimento (salas F) é distinto de monitoria (labs).",
+      "existe_na_base": false,
+      "resposta_esperada": "A planilha atual de horários de atendimento ao aluno (2026) não traz nenhum dos dois professores Igor, então o horário de atendimento deles não consta. O certo é dizer isso sem inventar horário, distinguir os dois Igors (Ígor Lorenzato Almeida e Ígor Abrahão Paranhos) e dar o contato que existe (e-mails igor.almeida@ e igor.paranhos@canoas.ifrs.edu.br). Monitoria (labs) é distinta de atendimento: pode ser citada como alternativa, mas não apresentada como o horário de atendimento do professor.",
       "gold_urls": [
         "https://docs.google.com/spreadsheets/d/e/2PACX-1vSe0FNxNDSYT0Zcd4AiYRPqUZri0OgIpuviesghmmDT_uctiIP5WNxkg7wDaXWnat_6O5EaW7BpQ20U/pubhtml?gid=791545582&single=true"
       ],
-      "answer_spans": [
-        "sala F117",
-        "quarta das 18h - 20h",
-        "quinta das 13h - 15h"
-      ],
-      "notas": "CORRIGIDO após revisão manual: (1) há DOIS Igors na base (Ígor Lorenzato Almeida e Ígor Abrahão Paranhos), então 'horário do Igor' É ambíguo e o agente acerta ao distinguir os dois. (2) atendimento (planilha gid=791545582, salas F117/F124) é DIFERENTE de monitoria (planilha gid=708551225, labs D10/D06); o gold anterior confundia os dois. Spans conferidos no conteúdo da planilha de atendimento. acao_esperada segue 'buscar' (listar os dois é o comportamento ideal). [Re-curado 04/08/2026: a planilha de atendimento MUDOU na fonte (era quinta 18-20 + sexta 13-15; agora quarta 18-20 + quinta 13-15). Gold com span literal de fonte mutavel apodrece: agora lista ALTERNATIVAS (any-match), com a sala F117 como a mais estavel. Re-curar quando a planilha mudar de novo.]"
+      "answer_spans": [],
+      "notas": "CORRIGIDO após revisão manual: (1) há DOIS Igors na base (Ígor Lorenzato Almeida e Ígor Abrahão Paranhos), então 'horário do Igor' É ambíguo e o agente acerta ao distinguir os dois. (2) atendimento (planilha gid=791545582, salas F117/F124) é DIFERENTE de monitoria (planilha gid=708551225, labs D10/D06); o gold anterior confundia os dois. Spans conferidos no conteúdo da planilha de atendimento. acao_esperada segue 'buscar' (listar os dois é o comportamento ideal). [Re-curado 04/08/2026: a planilha de atendimento MUDOU na fonte (era quinta 18-20 + sexta 13-15; agora quarta 18-20 + quinta 13-15). Gold com span literal de fonte mutavel apodrece: agora lista ALTERNATIVAS (any-match), com a sala F117 como a mais estavel. Re-curar quando a planilha mudar de novo.] [Re-curado 03/10/2026: a planilha de atendimento foi esvaziada na fonte para o novo semestre (6 docentes, nenhum Igor; conferido na planilha publicada e na base). O caso passa a ser de NAO-ALUCINACAO: existe_na_base=false, sem answer_spans; o gold_url segue a planilha, que e onde o dado deveria estar.]"
     },
     {
       "id": "atendimento-vago",
