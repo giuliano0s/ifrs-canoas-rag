@@ -6,10 +6,10 @@ url -> url do pai -> conteúdo do pai -> conteúdo do CSV.
 import json
 import time
 
-from pipelines.config import (HEADERS, PARSED_DIR, SHEETS_FALHAS, SHEETS_PARSED_PATH,
-                              google_client)
+from pipelines.config import HEADERS, PARSED_DIR, SHEETS_FALHAS, SHEETS_PARSED_PATH
 from pipelines.dates import extract_date_from_text, extract_date_from_url
 from pipelines.parser_html import parse_html_page
+from rag import llm
 
 
 def structure_sheet_text(csv_text):
@@ -19,6 +19,7 @@ REGRAS:
 - Baseie-se ESTRITAMENTE nas linhas do CSV. Nunca invente dados.
 - Os dados do EXEMPLO abaixo sao ficticios e servem so para mostrar o formato. NUNCA os inclua na saida.
 - Se o CSV so tiver cabecalhos, virgulas ou nada, responda exatamente: VAZIO
+- Cada linha de dados do CSV vira exatamente UMA frase, em UMA linha da saida. Se uma celula tiver quebras de linha (ex: varias disciplinas), junte os itens com virgula dentro da mesma frase.
 
 EXEMPLO (ficticio, apenas formato):
 CSV de exemplo:
@@ -31,12 +32,7 @@ AGORA CONVERTA ESTE CSV:
 {csv_text}"""
     for attempt in range(3):
         try:
-            response = google_client.models.generate_content(
-                model="gemini-2.5-flash-lite",
-                contents=prompt,
-                config={"temperature": 0.2}
-            )
-            content = (response.text or "").strip()
+            content = llm.completar(prompt, temperatura=0.2, leve=True).strip()
             # sem dados reais na planilha, o modelo responde VAZIO
             return None if content == "VAZIO" or not content else content
         except Exception as e:

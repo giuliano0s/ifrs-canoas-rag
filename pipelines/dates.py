@@ -7,7 +7,8 @@ arquivo -> conteúdo (LLM) -> pasta de upload da URL -> página pai (ver get_pub
 import re
 import time
 
-from pipelines.config import MAX_CHARS_FIM, MAX_CHARS_INICIO, google_client
+from pipelines.config import MAX_CHARS_FIM, MAX_CHARS_INICIO
+from rag import llm
 
 DATE_URL_PATTERN = re.compile(r"/(\d{4})/")
 
@@ -35,12 +36,7 @@ def extract_date_from_text(text):
     prompt = f"Qual é o ano de publicação deste documento? Responda APENAS com o ano no formato YYYY. Se não encontrar, responda exatamente: None\n\n{truncated}"
     for attempt in range(3):
         try:
-            response = google_client.models.generate_content(
-                model="gemini-2.5-flash-lite",
-                contents=prompt,
-                config={"temperature": 0.0}
-            )
-            result = (response.text or "").strip()
+            result = llm.completar(prompt, temperatura=0.0, leve=True).strip()
             # saneia a saida: aceita so um ano plausivel (2000-2035), senao None
             match = re.search(r"\b(20[0-3]\d)\b", result)
             return match.group(1) if match else None

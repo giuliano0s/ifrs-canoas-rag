@@ -6,15 +6,15 @@ calendário acadêmico estruturado por LLM a partir da extração posicional.
 import json
 import re
 import time
+import unicodedata
 
 import fitz
-from google.genai import types
 
 from pipelines.config import (FORMAT_ERRORS_PATH, MIN_CHARS, PAGES_PARSED_PATH,
-                              PARSED_DIR, PDFS_PARSED_PATH, PII_PATH, SAVE_INTERVAL, SCANNED_PATH,
-                              google_client)
+                              PARSED_DIR, PDFS_PARSED_PATH, PII_PATH, SAVE_INTERVAL, SCANNED_PATH)
 from pipelines.dates import extract_date_from_text, get_published_at
 from pipelines.urls import to_drive_view_url
+from rag import llm
 
 
 def is_schedule_pdf(title, text=""):
@@ -79,7 +79,8 @@ def structure_calendar_text(text):
     prompt = f"""Este e o texto de um calendario academico do IFRS Campus Canoas, extraido de PDF (grades de dias misturadas com observacoes por mes).
                 Extraia CADA evento datado em uma frase simples, uma por linha, sem texto adicional.
                 Cada linha do calendario no formato "DIA - Nome do evento" (ou "DIA a DIA - Nome") pertence ao mes da secao em que aparece. Componha a data completa com dia, mes e ano.
-                Comece com o ano do calendario.
+                A PRIMEIRA linha da saida e obrigatoriamente "Ano do calendario: AAAA".
+                Percorra o documento inteiro: inclua todos os meses, inclusive os do ano seguinte que o calendario trouxer (ex: janeiro e fevereiro do proximo ano), e a lista de feriados. Nao pare em dezembro.
 
                 Formato de saida, um por linha:
                 Ano do calendario: 2026
@@ -91,13 +92,8 @@ def structure_calendar_text(text):
                 {text}"""
     for attempt in range(3):
         try:
-            response = google_client.models.generate_content(
-                model="gemini-2.5-flash-lite",
-                contents=prompt,
-                config={"temperature": 0.3}
-            )
-            content = response.text
-            if content is None:
+            content = llm.completar(prompt, temperatura=0.3, leve=True)
+            if not content:
                 return text
             return content.strip()
         except Exception as e:
@@ -123,13 +119,8 @@ def structure_schedule_text(text):
                 {text}"""
     for attempt in range(3):
         try:
-            response = google_client.models.generate_content(
-                model="gemini-2.5-flash-lite",
-                contents=prompt,
-                config={"temperature": 0.6}
-            )
-            content = response.text
-            if content is None:
+            content = llm.completar(prompt, temperatura=0.6, leve=True)
+            if not content:
                 return text
             return content.strip()
         except Exception as e:
@@ -145,12 +136,58 @@ _SCHED_VISION_PROMPT = (
     "DISCIPLINA, o PROFESSOR e a SALA). Leia o cabeçalho da imagem para o curso/turma/turno e o ano/semestre.\n\n"
     "Extraia TODAS as aulas e agrupe POR PROFESSOR. Uma linha por professor, no formato EXATO:\n"
     "Disciplinas do professor NOME (curso/turma T, ANO/SEM): DISCIPLINA (DIA HH:MM-HH:MM, sala SALA); OUTRA (...).\n"
-    "Regras: DIA por extenso (Segunda a Sexta); use o horário e a sala da célula; nomes de professor são "
+    "Regras: DIA por extenso (Segunda a Sexta), tirado do cabeçalho Seg/Ter/Qua/Qui/Sex da COLUNA onde a célula está "
+    "(confira a coluna de cada célula antes de escrever o dia); use o horário e a sala da célula; nomes de professor são "
     "pessoas; se uma aula não tiver professor identificável, omita-a. Não escreva nada além das linhas."
 )
 
 def _norm_conteudo(s):
     return re.sub(r"\s+", "", (s or "").lower())
+
+_DIAS_ABREV = {"seg": "segunda", "ter": "terca", "qua": "quarta", "qui": "quinta", "sex": "sexta", "sab": "sabado"}
+_AULA_RX = re.compile(r"([^;:()]+?)\s*\((segunda|ter[cç]a|quarta|quinta|sexta|s[aá]bado)\b", re.IGNORECASE)
+
+def _sem_acento(s):
+    return unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode().lower()
+
+def _dias_conferem(saida, pg):
+    # GATE de dia por POSICAO: o gate de horario/sala confere so tokens contra o raw e deixa passar
+    # dia trocado. Aqui cada aula emitida (disciplina + dia) e conferida contra a coluna onde a
+    # disciplina aparece na pagina, medida pelas coordenadas das palavras e pelo cabecalho Seg..Sex.
+    # Sem cabecalho de dias reconhecivel ou sem a disciplina na pagina, nao ha como conferir: passa.
+    cabecalho = {}
+    palavras = pg.get_text("words")
+    for x0, y0, x1, y1, w, *_ in palavras:
+        dia = _DIAS_ABREV.get(_sem_acento(w).strip(".:")[:3]) if len(w.strip(".:")) in (3, 5, 6, 7) else None
+        if dia and (dia not in cabecalho or y0 < cabecalho[dia][1]):
+            cabecalho[dia] = ((x0 + x1) / 2, y0)
+    if len(cabecalho) < 3:
+        return True
+    centros = {dia: x for dia, (x, _) in cabecalho.items()}
+    topo = max(y for _, y in cabecalho.values())
+
+    # dias em que cada palavra aparece abaixo do cabecalho (coluna = cabecalho mais proximo em x)
+    dias_da_palavra = {}
+    for x0, y0, x1, y1, w, *_ in palavras:
+        if y0 <= topo:
+            continue
+        chave = _sem_acento(w).strip(".,:;")
+        dia = min(centros, key=lambda d: abs(centros[d] - (x0 + x1) / 2))
+        dias_da_palavra.setdefault(chave, set()).add(dia)
+
+    # cada aula e conferida pela palavra mais longa do nome que esta na pagina e que nao aparece em
+    # outra disciplina da mesma saida ("Fís" de "Fís I" e de "Ed Fís I" e ambigua e nao serve)
+    aulas = [(disciplina.strip(), dia) for disciplina, dia in _AULA_RX.findall(saida)]
+    tokens_de = {d: {_sem_acento(t).strip(".,:;") for t in d.split()} for d, _ in aulas}
+    for disciplina, dia in aulas:
+        outras = set().union(*(tk for d, tk in tokens_de.items() if d != disciplina))
+        candidatos = [t for t in tokens_de[disciplina] if len(t) >= 3 and t in dias_da_palavra and t not in outras]
+        if not candidatos:
+            continue
+        token = max(candidatos, key=len)
+        if _sem_acento(dia)[:5] not in {d[:5] for d in dias_da_palavra[token]}:
+            return False
+    return True
 
 def _grade_ano_raw(raw_text, title):
     # ano do RAW, DETERMINISTICO (mais confiavel que regex sobre a saida da visao, que pode alucinar):
@@ -180,30 +217,41 @@ def structure_schedule_vision(doc, max_pages=30):
             png = pg.get_pixmap(dpi=200).tobytes("png")
         except Exception as e:
             print(f"  ERRO render grade pag {i}: {e}"); puladas += 1; continue
-        out = None
-        for attempt in range(3):
-            try:
-                r = google_client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=[types.Part.from_bytes(data=png, mime_type="image/png"), _SCHED_VISION_PROMPT],
-                    config={"temperature": 0.1},
-                )
-                out = (r.text or "").strip(); break
-            except Exception as e:
-                wait = 20 * (attempt + 1)
-                print(f"  ERRO visao grade pag {i} (tentativa {attempt+1}/3): {e}; aguardando {wait}s")
-                time.sleep(wait)
-        if not out:
-            puladas += 1; continue
-        # GATE: os horarios (HH:MM) e codigos de sala (LAB X, F04...) da saida devem estar no raw
-        raw_n = _norm_conteudo(raw_pg)
-        toks = re.findall(r"\d{1,2}:\d{2}|LAB\s*[A-Z]?\s*\d+|\b[A-Z]{1,3}\d{2,3}\b", out)
-        if toks:
-            ok = sum(1 for t in toks if _norm_conteudo(t) in raw_n)
-            if ok / len(toks) < 0.75:
-                print(f"  grade pag {i}: {100 - ok/len(toks)*100:.0f}% dos tokens da visao fora do raw; DESCARTADA (suspeita de alucinacao)")
-                suspeitas += 1; continue
-        linhas.append(out)
+        # ate 3 leituras: a leitura reprovada num gate e refeita (o erro da visao varia entre leituras)
+        aceita, lida = None, False
+        for leitura in range(3):
+            out = None
+            for attempt in range(3):
+                try:
+                    out = llm.completar(_SCHED_VISION_PROMPT, temperatura=0.1, imagens=[png]).strip(); break
+                except Exception as e:
+                    wait = 20 * (attempt + 1)
+                    print(f"  ERRO visao grade pag {i} (tentativa {attempt+1}/3): {e}; aguardando {wait}s")
+                    time.sleep(wait)
+            if not out:
+                continue
+            lida = True
+
+            # GATE: os horarios (HH:MM) e codigos de sala (LAB X, F04...) da saida devem estar no raw
+            raw_n = _norm_conteudo(raw_pg)
+            toks = re.findall(r"\d{1,2}:\d{2}|LAB\s*[A-Z]?\s*\d+|\b[A-Z]{1,3}\d{2,3}\b", out)
+            if toks:
+                # "08:00" da visao e "8:00" no raw sao o mesmo horario: compara sem o zero a esquerda
+                ok = sum(1 for t in toks if _norm_conteudo(re.sub(r"^0(\d:)", r"\1", t)) in raw_n or _norm_conteudo(t) in raw_n)
+                if ok / len(toks) < 0.75:
+                    print(f"  grade pag {i} (leitura {leitura+1}): {100 - ok/len(toks)*100:.0f}% dos tokens da visao fora do raw")
+                    continue
+            if not _dias_conferem(out, pg):
+                print(f"  grade pag {i} (leitura {leitura+1}): dia da semana diverge da coluna da disciplina na pagina")
+                continue
+            aceita = out; break
+        if aceita:
+            linhas.append(aceita)
+        elif lida:
+            print(f"  grade pag {i}: DESCARTADA apos 3 leituras reprovadas (suspeita de erro de leitura)")
+            suspeitas += 1
+        else:
+            puladas += 1
     return "\n".join(linhas), {"paginas": min(doc.page_count, max_pages), "puladas": puladas,
                                "suspeitas": suspeitas, "truncado": truncado}
 
@@ -269,9 +317,7 @@ TEXTO:
     out = ""
     for _ in range(3):
         try:
-            r = google_client.models.generate_content(
-                model="gemini-2.5-flash-lite", contents=prompt, config={"temperature": 0.0})
-            out = (r.text or "").strip(); break
+            out = llm.completar(prompt, temperatura=0.0, leve=True).strip(); break
         except Exception as e:
             print(f"  ERRO structure vagas: {e}"); time.sleep(20)
     raw_n = _norm_ws(text)
