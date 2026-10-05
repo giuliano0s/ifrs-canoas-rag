@@ -6,6 +6,7 @@ doc-nível, consumido pelo rerank/cap do serving.
 """
 
 import json
+import re
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -59,6 +60,84 @@ def chunk_document(text, metadata, por_linha=False):
     parts = splitter.split_text(text)
     return [{"text": part, **metadata} for part in parts]
 
+# cabecalho da secao de um campus nos editais de ingresso multi-campus: o marcador do quadro de vagas
+# ("Campus Canoas (a descricao das vagas esta apos a tabela)", "Campus Alvorada: A descricao da tabela
+# encontra-se ao final") ou a linha "Campus <campus do IFRS>:" sozinha. o inicio de um ANEXO encerra a secao
+_CABECALHO_VAGAS = re.compile(
+    r"(?m)^[ \t]*Campus ([A-ZÁÉÍÓÚÂÊÔÃÕÇ][^\n:(,]{1,40}?)[ \t]*:?[ \t]*\(?[ \t]*[Aa] descri")
+_CABECALHO_LINHA = re.compile(r"(?m)^[ \t]*Campus ([A-ZÁÉÍÓÚÂÊÔÃÕÇ][^\n:(,]{1,40}?)[ \t]*:[ \t]*$")
+_INICIO_ANEXO = re.compile(r"(?m)^[ \t]*ANEXO [IVXL]+\b")
+
+def _campus_do_ifrs(nome):
+    return nome.startswith("Canoas") or any(nome.startswith(c) for c in _CAMPI_IFRS)
+
+def secoes_de_campus(text):
+    # divide um documento multi-campus em secoes [(campus ou None, trecho)], cortando no cabecalho de
+    # cada campus e no inicio de cada ANEXO. o corte vem ANTES do fatiamento por tamanho, entao nenhum
+    # chunk mistura dois campi (o bug de fronteira do antigo refino por chunk). exige 2 campi pelo
+    # marcador do quadro de vagas, ou 4 pela linha "Campus X:" (um livro com titulos "Campus Sertao:"
+    # nao e edital); devolve None no fluxo normal
+    cabecalhos = [(m.start(), m.group(1).strip()) for m in _CABECALHO_VAGAS.finditer(text)]
+    if len({c for _, c in cabecalhos}) < 2:
+        cabecalhos = [(m.start(), m.group(1).strip()) for m in _CABECALHO_LINHA.finditer(text)
+                      if _campus_do_ifrs(m.group(1).strip())]
+        if len({c for _, c in cabecalhos}) < 4:
+            return None
+    cortes = sorted(cabecalhos + [(m.start(), None) for m in _INICIO_ANEXO.finditer(text)],
+                    key=lambda corte: corte[0])
+    secoes = [(None, text[:cortes[0][0]])]
+    for i, (pos, campus) in enumerate(cortes):
+        fim = cortes[i + 1][0] if i + 1 < len(cortes) else len(text)
+        secoes.append((campus, text[pos:fim]))
+    return [(c, t) for c, t in secoes if t.strip()]
+
+def chunks_de_pdf(pdf):
+    # chunks de um PDF parseado, com o metadata que o ingest persiste
+    url = to_drive_view_url(pdf["source_url"])
+    base_meta = {
+        "source_url":   url,
+        "title":        pdf["title"],
+        "type":         "pdf",
+        "published_at": pdf.get("published_at"),
+        "source_hash":  pdf.get("source_hash"),
+    }
+    # quadro de vagas: um chunk por curso, com campus_scope POR REGISTRO (o curso de Canoas fica
+    # None e sobrevive ao cap; os outros campi ficam "outro" e sao despriorizados). o campus esta
+    # EXPLICITO em cada linha e cada chunk e um curso atomico, entao nao ha bug de fronteira (o que
+    # derrubou o antigo refino por chunk). o structurer ja emitiu uma linha por curso.
+    if pdf.get("is_vagas"):
+        return [{**base_meta, "text": ln.strip(), "campus_scope": None if "canoas" in ln.lower() else "outro"}
+                for ln in pdf["text"].split("\n") if ln.strip()]
+    metadata = {**base_meta,
+                "campus_scope": classify_campus_scope(pdf["title"], pdf["text"], url),
+                "curso_escopo": classify_curso_escopo(pdf["title"], pdf["text"], url)}
+    # grade de horario: leva os marcadores para o metadata (persistidos no upsert). nao e so o
+    # switch de parse: na base, is_schedule permite auditar/filtrar as grades e schedule_source
+    # (visao/visao_parcial/fallback_texto) sinaliza grade incompleta ou degradada, o que o texto
+    # do chunk sozinho nao revela (uma grade parcial parece completa, so com menos professores).
+    if pdf.get("is_schedule"):
+        metadata["is_schedule"]     = True
+        metadata["schedule_source"] = pdf.get("schedule_source")
+        return chunk_document(pdf["text"], metadata, por_linha=True)
+
+    # edital multi-campus: cada secao de campus e fatiada a parte, e cada chunk dela leva o nome do
+    # campus no texto (o pedaco de continuacao de um curso deixa de ficar sem campus) e o campus_scope
+    # da secao, para o cap tirar do contexto o que nao e de Canoas
+    # documento do site de Canoas nunca e dividido (mesma regra do classify_campus_scope)
+    secoes = None if "/canoas/" in url else secoes_de_campus(pdf["text"])
+    if not secoes:
+        return chunk_document(pdf["text"], metadata)
+    chunks = []
+    for campus, trecho in secoes:
+        if campus is None:
+            chunks.extend(chunk_document(trecho, metadata))
+            continue
+        escopo = None if "canoas" in campus.lower() else "outro"
+        for c in chunk_document(trecho, {**metadata, "campus_scope": escopo}):
+            c["text"] = f"[Edital, seção do Campus {campus}]\n{c['text']}"
+            chunks.append(c)
+    return chunks
+
 def run_chunker(pages_parsed, pdfs_parsed, sheets_parsed):
     print("\n" + "="*60)
     print("FASE 4 — CHUNKER")
@@ -82,39 +161,8 @@ def run_chunker(pages_parsed, pdfs_parsed, sheets_parsed):
 
     # processa PDFs (ignora escaneados)
     for pdf in pdfs_parsed:
-        if pdf["is_scanned"]:
-            continue
-        url = to_drive_view_url(pdf["source_url"])
-        base_meta = {
-            "source_url":   url,
-            "title":        pdf["title"],
-            "type":         "pdf",
-            "published_at": pdf.get("published_at"),
-            "source_hash":  pdf.get("source_hash"),
-        }
-        # quadro de vagas: um chunk por curso, com campus_scope POR REGISTRO (o curso de Canoas fica
-        # None e sobrevive ao cap; os outros campi ficam "outro" e sao despriorizados). o campus esta
-        # EXPLICITO em cada linha e cada chunk e um curso atomico, entao nao ha bug de fronteira (o que
-        # derrubou o antigo refino por chunk). o structurer ja emitiu uma linha por curso.
-        if pdf.get("is_vagas"):
-            for ln in pdf["text"].split("\n"):
-                ln = ln.strip()
-                if not ln:
-                    continue
-                chunks.append({**base_meta, "text": ln,
-                               "campus_scope": None if "canoas" in ln.lower() else "outro"})
-            continue
-        metadata = {**base_meta,
-                    "campus_scope": classify_campus_scope(pdf["title"], pdf["text"], url),
-                    "curso_escopo": classify_curso_escopo(pdf["title"], pdf["text"], url)}
-        # grade de horario: leva os marcadores para o metadata (persistidos no upsert). nao e so o
-        # switch de parse: na base, is_schedule permite auditar/filtrar as grades e schedule_source
-        # (visao/visao_parcial/fallback_texto) sinaliza grade incompleta ou degradada, o que o texto
-        # do chunk sozinho nao revela (uma grade parcial parece completa, so com menos professores).
-        if pdf.get("is_schedule"):
-            metadata["is_schedule"]     = True
-            metadata["schedule_source"] = pdf.get("schedule_source")
-        chunks.extend(chunk_document(pdf["text"], metadata, por_linha=pdf.get("is_schedule", False)))
+        if not pdf["is_scanned"]:
+            chunks.extend(chunks_de_pdf(pdf))
 
     # processa planilhas (Google Sheets estruturados em frases). por_linha=True: a planilha e uma
     # LISTA DE REGISTROS (o structure_sheet_text produz uma frase por linha, um por professor/setor),
