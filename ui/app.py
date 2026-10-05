@@ -3,6 +3,7 @@ import time
 from flask import Flask, request, jsonify, send_from_directory, abort
 from rag.chain import ask
 from rag.gatekeeper import check_rate_limit, check_global_budget
+from rag.llm import ProvedorIndisponivel
 from rag.telemetry import registrar_chat
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -91,16 +92,25 @@ def chat():
     # roda o agente com trace e envia a telemetria do turno (Langfuse); a telemetria é
     # opcional e protegida, e o try garante que uma falha do ask vire 500 limpo (e fique
     # registrada) em vez de estourar sem rastro
-    trace, inicio, erro, response = {}, time.time(), None, None
+    trace, inicio, erro, response, falha_provedor = {}, time.time(), None, None, None
     try:
         response = ask(query, history=history, trace=trace)
+    except ProvedorIndisponivel as e:
+        erro, falha_provedor = f"ProvedorIndisponivel[{e.motivo}]: {str(e)[:200]}", e
     except Exception as e:
         erro = f"{type(e).__name__}: {str(e)[:200]}"
     latencia_ms = int((time.time() - inicio) * 1000)
     registrar_chat(query, history, trace, response, latencia_ms, erro=erro, session_id=session_id, user_id=user_id)
 
+    # fluxo alto no provedor do LLM: 503 imediato com a espera sugerida, e o widget avisa o aluno e
+    # tenta de novo sozinho; credito ou queda: 503 com aviso de tentar mais tarde
+    if falha_provedor is not None and falha_provedor.motivo == "fluxo_alto":
+        return jsonify({"error": "Muitas perguntas ao mesmo tempo agora. Tente novamente em instantes.",
+                        "fluxo_alto": True, "tentar_em": falha_provedor.tentar_em}), 503
+    if falha_provedor is not None:
+        return jsonify({"error": "O assistente está indisponível no momento. Tente novamente em alguns minutos."}), 503
     if erro is not None:
-        return jsonify({"error": "erro ao processar a pergunta"}), 500
+        return jsonify({"error": "Não consegui responder agora. Tente novamente em instantes."}), 500
     return jsonify({"response": response})
 
 if __name__ == "__main__":

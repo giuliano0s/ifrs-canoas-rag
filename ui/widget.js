@@ -274,6 +274,27 @@
     return div;
   }
 
+  // fluxo alto no modelo: o servidor responde na hora e o widget avisa o aluno e tenta de novo
+  const MAX_TENTATIVAS_FLUXO = 3;
+
+  function esperarFluxo(segundos, aviso) {
+    // contagem regressiva visivel enquanto o fluxo de perguntas baixa
+    return new Promise((resolve) => {
+      let resta = segundos;
+      const texto = () => `Muitas perguntas ao mesmo tempo agora. Tentando de novo em ${resta}s...`;
+      aviso.textContent = texto();
+      const relogio = setInterval(() => {
+        resta -= 1;
+        if (resta <= 0) {
+          clearInterval(relogio);
+          resolve();
+          return;
+        }
+        aviso.textContent = texto();
+      }, 1000);
+    });
+  }
+
   async function send() {
     const query = input.value.trim();
     if (!query) return;
@@ -282,42 +303,54 @@
     sendBtn.disabled = true;
     addMessage(query, "user");
 
-    const typing = addMessage("Digitando...", "bot typing");
+    let typing = addMessage("Digitando...", "bot typing");
+    let aviso = null;
 
     try {
-      const res = await fetch(CHAT_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query, history, user_id: userId, session_id: sessionId })
-      });
-      typing.remove();
+      for (let tentativa = 1; ; tentativa++) {
+        const res = await fetch(CHAT_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query, history, user_id: userId, session_id: sessionId })
+        });
+        typing.remove();
 
-      // resposta do rate limiter
-      if (res.status === 429) {
-        addMessage("Muitas perguntas em pouco tempo. Aguarde um instante e tente novamente.", "bot");
-        sendBtn.disabled = false;
-        input.focus();
-        return;
+        // resposta do rate limiter
+        if (res.status === 429) {
+          if (aviso) aviso.remove();
+          addMessage("Muitas perguntas em pouco tempo. Aguarde um instante e tente novamente.", "bot");
+          break;
+        }
+
+        const data = await res.json();
+
+        // fluxo alto no provedor do modelo: avisa com contagem regressiva e reenvia sozinho
+        if (res.status === 503 && data.fluxo_alto && tentativa < MAX_TENTATIVAS_FLUXO) {
+          aviso = aviso || addMessage("", "bot");
+          await esperarFluxo(Math.round(Math.min(Math.max(data.tentar_em || 5, 3), 20)), aviso);
+          aviso.textContent = "Tentando de novo...";
+          typing = addMessage("Digitando...", "bot typing");
+          continue;
+        }
+        if (aviso) aviso.remove();
+
+        // erros tratados pelo servidor (pergunta longa, limite diario, falha): mostra a mensagem
+        // e nao acumula no historico
+        if (!res.ok) {
+          addMessage(data.error || "Não consegui responder agora. Tente novamente em instantes.", "bot");
+          break;
+        }
+
+        addMessage(data.response, "bot");
+
+        // acumula contexto da conversa ativa, descartado ao recarregar
+        history.push({ role: "user", content: query });
+        history.push({ role: "assistant", content: data.response });
+        break;
       }
-
-      const data = await res.json();
-
-      // erros tratados pelo servidor (pergunta longa, limite diario, falha): mostra a mensagem
-      // e nao acumula no historico
-      if (!res.ok) {
-        addMessage(data.error || "Não consegui responder agora. Tente novamente em instantes.", "bot");
-        sendBtn.disabled = false;
-        input.focus();
-        return;
-      }
-
-      addMessage(data.response, "bot");
-
-      // acumula contexto da conversa ativa, descartado ao recarregar
-      history.push({ role: "user", content: query });
-      history.push({ role: "assistant", content: data.response });
     } catch (e) {
       typing.remove();
+      if (aviso) aviso.remove();
       addMessage("Erro ao conectar com o assistente.", "bot");
     }
 

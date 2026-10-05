@@ -28,6 +28,8 @@ Configuração por ambiente:
 import base64
 import json
 import os
+import re
+import time
 from collections import namedtuple
 
 from dotenv import load_dotenv
@@ -229,8 +231,61 @@ def _cliente_openai():
         if not chave:
             raise RuntimeError("LLM_PROVIDER=openai exige OPENAI_API_KEY no ambiente (.env ou Vercel)")
         from openai import OpenAI
-        _CLIENTE_OPENAI = OpenAI(api_key=chave)
+        # sem novas tentativas no SDK: a recusa por limite (429) tem que chegar na hora ao chamador,
+        # para o aluno saber que a espera e fluxo alto; queda e 5xx sao refeitos em gerar()
+        _CLIENTE_OPENAI = OpenAI(api_key=chave, max_retries=0, timeout=20)
     return _CLIENTE_OPENAI
+
+
+class ProvedorIndisponivel(Exception):
+    """O provedor recusou ou não respondeu: limite por minuto (motivo "fluxo_alto", com a espera
+    sugerida em `tentar_em` segundos), crédito esgotado, queda ou timeout. O chamador avisa o aluno
+    e pede para tentar de novo, sem trocar de provedor."""
+
+    def __init__(self, mensagem, motivo="indisponivel", tentar_em=None):
+        super().__init__(mensagem)
+        self.motivo = motivo
+        self.tentar_em = tentar_em
+
+
+def _espera_sugerida(erro):
+    # segundos ate o limite liberar, pelos cabecalhos da recusa ("retry-after", ou "1.9s"/"120ms"/"6m0s")
+    cabecalhos = getattr(getattr(erro, "response", None), "headers", None) or {}
+    for nome in ("retry-after", "x-ratelimit-reset-tokens", "x-ratelimit-reset-requests"):
+        valor = cabecalhos.get(nome)
+        if not valor:
+            continue
+        try:
+            return float(valor)
+        except ValueError:
+            partes = re.findall(r"([\d.]+)(ms|m|s)", valor)
+            if partes:
+                return sum(float(n) * {"ms": 0.001, "s": 1, "m": 60}[u] for n, u in partes)
+    return None
+
+
+def _classificar(erro):
+    # (motivo, tentar_em) do erro transitorio do provedor; None quando o erro nao e do provedor
+    try:
+        import openai
+        if isinstance(erro, openai.RateLimitError):
+            if getattr(erro, "code", None) == "insufficient_quota":
+                return "credito", None
+            return "fluxo_alto", _espera_sugerida(erro)
+        if isinstance(erro, (openai.APIConnectionError, openai.InternalServerError)):
+            return "indisponivel", None
+    except ImportError:
+        pass
+    try:
+        from google.genai import errors as genai_errors
+        if isinstance(erro, genai_errors.APIError):
+            if getattr(erro, "code", None) == 429:
+                return "fluxo_alto", None
+            if getattr(erro, "code", None) in (500, 502, 503, 504):
+                return "indisponivel", None
+    except ImportError:
+        pass
+    return None
 
 
 # ── entradas usadas pelo serving e pela ingestão ────────────────────────────────
@@ -242,7 +297,19 @@ def gerar(mensagens, sistema=None, ferramentas=None, temperatura=0.7, leve=False
     adaptador = _ADAPTADORES.get(PROVIDER)
     if adaptador is None:
         raise RuntimeError(f"LLM_PROVIDER desconhecido: {PROVIDER!r} (use 'gemini' ou 'openai')")
-    return adaptador(mensagens, sistema, ferramentas, temperatura, leve)
+    # queda e 5xx sao refeitos aqui (2 novas tentativas, 1s e 2s); limite e credito sobem na hora
+    for tentativa in range(3):
+        try:
+            return adaptador(mensagens, sistema, ferramentas, temperatura, leve)
+        except Exception as e:
+            classe = _classificar(e)
+            if classe is None:
+                raise
+            motivo, tentar_em = classe
+            if motivo == "indisponivel" and tentativa < 2:
+                time.sleep(tentativa + 1)
+                continue
+            raise ProvedorIndisponivel(f"{type(e).__name__}: {str(e)[:200]}", motivo, tentar_em) from e
 
 
 def completar(prompt, temperatura, leve=False, imagens=None):
