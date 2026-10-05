@@ -19,6 +19,8 @@ _PADRAO_CURSO = re.compile(
     r"/no-campus/cursos/(curso-|tecnico-em-|proeja-tecnico-)"
     r"|/bacharelado-em-engenharia"
 )
+# so paginas do site do Campus Canoas: o portal de ingresso lista cursos de todos os campi
+_SITE_CANOAS = re.compile(r"^https?://(www\.)?ifrs\.edu\.br/canoas/")
 
 # prefixos/sufixos removidos para extrair o nucleo do nome do curso
 _PREFIXOS = [
@@ -48,7 +50,7 @@ def gerar(index=None, out=_OUT):
         for v in res.vectors:
             m = v.metadata or {}
             u = m.get("source_url", "")
-            if _PADRAO_CURSO.search(u) and u not in por_url:
+            if _SITE_CANOAS.match(u) and _PADRAO_CURSO.search(u) and u not in por_url:
                 por_url[u] = _nucleo(m.get("title", ""))
         cursor = res.next_cursor
         if cursor == "":
