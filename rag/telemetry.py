@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -24,6 +25,39 @@ def _cliente():
     return _client
 
 
+# dados pessoais que o aluno pode digitar na pergunta (CPF, e-mail, telefone com DDD ou celular,
+# numero longo como matricula); o telefone exige DDD ou o 9 do celular, para nao pegar "2026-2027"
+_PII = [
+    (re.compile(r"\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b"), "[CPF]"),
+    (re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+"), "[EMAIL]"),
+    (re.compile(r"\(?\b\d{2}\)?\s?9?\d{4}-?\d{4}\b|\b9\d{4}-?\d{4}\b"), "[TELEFONE]"),
+    (re.compile(r"\b\d{8,}\b"), "[NUMERO]"),
+]
+
+
+def redigir_pii(texto):
+    """Troca os dados pessoais do texto por rotulos.
+
+    Args:
+        texto: texto digitado pelo aluno (pergunta) ou derivado dele (query de busca).
+
+    Returns:
+        Par (texto redigido, lista dos trechos redigidos).
+    """
+    achados = []
+    for padrao, rotulo in _PII:
+        achados.extend(m.group(0) for m in padrao.finditer(texto or ""))
+        texto = padrao.sub(rotulo, texto or "")
+    return texto, achados
+
+
+def _sem_eco(texto, achados):
+    # a resposta mantem os contatos publicos da base; so o dado que o proprio aluno digitou e trocado
+    for trecho in sorted(set(achados), key=len, reverse=True):
+        texto = texto.replace(trecho, "[REDIGIDO]")
+    return texto
+
+
 # registra um turno de chat no Langfuse (sink duravel: o Vercel tem FS read-only) usando o MESMO
 # schema da coleta do eval, via registro_de_trace. e uma "extensao" da coleta, carimbada com a
 # versao viva do prompt: perguntas reais viram candidatas a caso de golden depois da curadoria.
@@ -35,9 +69,13 @@ def registrar_chat(query, history, trace, resposta, latencia_ms, erro=None, sess
         return
     try:
         from rag.chain import registro_de_trace, MODEL, PROMPT_VERSAO
+
+        # nada do que o aluno digitou sai com dado pessoal: pergunta, queries de busca e eco na resposta
+        query, achados = redigir_pii(query)
+        resposta = _sem_eco(resposta, achados) if resposta else resposta
         rec = registro_de_trace(trace, query, resposta, erro)
         rec["buscas"] = [
-            {"query": b.get("query"),
+            {"query": redigir_pii(b.get("query"))[0],
              "contexto_ids": b.get("contexto_ids", []),
              "hits": [{"id": h.get("id"), "url": h.get("url"),
                        "score": round(h.get("score") or 0.0, 3),

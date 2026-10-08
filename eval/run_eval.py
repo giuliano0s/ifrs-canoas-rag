@@ -312,8 +312,14 @@ def _tarefas_juiz(regs, casos):
         # gerando falso "sem apoio no contexto". Fidelidade so e confiavel se o juiz ve o mesmo
         # contexto que o agente viu.
         ctx = [t for b in r.get("buscas", []) for t in b.get("chunks_textos", [])]
+        # o "hoje" do agente naquela execucao: a data fixa do caso temporal, ou o dia da coleta.
+        # sem ela o juiz mede "proxima ocorrencia"/"ja passou" contra a data real do julgamento
+        data_atual = caso.get("data_referencia")
+        if not data_atual and r.get("ts"):
+            data_atual = datetime.fromisoformat(r["ts"]).strftime("%d/%m/%Y")
         tarefas.append({
             "case_id": r["case_id"], "input": r["input"], "run": r["run"],
+            "data_atual": data_atual,
             "checar": _dims(caso, r),
             "resposta": r.get("resposta") or "",
             "contexto": ctx,
@@ -354,7 +360,9 @@ def _prompt_juiz(t):
         f"RESPOSTA DO ASSISTENTE: {t['resposta']}\n\n"
         f"CONTEXTO (trechos recuperados):\n{ctx}\n\n"
         f"REFERÊNCIA (fato/comportamento esperado): {t['resposta_esperada']}\n"
-        f"TIPO DO CASO: {t['tipo']}\n"
+        + (f"DATA ATUAL DO ASSISTENTE NESTA EXECUÇÃO: {t['data_atual']} (julgue 'próxima ocorrência', "
+           f"'já passou' e 'vigente' contra esta data, nunca contra a data de hoje)\n" if t.get("data_atual") else "")
+        + f"TIPO DO CASO: {t['tipo']}\n"
         f"NOTAS DO GABARITO: {t['notas']}\n\n"
         f"CRITÉRIOS A AVALIAR (responda só estes): {', '.join(t['checar'])}"
     )

@@ -42,6 +42,9 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL") or "gemini-2.5-flash"
 GEMINI_MODEL_LEVE = os.getenv("GEMINI_MODEL_LEVE") or "gemini-2.5-flash-lite"
 OPENAI_MODEL = os.getenv("OPENAI_MODEL") or "gpt-5.6-luna"
 OPENAI_REASONING = (os.getenv("OPENAI_REASONING") or "none").strip().lower()
+# prazo por chamada da ingestao (completar), em segundos: um calendario estruturado leva de 30 a 55 s
+# no luna, e o prazo de 20 s do cliente, feito para o aluno nao esperar, o derrubaria
+PRAZO_INGESTAO = 180
 
 # resposta neutra: ou o modelo produziu texto, ou pediu uma ferramenta (nunca os dois no fluxo atual)
 Resposta = namedtuple("Resposta", "texto chamada")
@@ -77,7 +80,7 @@ def _data_url(png):
 
 
 # ── adaptador Gemini ────────────────────────────────────────────────────────────
-def _gerar_gemini(mensagens, sistema, ferramentas, temperatura, leve):
+def _gerar_gemini(mensagens, sistema, ferramentas, temperatura, leve, prazo=None):
     from google.genai import types
     cliente = _cliente_gemini()
 
@@ -133,15 +136,15 @@ def _cliente_gemini():
 
 
 # ── adaptador OpenAI ────────────────────────────────────────────────────────────
-def _gerar_openai(mensagens, sistema, ferramentas, temperatura, leve):
+def _gerar_openai(mensagens, sistema, ferramentas, temperatura, leve, prazo=None):
     # sem raciocinio: chat.completions com temperatura; com raciocinio: API Responses.
     # o luna ja e o modelo barato, entao leve nao muda o modelo aqui
     if OPENAI_REASONING == "none":
-        return _gerar_openai_chat(mensagens, sistema, ferramentas, temperatura)
-    return _gerar_openai_responses(mensagens, sistema, ferramentas)
+        return _gerar_openai_chat(mensagens, sistema, ferramentas, temperatura, prazo)
+    return _gerar_openai_responses(mensagens, sistema, ferramentas, prazo)
 
 
-def _gerar_openai_chat(mensagens, sistema, ferramentas, temperatura):
+def _gerar_openai_chat(mensagens, sistema, ferramentas, temperatura, prazo=None):
     cliente = _cliente_openai()
 
     msgs = []
@@ -175,6 +178,8 @@ def _gerar_openai_chat(mensagens, sistema, ferramentas, temperatura):
             "name": f["nome"], "description": f["descricao"], "parameters": f["parametros"]}}
             for f in ferramentas]
 
+    if prazo:
+        kwargs["timeout"] = prazo
     r = cliente.chat.completions.create(**kwargs)
     escolha = r.choices[0].message
     chamadas = getattr(escolha, "tool_calls", None)
@@ -186,7 +191,7 @@ def _gerar_openai_chat(mensagens, sistema, ferramentas, temperatura):
     return Resposta(texto=(escolha.content or "").strip(), chamada=None)
 
 
-def _gerar_openai_responses(mensagens, sistema, ferramentas):
+def _gerar_openai_responses(mensagens, sistema, ferramentas, prazo=None):
     cliente = _cliente_openai()
 
     # conversa como itens da API Responses; chamada e devolucao casam pelo call_id posicional
@@ -216,6 +221,8 @@ def _gerar_openai_responses(mensagens, sistema, ferramentas):
         kwargs["tools"] = [{"type": "function", "name": f["nome"], "description": f["descricao"],
                             "parameters": f["parametros"]} for f in ferramentas]
 
+    if prazo:
+        kwargs["timeout"] = prazo
     r = cliente.responses.create(**kwargs)
     for item in r.output:
         if item.type == "function_call":
@@ -291,16 +298,17 @@ def _classificar(erro):
 # ── entradas usadas pelo serving e pela ingestão ────────────────────────────────
 _ADAPTADORES = {"gemini": _gerar_gemini, "openai": _gerar_openai}
 
-def gerar(mensagens, sistema=None, ferramentas=None, temperatura=0.7, leve=False):
+def gerar(mensagens, sistema=None, ferramentas=None, temperatura=0.7, leve=False, prazo=None):
     # ponto único de geração: devolve Resposta(texto, chamada) qualquer que seja o provedor.
-    # leve=True pede o modelo barato do provedor (estruturadores e inferência de data da ingestão)
+    # leve=True pede o modelo barato do provedor (estruturadores e inferência de data da ingestão);
+    # prazo troca o tempo maximo da chamada (o cliente da OpenAI usa 20 s, o tempo do atendimento)
     adaptador = _ADAPTADORES.get(PROVIDER)
     if adaptador is None:
         raise RuntimeError(f"LLM_PROVIDER desconhecido: {PROVIDER!r} (use 'gemini' ou 'openai')")
     # queda e 5xx sao refeitos aqui (2 novas tentativas, 1s e 2s); limite e credito sobem na hora
     for tentativa in range(3):
         try:
-            return adaptador(mensagens, sistema, ferramentas, temperatura, leve)
+            return adaptador(mensagens, sistema, ferramentas, temperatura, leve, prazo)
         except Exception as e:
             classe = _classificar(e)
             if classe is None:
@@ -317,7 +325,7 @@ def completar(prompt, temperatura, leve=False, imagens=None):
     mensagem = {"papel": "usuario", "texto": prompt}
     if imagens:
         mensagem["imagens"] = imagens
-    return gerar([mensagem], temperatura=temperatura, leve=leve).texto or ""
+    return gerar([mensagem], temperatura=temperatura, leve=leve, prazo=PRAZO_INGESTAO).texto or ""
 
 
 def modelo_ativo():

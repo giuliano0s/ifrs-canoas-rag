@@ -11,6 +11,7 @@ from google.genai import errors as genai_errors
 from rag import llm
 from rag.cursos_escopo import curso_da_query, nome_curso
 import time
+import unicodedata
 from datetime import datetime, date
 
 load_dotenv()
@@ -41,6 +42,9 @@ CAMPUS_OUTRO_MAX = 0  # teto de chunks campus_scope="outro" (institucional/multi
                       # contexto final. a penalidade so REBAIXA o "outro"; ele ainda sobrava no top-15
                       # e vazava (Torre Norte etc.) em parte das respostas de salas. este cap o EXPULSA
                       # do contexto (0 = nenhum): a base e toda de Canoas, institucional nao responde daqui.
+# o "outro" sai ja na busca: sem o filtro, o PDI ocupava ate 57 dos 60 lugares do pool numa query de
+# salas, e a trava acima deixava o contexto com 3 trechos. o chunk de Canoas nao grava o campo
+CAMPUS_FILTRO = "HAS NOT FIELD campus_scope OR campus_scope != 'outro'"
 CURSO_PENALTY = 0.20  # penalidade no rerank para chunk de curso DIFERENTE do citado na pergunta
                       # (metadata curso_escopo). SUAVE (0.20 < CAMPUS_PENALTY 0.35) e SEM cap: doc de
                       # outro curso pode ser pertinente, entao so desce, nao e expulso. fecha o erro de
@@ -93,6 +97,7 @@ def search(query, top_k):
                 vector=vector,
                 top_k=top_k,
                 include_metadata=True,
+                filter=CAMPUS_FILTRO,
             )
             return hits
         except genai_errors.APIError as e:
@@ -110,10 +115,15 @@ def build_context(hits, min_score=MIN_SCORE, top_n=CONTEXT_K):
     # seleciona o top_n por score (hits ja vem reordenados pelo rerank), com TETO de slots "outro":
     # a penalidade de rerank rebaixa o institucional, este cap o EXPULSA do contexto (fecha o vazamento
     # do PDI nas salas). ao pular um "outro" excedente, o proximo chunk de Canoas ocupa a vaga.
-    filtered, n_outro = [], 0
+    filtered, n_outro, vistos = [], 0, set()
     for h in hits:
         if h.score < min_score:
             continue
+        # eventos do mesmo mes de um calendario compartilham o texto; repetido nao ocupa outra vaga
+        chave = ((h.metadata or {}).get("source_url"), (h.metadata or {}).get("text"))
+        if chave in vistos:
+            continue
+        vistos.add(chave)
         if (h.metadata or {}).get("campus_scope") == "outro":
             if n_outro >= CAMPUS_OUTRO_MAX:
                 continue
@@ -267,10 +277,11 @@ def registro_de_trace(trace, query, resposta, erro=None):
 
 
 # ── guard de saida: checagens pos-geracao, antes de entregar a resposta ──────────
-# rodam depois que o modelo produz o texto final. hoje cobrem consistencia temporal
-# (A: ressalva de dado antigo; B: liderar com a proxima data futura). ambas so agem
+# rodam depois que o modelo produz o texto final: seguranca (vazamento do prompt, que troca
+# a resposta pela recusa), consistencia temporal (A: ressalva de dado
+# antigo; B: liderar com a proxima data futura) e soma propria (C). as temporais so agem
 # quando ha sinal concreto (fonte antiga citada / data passada com futura no contexto),
-# senao devolvem a resposta intacta. o mesmo hook hospedara o guard de seguranca depois.
+# senao devolvem a resposta intacta.
 
 _MESES = {"janeiro": 1, "fevereiro": 2, "marco": 3, "março": 3, "abril": 4, "maio": 5,
           "junho": 6, "julho": 7, "agosto": 8, "setembro": 9, "outubro": 10,
@@ -468,6 +479,39 @@ def _guard_soma_propria(corpo, contexto):
     return re.sub(r"\n{3,}", "\n\n", "".join(saida)).strip()
 
 
+# ── guard de seguranca: vazamento do prompt ──────────────────────────────────────
+# o vazamento e medido por sequencias de 8 palavras do prompt (sem acento, minusculas) que a resposta
+# repete. respostas legitimas repetem ate 11 (frases que o proprio prompt manda dizer, como a correcao
+# de curso inexistente); um trecho de 50 palavras do prompt repete 43. a lista de cursos formatada no
+# prompt fica de fora, pois listar os cursos e resposta legitima.
+
+_N_SEQUENCIA = 8
+_LIMITE_VAZAMENTO = 30
+RECUSA_SEGURANCA = ("Não posso ajudar com isso. Sou o assistente virtual do IFRS Campus Canoas e respondo "
+                    "dúvidas sobre o campus, como cursos, calendário, horários, editais e serviços.")
+
+
+def _palavras(texto):
+    sem_acento = unicodedata.normalize("NFKD", (texto or "").lower()).encode("ascii", "ignore").decode()
+    return re.findall(r"[a-z0-9]+", sem_acento)
+
+
+def _sequencias(palavras):
+    return {" ".join(palavras[i:i + _N_SEQUENCIA]) for i in range(len(palavras) - _N_SEQUENCIA + 1)}
+
+
+_SEQUENCIAS_PROMPT = _sequencias(_palavras(agent_prompt))
+
+
+def _vazou_prompt(corpo):
+    # so conjuntos e regex, sem rede nem LLM; erro inesperado deixa a resposta passar e fica no log
+    try:
+        return len(_sequencias(_palavras(corpo)) & _SEQUENCIAS_PROMPT) >= _LIMITE_VAZAMENTO
+    except Exception as e:
+        logger.warning(_safe(f"[GUARD] checagem de vazamento falhou, mantendo resposta original: {e}"))
+        return False
+
+
 def _aplicar_guards(corpo, query, fontes_anos, contexto, data_atual):
     # orquestra as checagens pos-geracao sobre o corpo. fail-safe: qualquer erro devolve
     # o corpo original. no-op quando nao houve busca (sem fontes nem contexto).
@@ -491,6 +535,13 @@ def _pos_processar(resposta, query, fontes_anos, contexto, sources_map, data_atu
     # pos-processamento unico da resposta final: decompoe em (corpo, fontes), aplica os
     # guards sobre o corpo, garante as fontes citadas e recompoe na borda de saida
     corpo, fontes, tinha_bloco = _decompor_resposta(resposta)
+
+    # seguranca antes das demais checagens: resposta que copia trecho longo do prompt vira a recusa
+    # inteira, sem fontes
+    if _vazou_prompt(corpo):
+        logger.warning("[GUARD] resposta substituida pela recusa de seguranca")
+        return RECUSA_SEGURANCA
+
     corpo = _aplicar_guards(corpo, query, fontes_anos, contexto, data_atual)
     fontes = _backfill_fontes(corpo, fontes, tinha_bloco, sources_map)
     return _compor_resposta(corpo, fontes)

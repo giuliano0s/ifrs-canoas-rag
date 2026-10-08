@@ -44,7 +44,7 @@ def ingest_chunks(chunks, batch_size=100):
     total = len(chunks)
     for i in range(0, total, batch_size):
         batch = chunks[i:i + batch_size]
-        texts = [c["text"] for c in batch]
+        texts = [c.get("texto_busca") or c["text"] for c in batch]
 
         # embeda com retry
         for attempt in range(5):
@@ -78,6 +78,13 @@ def ingest_chunks(chunks, batch_size=100):
             if chunk.get("is_schedule"):
                 meta["is_schedule"]     = True
                 meta["schedule_source"] = chunk.get("schedule_source")
+            # calendario por evento: o vetor e o da frase do evento, e o text e o bloco do mes
+            if chunk.get("is_calendar"):
+                meta["is_calendar"] = True
+                meta["texto_busca"] = chunk.get("texto_busca")
+            # campo nulo nao e gravado: o filtro do Upstash nao seleciona nulo, e o filtro de campus
+            # do atendimento depende do campo ausente nos chunks de Canoas
+            meta = {chave: valor for chave, valor in meta.items() if valor is not None}
             vectors.append((chunk["id"], embedding.values, meta))
 
         index.upsert(vectors=vectors)

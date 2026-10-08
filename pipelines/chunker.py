@@ -91,6 +91,50 @@ def secoes_de_campus(text):
         secoes.append((campus, text[pos:fim]))
     return [(c, t) for c, t in secoes if t.strip()]
 
+_MESES_CAL = ("janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto",
+              "setembro", "outubro", "novembro", "dezembro")
+_ANO_CAL = re.compile(r"(?i)^\s*ano do calend[aá]rio:\s*(20\d{2})")
+_MES_DE = re.compile(r"\bde (" + "|".join(_MESES_CAL) + r")\b(?: de (20\d{2}))?")
+_MES_SOLTO = re.compile(r"\b(" + "|".join(_MESES_CAL) + r")\b(?:.*?\b(20\d{2})\b)?")
+
+def _mes_do_evento(linha, ano):
+    # (mes, ano) da primeira data da linha ("27 de junho de 2026"); sem "de <mes>", o primeiro mes citado
+    baixa = linha.lower()
+    achado = _MES_DE.search(baixa) or _MES_SOLTO.search(baixa)
+    if not achado:
+        return None
+    return f"{achado.group(1)} de {achado.group(2) or ano}"
+
+def chunks_de_calendario(text, metadata):
+    """Fatia um calendario academico estruturado em um chunk por evento.
+
+    Cada chunk e buscado pela frase do proprio evento (texto_busca, o que e embedado) e entregue ao
+    contexto com o bloco do mes inteiro (text). O evento pontual casa forte com a pergunta, e a
+    pergunta de conjunto (feriados do ano, eventos de novembro) recebe o mes completo.
+
+    Args:
+        text: saida do structure_calendar_text, um evento por linha apos "Ano do calendario: AAAA".
+        metadata: metadata comum do documento.
+
+    Returns:
+        Lista de chunks; eventos do mesmo mes compartilham o mesmo text.
+    """
+
+    # ano do calendario e eventos unicos, na ordem do documento
+    linhas = [ln.strip() for ln in text.split("\n") if ln.strip()]
+    ano = next((m.group(1) for m in map(_ANO_CAL.match, linhas) if m), metadata.get("published_at"))
+    cabecalho = f"Calendário acadêmico {ano} do Campus Canoas"
+    eventos = list(dict.fromkeys(ln for ln in linhas if not _ANO_CAL.match(ln)))
+
+    # bloco de cada mes, com o cabecalho do calendario
+    por_mes = {}
+    for evento in eventos:
+        por_mes.setdefault(_mes_do_evento(evento, ano), []).append(evento)
+    blocos = {mes: (f"{cabecalho}, eventos de {mes}:\n" if mes else f"{cabecalho}:\n") + "\n".join(lista)
+              for mes, lista in por_mes.items()}
+    return [{**metadata, "text": blocos[_mes_do_evento(evento, ano)], "texto_busca": f"{cabecalho}: {evento}"}
+            for evento in eventos]
+
 def chunks_de_pdf(pdf):
     # chunks de um PDF parseado, com o metadata que o ingest persiste
     url = to_drive_view_url(pdf["source_url"])
@@ -119,6 +163,12 @@ def chunks_de_pdf(pdf):
         metadata["is_schedule"]     = True
         metadata["schedule_source"] = pdf.get("schedule_source")
         return chunk_document(pdf["text"], metadata, por_linha=True)
+    # calendario estruturado que nao cabe num chunk: um chunk por evento; o que cabe ja e uma unidade
+    if pdf.get("is_calendar"):
+        metadata["is_calendar"] = True
+        if len(pdf["text"]) > CHUNK_SIZE:
+            return chunks_de_calendario(pdf["text"], metadata)
+        return chunk_document(pdf["text"], metadata)
 
     # edital multi-campus: cada secao de campus e fatiada a parte, e cada chunk dela leva o nome do
     # campus no texto (o pedaco de continuacao de um curso deixa de ficar sem campus) e o campus_scope
