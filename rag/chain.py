@@ -437,6 +437,13 @@ def _guard_ressalva_temporal(corpo, fontes_anos, ano_atual, uso=None):
 _FONTE_CTX_RX = re.compile(r"^\[(\d+)\] Fonte:", re.MULTILINE)
 
 
+def _dias_meses(texto):
+    # (dia, mes) das datas do texto, com ou sem ano: "27 de julho", "27 de julho de 2026", "27/07"
+    t = (texto or "").lower()
+    pares = {(int(d), _MESES[m]) for d, m in re.findall(rf"\b(\d{{1,2}})\s+de\s+({_MESES_RX})\b", t)}
+    return pares | {(int(d), int(m)) for d, m in re.findall(r"\b(\d{1,2})/(\d{1,2})\b", t)}
+
+
 def _guard_data_futura(corpo, query, contexto, hoje, uso=None):
     # B: o corpo cita data ja passada e o contexto tem data futura -> re-check ACRESCENTA uma frase
     # com a proxima ocorrencia do mesmo evento (o texto ja exibido nao e reescrito). a query e dado
@@ -446,6 +453,9 @@ def _guard_data_futura(corpo, query, contexto, hoje, uso=None):
         return corpo
     futuras_ctx = {d for d in _extrair_datas(contexto) if d >= hoje}
     if not futuras_ctx:
+        return corpo
+    # o corpo ja informa uma data futura do contexto (o modelo costuma omitir o ano: "27 de julho")
+    if _dias_meses(corpo) & {(d.day, d.month) for d in futuras_ctx}:
         return corpo
     # passa os cabecalhos [n] e as linhas datadas do contexto: a data futura e a fonte dela chegam ao re-check
     linhas = "\n".join(ln for ln in (contexto or "").splitlines()
@@ -463,7 +473,7 @@ def _guard_data_futura(corpo, query, contexto, hoje, uso=None):
     datas_frase = {d for d in _extrair_datas(frase) if d >= hoje}
     fontes_ctx = {int(n) for n in _FONTE_CTX_RX.findall(contexto or "")}
     citadas = _citacoes(frase)
-    if not (datas_frase & futuras_ctx) or datas_frase & set(_extrair_datas(corpo)) or not citadas or not citadas <= fontes_ctx:
+    if not (datas_frase & futuras_ctx) or _dias_meses(frase) & _dias_meses(corpo) or not citadas or not citadas <= fontes_ctx:
         return corpo
     return corpo.rstrip() + "\n\n" + frase
 
