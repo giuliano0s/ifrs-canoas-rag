@@ -295,6 +295,63 @@
     });
   }
 
+  // le a resposta em fluxo (uma linha JSON por evento) e desenha a previa enquanto ela chega.
+  // devolve {fim: texto final}, {fluxo: segundos, erro} no fluxo alto ou {erro: mensagem}
+  async function lerFluxo(res, typing) {
+    const leitor = res.body.getReader();
+    const decodificador = new TextDecoder();
+    let buffer = "";
+    let previa = "";
+    let balao = null;
+
+    function tratar(ev) {
+      if (ev.tipo === "status") {
+        typing.textContent = ev.texto;
+        return null;
+      }
+      if (ev.tipo === "texto") {
+        if (!balao) {
+          typing.remove();
+          balao = addMessage("", "bot");
+        }
+        previa += ev.delta;
+        balao.textContent = previa;
+        messages.scrollTop = messages.scrollHeight;
+        return null;
+      }
+      if (ev.tipo === "limpar") {
+        previa = "";
+        if (balao) balao.remove();
+        balao = null;
+        messages.appendChild(typing);
+        return null;
+      }
+      if (balao) balao.remove();
+      typing.remove();
+      if (ev.tipo === "fim") return { fim: ev.resposta };
+      if (ev.tipo === "erro") return ev.fluxo_alto ? { fluxo: ev.tentar_em, erro: ev.error } : { erro: ev.error };
+      return null;
+    }
+
+    // a resposta final substitui a previa: ela traz as checagens e a secao de fontes
+    while (true) {
+      const { value, done } = await leitor.read();
+      if (value) buffer += decodificador.decode(value, { stream: true });
+      let quebra;
+      while ((quebra = buffer.indexOf("\n")) >= 0) {
+        const linha = buffer.slice(0, quebra).trim();
+        buffer = buffer.slice(quebra + 1);
+        if (!linha) continue;
+        const resultado = tratar(JSON.parse(linha));
+        if (resultado) return resultado;
+      }
+      if (done) break;
+    }
+    if (balao) balao.remove();
+    typing.remove();
+    return { erro: null };
+  }
+
   async function send() {
     const query = input.value.trim();
     if (!query) return;
@@ -313,21 +370,31 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ query, history, user_id: userId, session_id: sessionId })
         });
-        typing.remove();
 
         // resposta do rate limiter
         if (res.status === 429) {
+          typing.remove();
           if (aviso) aviso.remove();
           addMessage("Muitas perguntas em pouco tempo. Aguarde um instante e tente novamente.", "bot");
           break;
         }
 
-        const data = await res.json();
+        // resposta em fluxo; erro tratado pelo servidor antes do fluxo chega como JSON
+        let resultado;
+        if ((res.headers.get("Content-Type") || "").includes("ndjson")) {
+          resultado = await lerFluxo(res, typing);
+        } else {
+          typing.remove();
+          const data = await res.json();
+          if (res.ok) resultado = { fim: data.response };
+          else if (res.status === 503 && data.fluxo_alto) resultado = { fluxo: data.tentar_em, erro: data.error };
+          else resultado = { erro: data.error };
+        }
 
         // fluxo alto no provedor do modelo: avisa com contagem regressiva e reenvia sozinho
-        if (res.status === 503 && data.fluxo_alto && tentativa < MAX_TENTATIVAS_FLUXO) {
+        if (resultado.fluxo !== undefined && tentativa < MAX_TENTATIVAS_FLUXO) {
           aviso = aviso || addMessage("", "bot");
-          await esperarFluxo(Math.round(Math.min(Math.max(data.tentar_em || 5, 3), 20)), aviso);
+          await esperarFluxo(Math.round(Math.min(Math.max(resultado.fluxo || 5, 3), 20)), aviso);
           aviso.textContent = "Tentando de novo...";
           typing = addMessage("Digitando...", "bot typing");
           continue;
@@ -336,16 +403,16 @@
 
         // erros tratados pelo servidor (pergunta longa, limite diario, falha): mostra a mensagem
         // e nao acumula no historico
-        if (!res.ok) {
-          addMessage(data.error || "Não consegui responder agora. Tente novamente em instantes.", "bot");
+        if (resultado.fim === undefined) {
+          addMessage(resultado.erro || "Não consegui responder agora. Tente novamente em instantes.", "bot");
           break;
         }
 
-        addMessage(data.response, "bot");
+        addMessage(resultado.fim, "bot");
 
         // acumula contexto da conversa ativa, descartado ao recarregar
         history.push({ role: "user", content: query });
-        history.push({ role: "assistant", content: data.response });
+        history.push({ role: "assistant", content: resultado.fim });
         break;
       }
     } catch (e) {

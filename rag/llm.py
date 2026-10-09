@@ -46,8 +46,9 @@ OPENAI_REASONING = (os.getenv("OPENAI_REASONING") or "none").strip().lower()
 # no luna, e o prazo de 20 s do cliente, feito para o aluno nao esperar, o derrubaria
 PRAZO_INGESTAO = 180
 
-# resposta neutra: ou o modelo produziu texto, ou pediu uma ferramenta (nunca os dois no fluxo atual)
-Resposta = namedtuple("Resposta", "texto chamada")
+# resposta neutra: ou o modelo produziu texto, ou pediu uma ferramenta (nunca os dois no fluxo atual);
+# uso = {"entrada": tokens, "saida": tokens} da chamada, quando o provedor informa
+Resposta = namedtuple("Resposta", "texto chamada uso", defaults=(None,))
 
 # ferramenta descrita de forma neutra (JSON Schema), traduzida por cada adaptador
 FERRAMENTA_BUSCA = {
@@ -110,11 +111,14 @@ def _gerar_gemini(mensagens, sistema, ferramentas, temperatura, leve, prazo=None
 
     r = cliente.models.generate_content(model=GEMINI_MODEL_LEVE if leve else GEMINI_MODEL, contents=contents,
                                         config=types.GenerateContentConfig(**cfg))
+    meta = getattr(r, "usage_metadata", None)
+    uso = {"entrada": getattr(meta, "prompt_token_count", 0) or 0,
+           "saida": getattr(meta, "candidates_token_count", 0) or 0} if meta else None
     for parte in (r.candidates[0].content.parts or []):
         fc = getattr(parte, "function_call", None)
         if fc:
-            return Resposta(texto=None, chamada={"nome": fc.name, "args": dict(fc.args or {})})
-    return Resposta(texto=(r.text or "").strip(), chamada=None)
+            return Resposta(texto=None, chamada={"nome": fc.name, "args": dict(fc.args or {})}, uso=uso)
+    return Resposta(texto=(r.text or "").strip(), chamada=None, uso=uso)
 
 
 def _schema_gemini(js):
@@ -144,9 +148,17 @@ def _gerar_openai(mensagens, sistema, ferramentas, temperatura, leve, prazo=None
     return _gerar_openai_responses(mensagens, sistema, ferramentas, prazo)
 
 
-def _gerar_openai_chat(mensagens, sistema, ferramentas, temperatura, prazo=None):
-    cliente = _cliente_openai()
+def _uso_openai(usage):
+    # tokens de entrada e saida informados pela OpenAI (None quando a resposta nao traz)
+    if not usage:
+        return None
+    entrada = getattr(usage, "prompt_tokens", None) or getattr(usage, "input_tokens", 0) or 0
+    saida = getattr(usage, "completion_tokens", None) or getattr(usage, "output_tokens", 0) or 0
+    return {"entrada": entrada, "saida": saida}
 
+
+def _kwargs_openai_chat(mensagens, sistema, ferramentas, temperatura, prazo=None):
+    # pedido do chat.completions no formato da OpenAI, a partir da conversa neutra
     msgs = []
     if sistema:
         msgs.append({"role": "system", "content": sistema})
@@ -180,15 +192,48 @@ def _gerar_openai_chat(mensagens, sistema, ferramentas, temperatura, prazo=None)
 
     if prazo:
         kwargs["timeout"] = prazo
-    r = cliente.chat.completions.create(**kwargs)
+    return kwargs
+
+
+def _gerar_openai_chat(mensagens, sistema, ferramentas, temperatura, prazo=None):
+    r = _cliente_openai().chat.completions.create(**_kwargs_openai_chat(mensagens, sistema, ferramentas, temperatura, prazo))
     escolha = r.choices[0].message
+    uso = _uso_openai(r.usage)
     chamadas = getattr(escolha, "tool_calls", None)
     if chamadas:
         c = chamadas[0]
         args = c.function.arguments
         return Resposta(texto=None, chamada={"nome": c.function.name,
-                                             "args": json.loads(args) if isinstance(args, str) else (args or {})})
-    return Resposta(texto=(escolha.content or "").strip(), chamada=None)
+                                             "args": json.loads(args) if isinstance(args, str) else (args or {})}, uso=uso)
+    return Resposta(texto=(escolha.content or "").strip(), chamada=None, uso=uso)
+
+
+def _fluxo_openai_chat(mensagens, sistema, ferramentas, temperatura):
+    # mesma chamada em streaming: devolve ("texto", pedaco) a cada pedaco e ("fim", Resposta) no final;
+    # a chamada de ferramenta chega em pedacos de argumento, montados por indice
+    kwargs = _kwargs_openai_chat(mensagens, sistema, ferramentas, temperatura)
+    kwargs.update(stream=True, stream_options={"include_usage": True})
+    texto, chamadas, uso = [], {}, None
+    for parte in _cliente_openai().chat.completions.create(**kwargs):
+        if getattr(parte, "usage", None):
+            uso = _uso_openai(parte.usage)
+        if not parte.choices:
+            continue
+        delta = parte.choices[0].delta
+        if delta.content:
+            texto.append(delta.content)
+            yield "texto", delta.content
+        for tc in delta.tool_calls or []:
+            atual = chamadas.setdefault(tc.index, {"nome": "", "args": ""})
+            if tc.function and tc.function.name:
+                atual["nome"] += tc.function.name
+            if tc.function and tc.function.arguments:
+                atual["args"] += tc.function.arguments
+    if chamadas:
+        c = chamadas[min(chamadas)]
+        yield "fim", Resposta(texto=None, chamada={"nome": c["nome"], "args": json.loads(c["args"] or "{}")}, uso=uso)
+    else:
+        yield "fim", Resposta(texto="".join(texto).strip(), chamada=None, uso=uso)
 
 
 def _gerar_openai_responses(mensagens, sistema, ferramentas, prazo=None):
@@ -224,10 +269,11 @@ def _gerar_openai_responses(mensagens, sistema, ferramentas, prazo=None):
     if prazo:
         kwargs["timeout"] = prazo
     r = cliente.responses.create(**kwargs)
+    uso = _uso_openai(getattr(r, "usage", None))
     for item in r.output:
         if item.type == "function_call":
-            return Resposta(texto=None, chamada={"nome": item.name, "args": json.loads(item.arguments or "{}")})
-    return Resposta(texto=(r.output_text or "").strip(), chamada=None)
+            return Resposta(texto=None, chamada={"nome": item.name, "args": json.loads(item.arguments or "{}")}, uso=uso)
+    return Resposta(texto=(r.output_text or "").strip(), chamada=None, uso=uso)
 
 
 _CLIENTE_OPENAI = None
@@ -315,6 +361,46 @@ def gerar(mensagens, sistema=None, ferramentas=None, temperatura=0.7, leve=False
                 raise
             motivo, tentar_em = classe
             if motivo == "indisponivel" and tentativa < 2:
+                time.sleep(tentativa + 1)
+                continue
+            raise ProvedorIndisponivel(f"{type(e).__name__}: {str(e)[:200]}", motivo, tentar_em) from e
+
+
+def gerar_fluxo(mensagens, sistema=None, ferramentas=None, temperatura=0.7):
+    """Gera em streaming: devolve ("texto", pedaco) a cada pedaco e ("fim", Resposta) no final.
+
+    So o chat.completions da OpenAI (sem raciocinio) transmite de verdade; nos demais caminhos a
+    resposta inteira sai num pedaco so. Queda antes do primeiro pedaco e refeita como em gerar();
+    depois dele, a falha sobe como ProvedorIndisponivel, porque o aluno ja viu parte do texto.
+
+    Args:
+        mensagens: conversa no formato neutro.
+        sistema: prompt de sistema.
+        ferramentas: ferramentas no formato neutro.
+        temperatura: temperatura da geracao.
+
+    Yields:
+        Tuplas ("texto", str) e, por ultimo, ("fim", Resposta).
+    """
+    if PROVIDER != "openai" or OPENAI_REASONING != "none":
+        r = gerar(mensagens, sistema, ferramentas, temperatura)
+        if r.texto:
+            yield "texto", r.texto
+        yield "fim", r
+        return
+    for tentativa in range(3):
+        transmitiu = False
+        try:
+            for evento in _fluxo_openai_chat(mensagens, sistema, ferramentas, temperatura):
+                transmitiu = transmitiu or evento[0] == "texto"
+                yield evento
+            return
+        except Exception as e:
+            classe = _classificar(e)
+            if classe is None:
+                raise
+            motivo, tentar_em = classe
+            if motivo == "indisponivel" and tentativa < 2 and not transmitiu:
                 time.sleep(tentativa + 1)
                 continue
             raise ProvedorIndisponivel(f"{type(e).__name__}: {str(e)[:200]}", motivo, tentar_em) from e

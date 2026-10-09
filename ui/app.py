@@ -1,7 +1,9 @@
+import itertools
+import json
 import os
 import time
-from flask import Flask, request, jsonify, send_from_directory, abort
-from rag.chain import ask
+from flask import Flask, Response, request, jsonify, send_from_directory, abort
+from rag.chain import ask_stream
 from rag.gatekeeper import check_rate_limit, check_global_budget
 from rag.llm import ProvedorIndisponivel
 from rag.telemetry import registrar_chat
@@ -89,29 +91,50 @@ def chat():
     # histórico chega pronto do cliente, servidor não guarda estado
     history = sanitize_history(data.get("history"))
 
-    # roda o agente com trace e envia a telemetria do turno (Langfuse); a telemetria é
-    # opcional e protegida, e o try garante que uma falha do ask vire 500 limpo (e fique
-    # registrada) em vez de estourar sem rastro
-    trace, inicio, erro, response, falha_provedor = {}, time.time(), None, None, None
+    # roda o agente em streaming. o 1o evento sai antes de abrir a resposta: limite ou queda do provedor
+    # na 1a chamada ainda vira 503 com o aviso de fluxo alto do widget; falha depois dele vira evento
+    # "erro" dentro do fluxo. a telemetria do turno (Langfuse) e registrada uma vez, ao fim
+    trace, inicio = {}, time.time()
+    eventos = ask_stream(query, history=history, trace=trace)
     try:
-        response = ask(query, history=history, trace=trace)
-    except ProvedorIndisponivel as e:
-        erro, falha_provedor = f"ProvedorIndisponivel[{e.motivo}]: {str(e)[:200]}", e
+        primeiro = next(eventos)
     except Exception as e:
-        erro = f"{type(e).__name__}: {str(e)[:200]}"
-    latencia_ms = int((time.time() - inicio) * 1000)
-    registrar_chat(query, history, trace, response, latencia_ms, erro=erro, session_id=session_id, user_id=user_id)
+        erro = (f"ProvedorIndisponivel[{e.motivo}]: {str(e)[:200]}" if isinstance(e, ProvedorIndisponivel)
+                else f"{type(e).__name__}: {str(e)[:200]}")
+        registrar_chat(query, history, trace, None, int((time.time() - inicio) * 1000), erro=erro,
+                       session_id=session_id, user_id=user_id)
+        return jsonify(_aviso_de_falha(e)), (503 if isinstance(e, ProvedorIndisponivel) else 500)
 
-    # fluxo alto no provedor do LLM: 503 imediato com a espera sugerida, e o widget avisa o aluno e
-    # tenta de novo sozinho; credito ou queda: 503 com aviso de tentar mais tarde
-    if falha_provedor is not None and falha_provedor.motivo == "fluxo_alto":
-        return jsonify({"error": "Muitas perguntas ao mesmo tempo agora. Tente novamente em instantes.",
-                        "fluxo_alto": True, "tentar_em": falha_provedor.tentar_em}), 503
-    if falha_provedor is not None:
-        return jsonify({"error": "O assistente está indisponível no momento. Tente novamente em alguns minutos."}), 503
-    if erro is not None:
-        return jsonify({"error": "Não consegui responder agora. Tente novamente em instantes."}), 500
-    return jsonify({"response": response})
+    def transmitir():
+        resposta, erro, primeiro_texto_ms = None, None, None
+        try:
+            for evento in itertools.chain([primeiro], eventos):
+                if evento["tipo"] == "texto" and primeiro_texto_ms is None:
+                    primeiro_texto_ms = int((time.time() - inicio) * 1000)
+                if evento["tipo"] == "fim":
+                    resposta = evento["resposta"]
+                yield json.dumps(evento, ensure_ascii=False) + "\n"
+        except Exception as e:
+            erro = (f"ProvedorIndisponivel[{e.motivo}]: {str(e)[:200]}" if isinstance(e, ProvedorIndisponivel)
+                    else f"{type(e).__name__}: {str(e)[:200]}")
+            yield json.dumps({"tipo": "erro", **_aviso_de_falha(e)}, ensure_ascii=False) + "\n"
+        finally:
+            registrar_chat(query, history, trace, resposta, int((time.time() - inicio) * 1000), erro=erro,
+                           session_id=session_id, user_id=user_id, primeiro_texto_ms=primeiro_texto_ms)
+
+    return Response(transmitir(), mimetype="application/x-ndjson",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+def _aviso_de_falha(erro):
+    # mensagem ao aluno por tipo de falha. fluxo alto no provedor do LLM leva a espera sugerida, e o
+    # widget avisa e tenta de novo sozinho; credito ou queda: tentar mais tarde; o resto: erro generico
+    if isinstance(erro, ProvedorIndisponivel) and erro.motivo == "fluxo_alto":
+        return {"error": "Muitas perguntas ao mesmo tempo agora. Tente novamente em instantes.",
+                "fluxo_alto": True, "tentar_em": erro.tentar_em}
+    if isinstance(erro, ProvedorIndisponivel):
+        return {"error": "O assistente está indisponível no momento. Tente novamente em alguns minutos."}
+    return {"error": "Não consegui responder agora. Tente novamente em instantes."}
 
 if __name__ == "__main__":
     # execucao local de dev: liga o dump de retrieval (DEBUG do pacote rag) no console.
