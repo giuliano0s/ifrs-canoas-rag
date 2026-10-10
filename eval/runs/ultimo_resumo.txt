@@ -1,8 +1,7 @@
 Coleta: 430 execucoes (0 com erro de API, excluidas)
 
-FASE 1 (decisao)  ->  428/430 = 100% (por execucao)
+FASE 1 (decisao)  ->  429/430 = 100% (por execucao)
   curso-inexistente                14/15   93%  [ 70%,  99%]
-  horario-aulas-turma              14/15   93%  [ 70%,  99%]
   diretor-geral-campus             15/15  100%  [ 80%, 100%]
   atendimento-igor                 20/20  100%  [ 84%, 100%]
   atendimento-vago                 10/10  100%  [ 72%, 100%]
@@ -26,13 +25,14 @@ FASE 1 (decisao)  ->  428/430 = 100% (por execucao)
   documentos-vaga                  15/15  100%  [ 80%, 100%]
   numero-servidores                15/15  100%  [ 80%, 100%]
   total-vagas-campus               15/15  100%  [ 80%, 100%]
-  festa-junina-data                15/15  100%  [ 80%, 100%]
   inicio-aulas-proximo-semestre    15/15  100%  [ 80%, 100%]
   rematricula-2026                 15/15  100%  [ 80%, 100%]
-  salas-professores-predio         15/15  100%  [ 80%, 100%]
   disciplinas-professor            15/15  100%  [ 80%, 100%]
+  festa-junina-data                15/15  100%  [ 80%, 100%]
+  salas-professores-predio         15/15  100%  [ 80%, 100%]
+  horario-aulas-turma              15/15  100%  [ 80%, 100%]
 
-FASE 2 (formulacao da query; so execucoes que buscaram)  ->  245/245 = 100% (por execucao)
+FASE 2 (formulacao da query; so execucoes que buscaram)  ->  259/259 = 100% (por execucao)
   diretor-geral-campus             15/15  100%  [ 80%, 100%]
   atendimento-igor                 20/20  100%  [ 84%, 100%]
   auxilio-estudantil               15/15  100%  [ 80%, 100%]
@@ -43,15 +43,15 @@ FASE 2 (formulacao da query; so execucoes que buscaram)  ->  245/245 = 100% (por
   bolsa-vaga                       15/15  100%  [ 80%, 100%]
   numero-servidores                15/15  100%  [ 80%, 100%]
   total-vagas-campus               15/15  100%  [ 80%, 100%]
-  festa-junina-data                15/15  100%  [ 80%, 100%]
   inicio-aulas-proximo-semestre    15/15  100%  [ 80%, 100%]
   rematricula-2026                 15/15  100%  [ 80%, 100%]
   curso-inexistente                14/14  100%  [ 78%, 100%]
-  salas-professores-predio         15/15  100%  [ 80%, 100%]
   disciplinas-professor            15/15  100%  [ 80%, 100%]
-  horario-aulas-turma              1/1  100%  [ 21%, 100%]
+  festa-junina-data                15/15  100%  [ 80%, 100%]
+  salas-professores-predio         15/15  100%  [ 80%, 100%]
+  horario-aulas-turma              15/15  100%  [ 80%, 100%]
 
-FASE 3 (retrieval)  ->  doc 214/214 = 100% | span 150/180 = 83%  |  falhas de span: 0 retrieval + 30 chunk
+FASE 3 (retrieval)  ->  doc 214/214 = 100% | span 165/180 = 92%  |  falhas de span: 0 retrieval + 15 chunk
   diretor-geral-campus             doc  15/15  span  15/15
   atendimento-igor                 doc  20/20  span      -
   auxilio-estudantil               doc  15/15  span  15/15
@@ -60,16 +60,16 @@ FASE 3 (retrieval)  ->  doc 214/214 = 100% | span 150/180 = 83%  |  falhas de sp
   email-coord-tads                 doc  15/15  span  15/15
   numero-servidores                doc  15/15  span  15/15
   total-vagas-campus               doc  15/15  span   0/15   (span: 0 retrieval + 15 chunk)
-  festa-junina-data                doc  15/15  span  15/15
   inicio-aulas-proximo-semestre    doc  15/15  span  15/15
   rematricula-2026                 doc  15/15  span  15/15
   curso-inexistente                doc  14/14  span      -
-  salas-professores-predio         doc  15/15  span   0/15   (span: 0 retrieval + 15 chunk)
   disciplinas-professor            doc  15/15  span  15/15
+  festa-junina-data                doc  15/15  span  15/15
+  salas-professores-predio         doc  15/15  span  15/15
 
 MRR (gold_url no contexto): 0.69 (media sobre 214 execucoes com gold)
 
-FASE 7 (citacao: todo [n] citado e fonte do contexto)  ->  245/245 = 100% (por execucao)
+FASE 7 (citacao: todo [n] citado e fonte do contexto)  ->  259/259 = 100% (por execucao)
   diretor-geral-campus             15/15  100%  [ 80%, 100%]
   atendimento-igor                 20/20  100%  [ 84%, 100%]
   auxilio-estudantil               15/15  100%  [ 80%, 100%]
@@ -80,13 +80,13 @@ FASE 7 (citacao: todo [n] citado e fonte do contexto)  ->  245/245 = 100% (por e
   bolsa-vaga                       15/15  100%  [ 80%, 100%]
   numero-servidores                15/15  100%  [ 80%, 100%]
   total-vagas-campus               15/15  100%  [ 80%, 100%]
-  festa-junina-data                15/15  100%  [ 80%, 100%]
   inicio-aulas-proximo-semestre    15/15  100%  [ 80%, 100%]
   rematricula-2026                 15/15  100%  [ 80%, 100%]
   curso-inexistente                14/14  100%  [ 78%, 100%]
-  salas-professores-predio         15/15  100%  [ 80%, 100%]
   disciplinas-professor            15/15  100%  [ 80%, 100%]
-  horario-aulas-turma              1/1  100%  [ 21%, 100%]
+  festa-junina-data                15/15  100%  [ 80%, 100%]
+  salas-professores-predio         15/15  100%  [ 80%, 100%]
+  horario-aulas-turma              15/15  100%  [ 80%, 100%]
 
 FASE 4 (answerability: a resposta existe na base? varredura de conteudo)
   auxilio-estudantil               SIM 
@@ -104,11 +104,10 @@ FASE 4 (answerability: a resposta existe na base? varredura de conteudo)
 
 FASES 5/6 (juiz=claude): 258/430 tarefas julgadas
 
-FASE 5a (fidelidade ao contexto)  ->  142/147 = 97% (por execucao)
+FASE 5a (fidelidade ao contexto)  ->  152/156 = 97% (por execucao)
   numero-servidores                7/9   78%  [ 45%,  94%]
   complementares-tads              8/9   89%  [ 56%,  98%]
   rematricula-2026                 8/9   89%  [ 56%,  98%]
-  festa-junina-data                8/9   89%  [ 56%,  98%]
   auxilio-estudantil               9/9  100%  [ 70%, 100%]
   total-vagas-campus               9/9  100%  [ 70%, 100%]
   diretor-geral-campus             9/9  100%  [ 70%, 100%]
@@ -119,8 +118,10 @@ FASE 5a (fidelidade ao contexto)  ->  142/147 = 97% (por execucao)
   bolsa-vaga                       9/9  100%  [ 70%, 100%]
   disciplinas-professor            9/9  100%  [ 70%, 100%]
   curso-inexistente                9/9  100%  [ 70%, 100%]
-  salas-professores-predio         9/9  100%  [ 70%, 100%]
   inicio-aulas-proximo-semestre    9/9  100%  [ 70%, 100%]
+  festa-junina-data                9/9  100%  [ 70%, 100%]
+  salas-professores-predio         9/9  100%  [ 70%, 100%]
+  horario-aulas-turma              9/9  100%  [ 70%, 100%]
 
 FASE 5b (relevancia da resposta)  ->  258/258 = 100% (por execucao)
   numero-servidores                9/9  100%  [ 70%, 100%]
@@ -147,17 +148,15 @@ FASE 5b (relevancia da resposta)  ->  258/258 = 100% (por execucao)
   bolsa-vaga                       9/9  100%  [ 70%, 100%]
   responder-direto-agradecimento   9/9  100%  [ 70%, 100%]
   rematricula-2026                 9/9  100%  [ 70%, 100%]
-  festa-junina-data                9/9  100%  [ 70%, 100%]
   disciplinas-professor            9/9  100%  [ 70%, 100%]
   curso-inexistente                9/9  100%  [ 70%, 100%]
-  horario-aulas-turma              9/9  100%  [ 70%, 100%]
-  salas-professores-predio         9/9  100%  [ 70%, 100%]
   inicio-aulas-proximo-semestre    9/9  100%  [ 70%, 100%]
+  festa-junina-data                9/9  100%  [ 70%, 100%]
+  salas-professores-predio         9/9  100%  [ 70%, 100%]
+  horario-aulas-turma              9/9  100%  [ 70%, 100%]
 
-FASE 5c (correcao do fato)  ->  148/156 = 95% (por execucao)
-  salas-professores-predio         6/9   67%  [ 35%,  88%]
+FASE 5c (correcao do fato)  ->  162/165 = 98% (por execucao)
   total-vagas-campus               7/9   78%  [ 45%,  94%]
-  festa-junina-data                7/9   78%  [ 45%,  94%]
   inicio-aulas-proximo-semestre    8/9   89%  [ 56%,  98%]
   numero-servidores                9/9  100%  [ 70%, 100%]
   complementares-tads              9/9  100%  [ 70%, 100%]
@@ -172,9 +171,12 @@ FASE 5c (correcao do fato)  ->  148/156 = 95% (por execucao)
   rematricula-2026                 9/9  100%  [ 70%, 100%]
   disciplinas-professor            9/9  100%  [ 70%, 100%]
   curso-inexistente                9/9  100%  [ 70%, 100%]
+  festa-junina-data                9/9  100%  [ 70%, 100%]
+  salas-professores-predio         9/9  100%  [ 70%, 100%]
+  horario-aulas-turma              9/9  100%  [ 70%, 100%]
 
-FASE 6 (comportamento)  ->  202/204 = 99% (por execucao)
-  festa-junina-data                8/9   89%  [ 56%,  98%]
+FASE 6 (comportamento)  ->  201/204 = 99% (por execucao)
+  horario-aulas-turma              7/9   78%  [ 45%,  94%]
   inicio-aulas-proximo-semestre    8/9   89%  [ 56%,  98%]
   numero-servidores                9/9  100%  [ 70%, 100%]
   responder-direto-meta            9/9  100%  [ 70%, 100%]
@@ -197,4 +199,4 @@ FASE 6 (comportamento)  ->  202/204 = 99% (por execucao)
   responder-direto-agradecimento   9/9  100%  [ 70%, 100%]
   rematricula-2026                 9/9  100%  [ 70%, 100%]
   curso-inexistente                9/9  100%  [ 70%, 100%]
-  horario-aulas-turma              9/9  100%  [ 70%, 100%]
+  festa-junina-data                9/9  100%  [ 70%, 100%]

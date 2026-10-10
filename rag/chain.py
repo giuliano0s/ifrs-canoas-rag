@@ -206,10 +206,24 @@ def rerank_by_date(hits, curso_query=None):
     )
 
 
+# nomes que o aluno usa para o mesmo evento: a busca leva todos, sem depender da palavra escolhida
+_SINONIMOS_BUSCA = [
+    (re.compile(r"\bfesta\s+(junina|julina|agostina)\b|\barrai[aá]\b", re.IGNORECASE),
+     "festa junina festa julina festa agostina arraiá"),
+    (re.compile(r"\b(bloco|pr[ée]dio)s?\b", re.IGNORECASE), "bloco prédio"),
+]
+
+
+def _com_sinonimos(query):
+    extras = [termos for padrao, termos in _SINONIMOS_BUSCA if padrao.search(query or "")]
+    return " ".join([query] + extras)
+
+
 def _executar_busca(search_query, trace=None):
     # coleta um pool grande por similaridade, reordena por data e corta para o contexto. se a query
     # nomeia um curso, o rerank desprioriza doc de curso diferente (curso_da_query -> _curso_penalty).
-    hits = search(search_query, top_k=FETCH_K)
+    # o trace guarda a query do agente; a busca leva os sinonimos dela
+    hits = search(_com_sinonimos(search_query), top_k=FETCH_K)
     rank_sim = {h.id: i for i, h in enumerate(hits)}  # posicao por similaridade, antes do rerank
     hits = rerank_by_date(hits, curso_da_query(search_query))
     context, filtered, sources, source_years = build_context(hits)

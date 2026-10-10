@@ -45,7 +45,9 @@ def is_calendar_pdf(url, text):
                 or "CALENDARIO ACADEMICO" in (text or "")[:300].upper())
     n_datas = len(re.findall(r"\b\d{1,2}/\d{1,2}/20\d{2}\b|\b\d{1,2}\s+de\s+[a-zç]+\s+de\s+20\d{2}\b",
                              (text or "").lower()))
-    return marcador and n_datas >= 8
+    # calendario que lista os eventos como "27 - Festa Junina" sob o cabecalho do mes, sem data completa
+    n_eventos = len(re.findall(r"(?m)^\s*\d{1,2}(?:\s*(?:a|e|,)\s*\d{1,2})*(?:/\d{1,2})?\s*[-–]\s*\w", text or ""))
+    return marcador and (n_datas >= 8 or n_eventos >= 8)
 
 _MESES = ("JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO",
           "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO")
@@ -55,14 +57,68 @@ _CABECALHO_MES = re.compile(r"(?i)^(" + "|".join(_MESES) + r")\s*\|?\s*(20\d{2})
 # marcas invisiveis de direcao de texto que alguns PDFs gravam em volta de cada palavra
 _MARCAS_DIRECAO = dict.fromkeys(map(ord, "‎‏‪‫‬‭‮⁦⁧⁨⁩"))
 
+def _linhas_da_pagina_com_grade(page):
+    """Le uma pagina de calendario com grade de dias pelas coordenadas de cada palavra.
+
+    Alguns PDFs gravam o texto palavra por palavra, e o dia que abre um evento cai noutro bloco
+    ("03" num bloco, "a 07- 2ª Etapa" noutro). Remontando cada linha visual pela posicao, o que
+    fica a direita da coluna "Sab" da grade e observacao, e a esquerda ficam a grade e o
+    cabecalho do mes.
+
+    Args:
+        page: pagina do PyMuPDF.
+
+    Returns:
+        Lista de (cabecalho do mes ou None, texto da observacao) na ordem de leitura, ou None se a
+        pagina nao tem grade de dias (tabelas do fim, paginas de resolucao).
+    """
+    palavras = [(x0, y0, x1, y1, w.translate(_MARCAS_DIRECAO).strip())
+                for x0, y0, x1, y1, w, *_ in page.get_text("words")]
+    palavras = [p for p in palavras if p[4]]
+    sabados = [p for p in palavras if p[4].lower() in ("sáb", "sab")]
+    if not sabados:
+        return None
+    borda = max(p[2] for p in sabados) + 3
+
+    # linhas visuais: palavras com o centro vertical a ate 3 pt da linha corrente
+    linhas, atual, y_atual = [], [], None
+    for p in sorted(palavras, key=lambda p: ((p[1] + p[3]) / 2, p[0])):
+        y = (p[1] + p[3]) / 2
+        if atual and abs(y - y_atual) > 3:
+            linhas.append(atual)
+            atual = []
+        if not atual:
+            y_atual = y
+        atual.append(p)
+    if atual:
+        linhas.append(atual)
+
+    # em cada linha, a esquerda da borda pode ser o cabecalho do mes; a direita e observacao
+    saida = []
+    for linha in linhas:
+        linha.sort(key=lambda p: p[0])
+        esquerda = " ".join(p[4] for p in linha if p[0] <= borda)
+        direita = " ".join(p[4] for p in linha if p[0] > borda)
+        cabecalho = _CABECALHO_MES.match(" ".join(esquerda.split()))
+        saida.append((f"{cabecalho.group(1).upper()} {cabecalho.group(2)}" if cabecalho else None, direita))
+    return saida
+
 def extract_calendar_text(doc):
-    # le os blocos por posicao (top-down, esquerda-direita) e prefixa CADA linha de
-    # observacao com o mes/ano da secao corrente, corrigindo a ordem embaralhada do PDF;
-    # descarta a grade de dias (linhas so com numeros/dias da semana)
+    # le cada pagina por posicao e prefixa CADA linha de observacao com o mes/ano da secao corrente,
+    # corrigindo a ordem embaralhada do PDF; descarta a grade de dias. pagina com grade e lida pelas
+    # palavras (_linhas_da_pagina_com_grade); a sem grade, pelos blocos de texto
     dias_semana = {"dom", "seg", "ter", "qua", "qui", "sex", "sáb", "sab"}
     saida = []
     secao_atual = None
     for page in doc:
+        por_palavra = _linhas_da_pagina_com_grade(page)
+        if por_palavra is not None:
+            for cabecalho, texto in por_palavra:
+                if cabecalho:
+                    secao_atual = cabecalho
+                if texto:
+                    saida.append(f"({secao_atual}) {texto}" if secao_atual else texto)
+            continue
         blocks = sorted(page.get_text("blocks"), key=lambda b: (round(b[1]), round(b[0])))
         for b in blocks:
             bloco = b[4].translate(_MARCAS_DIRECAO).strip()

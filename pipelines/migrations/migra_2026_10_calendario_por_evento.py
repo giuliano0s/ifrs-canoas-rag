@@ -76,7 +76,12 @@ def _calendarios_na_base():
 
 
 def _texto_do_documento(chunks):
-    # une as linhas dos chunks sobrepostos na ordem do documento, sem repetir a sobreposicao
+    # une as linhas dos chunks sobrepostos na ordem do documento, sem repetir a sobreposicao. chunk ja
+    # fatiado por evento traz o evento em texto_busca (o text e o bloco do mes, com cabecalho)
+    if chunks and chunks[0]["metadata"].get("texto_busca"):
+        md = chunks[0]["metadata"]
+        eventos = list(dict.fromkeys(c["metadata"]["texto_busca"].split(": ", 1)[1] for c in chunks))
+        return f"Ano do calendário: {md.get('published_at')}\n" + "\n".join(eventos)
     linhas = []
     for c in chunks:
         for ln in c["metadata"].get("text", "").split("\n"):

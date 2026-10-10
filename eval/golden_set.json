@@ -653,9 +653,9 @@
         "https://ifrs.edu.br/canoas/wp-content/uploads/sites/6/2026/03/RelatorioCPA-2025-RelatorioCPA-2025-12.pdf"
       ],
       "answer_spans": [
-        "F111"
+        "Prédio F"
       ],
-      "notas": "Caso da telemetria (escopo). Antes do fix, o agente listava 'Torre Norte / Bloco Usinagem / Vestuário' vindos do PDI IFRS 2024-2028 (drive 1Sd1P), que não é de Canoas. Fix: ancoragem da query em 'Campus Canoas' (traz docs de Canoas ao pool) + penalidade de rerank para campus_scope='outro' (PDI tagueado). Depois: 'salas dos professores no Prédio F', citando RelatorioCPA-2025 + PPC-2025. answer_span vazio: o fato certo é 'ser de Canoas', não uma string fixa; a Fase 6 (comportamento/escopo) e a citação (gold_url de Canoas) medem isso. Curar um span de Canoas depois. [Curadoria: gold_url primario = planilha de atendimento, que traz as salas dos professores no bloco F (ex: sala F111); o RelatorioCPA so cita Predio F de passagem.]",
+      "notas": "Caso da telemetria (escopo). Antes do fix, o agente listava 'Torre Norte / Bloco Usinagem / Vestuário' vindos do PDI IFRS 2024-2028 (drive 1Sd1P), que não é de Canoas. Fix: ancoragem da query em 'Campus Canoas' (traz docs de Canoas ao pool) + penalidade de rerank para campus_scope='outro' (PDI tagueado). Depois: 'salas dos professores no Prédio F', citando RelatorioCPA-2025 + PPC-2025. answer_span vazio: o fato certo é 'ser de Canoas', não uma string fixa; a Fase 6 (comportamento/escopo) e a citação (gold_url de Canoas) medem isso. Curar um span de Canoas depois. [Curadoria: gold_url primario = planilha de atendimento, que traz as salas dos professores no bloco F (ex: sala F111); o RelatorioCPA so cita Predio F de passagem.] [10/10/2026: answer_span re-curado de \"F111\" (sala arbitrária de um professor) para \"Prédio F\", o fato que a pergunta pede, literal no RelatorioCPA-2025.]",
       "origem": "producao",
       "trace_id": "122ddfb1-32d4-46a4-8071-80d16b37b0a8"
     },
@@ -732,16 +732,19 @@
         "qual a grade de horário das aulas do próximo semestre?"
       ],
       "tipo": "pergunta_vaga: falta o curso/turma (turno 1 de esclarecimento)",
-      "acao_esperada": "perguntar",
+      "acao_esperada": [
+        "perguntar",
+        "buscar"
+      ],
       "criterios_query": {
         "deve_conter": [],
         "nao_deve_conter": []
       },
       "existe_na_base": "parcial",
-      "resposta_esperada": "Pedir o curso/turma (o horário depende do curso). Este é o turno de esclarecimento. Observação de conteúdo: o horário de cada aula (dia + hora) EXISTE nas grades (PDFs aSc), mas a ingestão atual descarta dia/hora ao estruturar, então mesmo com o curso o agente ainda não entrega a hora até a reestruturação.",
+      "resposta_esperada": "Pode informar os horários gerais de início de cada turno, se vierem dos documentos, mas tem de terminar perguntando se o estudante quer especificar: curso e turma, uma disciplina ou uma aula fora do horário padrão. Errado: apresentar o horário geral de um turno como se fosse a grade de um curso, ou não pedir o que especificar.",
       "gold_urls": [],
       "answer_spans": [],
-      "notas": "Caso da telemetria. Em produção o agente pediu o curso (CORRETO), por isso acao_esperada=perguntar. O fix real do caso é de INGESTÃO: a grade (aSc TimeTables) tem dia+hora (ex '7:10-8:00', 'Seg Ter Qua'), mas structure_schedule_text lineariza e perde. Fix provado (find_tables recupera o grid 21x9; LLM emite frases granulares com dia+hora+prof+sala), PENDENTE de re-embed (extração ainda ruidosa; não injetar na base viva sem revisão). Após o fix, adicionar um caso turno-2 'que horas é a aula X do curso Y' com existe_na_base=true e answer_span do horário.",
+      "notas": "Caso da telemetria. Desde 10/10/2026 (decisão do responsável), dar os horários gerais de turno é aceitável, desde que a resposta termine perguntando o que especificar; por isso acao_esperada aceita perguntar ou buscar. As grades estão na base lidas pelas coordenadas do PDF desde 07/10/2026, com dia, hora e sala por professor; falta um caso turno-2 'que horas é a aula X do curso Y' com answer_span do horário.",
       "origem": "producao",
       "trace_id": "c83d410d-132d-4bed-9f07-8cddac23a48f"
     }
