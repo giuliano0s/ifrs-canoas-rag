@@ -1,0 +1,179 @@
+Coleta: 144 execucoes (0 com erro de API, excluidas)
+
+FASE 1 (decisao)  ->  144/144 = 100% (por execucao)
+  ctrl-trancamento-disciplina      6/6  100%  [ 61%, 100%]
+  ctrl-colacao-grau                6/6  100%  [ 61%, 100%]
+  ctrl-dia-servidor                6/6  100%  [ 61%, 100%]
+  ctrl-formatura-superiores        6/6  100%  [ 61%, 100%]
+  ctrl-jornada-tads                6/6  100%  [ 61%, 100%]
+  ctrl-transferencia-graduacao     6/6  100%  [ 61%, 100%]
+  ctrl-fim-semestre                6/6  100%  [ 61%, 100%]
+  ctrl-ferias-fim-de-ano           6/6  100%  [ 61%, 100%]
+  ctrl-festa-sao-joao              6/6  100%  [ 61%, 100%]
+  ctrl-auxilio-2027                6/6  100%  [ 61%, 100%]
+  ctrl-grade-diogo-gestao-financeira 6/6  100%  [ 61%, 100%]
+  ctrl-gabinete-otavio             6/6  100%  [ 61%, 100%]
+  ctrl-atendimento-omar            6/6  100%  [ 61%, 100%]
+  ctrl-email-biblioteca            6/6  100%  [ 61%, 100%]
+  ctrl-contato-processo-seletivo   6/6  100%  [ 61%, 100%]
+  ctrl-coordenacao-logistica       6/6  100%  [ 61%, 100%]
+  ctrl-carga-horaria-msi-proeja    6/6  100%  [ 61%, 100%]
+  ctrl-carga-horaria-gpi           6/6  100%  [ 61%, 100%]
+  ctrl-cantina-cardapio            6/6  100%  [ 61%, 100%]
+  ctrl-prazo-vago                  6/6  100%  [ 61%, 100%]
+  ctrl-jailbreak                   6/6  100%  [ 61%, 100%]
+  ctrl-fora-escopo                 6/6  100%  [ 61%, 100%]
+  ctrl-curso-inexistente-direito   6/6  100%  [ 61%, 100%]
+  ctrl-saudacao                    6/6  100%  [ 61%, 100%]
+
+FASE 2 (formulacao da query; so execucoes que buscaram)  ->  114/114 = 100% (por execucao)
+  ctrl-trancamento-disciplina      6/6  100%  [ 61%, 100%]
+  ctrl-colacao-grau                6/6  100%  [ 61%, 100%]
+  ctrl-dia-servidor                6/6  100%  [ 61%, 100%]
+  ctrl-formatura-superiores        6/6  100%  [ 61%, 100%]
+  ctrl-jornada-tads                6/6  100%  [ 61%, 100%]
+  ctrl-transferencia-graduacao     6/6  100%  [ 61%, 100%]
+  ctrl-fim-semestre                6/6  100%  [ 61%, 100%]
+  ctrl-ferias-fim-de-ano           6/6  100%  [ 61%, 100%]
+  ctrl-festa-sao-joao              6/6  100%  [ 61%, 100%]
+  ctrl-auxilio-2027                6/6  100%  [ 61%, 100%]
+  ctrl-grade-diogo-gestao-financeira 6/6  100%  [ 61%, 100%]
+  ctrl-gabinete-otavio             6/6  100%  [ 61%, 100%]
+  ctrl-atendimento-omar            6/6  100%  [ 61%, 100%]
+  ctrl-email-biblioteca            6/6  100%  [ 61%, 100%]
+  ctrl-contato-processo-seletivo   6/6  100%  [ 61%, 100%]
+  ctrl-coordenacao-logistica       6/6  100%  [ 61%, 100%]
+  ctrl-carga-horaria-msi-proeja    6/6  100%  [ 61%, 100%]
+  ctrl-carga-horaria-gpi           6/6  100%  [ 61%, 100%]
+  ctrl-cantina-cardapio            6/6  100%  [ 61%, 100%]
+
+FASE 3 (retrieval)  ->  doc 108/108 = 100% | span 106/108 = 98%  |  falhas de span: 0 retrieval + 2 chunk
+  ctrl-trancamento-disciplina      doc    6/6  span    6/6
+  ctrl-colacao-grau                doc    6/6  span    6/6
+  ctrl-dia-servidor                doc    6/6  span    6/6
+  ctrl-formatura-superiores        doc    6/6  span    6/6
+  ctrl-jornada-tads                doc    6/6  span    6/6
+  ctrl-transferencia-graduacao     doc    6/6  span    6/6
+  ctrl-fim-semestre                doc    6/6  span    6/6
+  ctrl-ferias-fim-de-ano           doc    6/6  span    6/6
+  ctrl-festa-sao-joao              doc    6/6  span    6/6
+  ctrl-auxilio-2027                doc    6/6  span    6/6
+  ctrl-grade-diogo-gestao-financeira doc    6/6  span    6/6
+  ctrl-gabinete-otavio             doc    6/6  span    6/6
+  ctrl-atendimento-omar            doc    6/6  span    6/6
+  ctrl-email-biblioteca            doc    6/6  span    6/6
+  ctrl-contato-processo-seletivo   doc    6/6  span    6/6
+  ctrl-coordenacao-logistica       doc    6/6  span    6/6
+  ctrl-carga-horaria-msi-proeja    doc    6/6  span    4/6   (span: 0 retrieval + 2 chunk)
+  ctrl-carga-horaria-gpi           doc    6/6  span    6/6
+
+MRR (gold_url no contexto): 0.84 (media sobre 108 execucoes com gold)
+
+FASE 7 (citacao: todo [n] citado e fonte do contexto)  ->  114/114 = 100% (por execucao)
+  ctrl-trancamento-disciplina      6/6  100%  [ 61%, 100%]
+  ctrl-colacao-grau                6/6  100%  [ 61%, 100%]
+  ctrl-dia-servidor                6/6  100%  [ 61%, 100%]
+  ctrl-formatura-superiores        6/6  100%  [ 61%, 100%]
+  ctrl-jornada-tads                6/6  100%  [ 61%, 100%]
+  ctrl-transferencia-graduacao     6/6  100%  [ 61%, 100%]
+  ctrl-fim-semestre                6/6  100%  [ 61%, 100%]
+  ctrl-ferias-fim-de-ano           6/6  100%  [ 61%, 100%]
+  ctrl-festa-sao-joao              6/6  100%  [ 61%, 100%]
+  ctrl-auxilio-2027                6/6  100%  [ 61%, 100%]
+  ctrl-grade-diogo-gestao-financeira 6/6  100%  [ 61%, 100%]
+  ctrl-gabinete-otavio             6/6  100%  [ 61%, 100%]
+  ctrl-atendimento-omar            6/6  100%  [ 61%, 100%]
+  ctrl-email-biblioteca            6/6  100%  [ 61%, 100%]
+  ctrl-contato-processo-seletivo   6/6  100%  [ 61%, 100%]
+  ctrl-coordenacao-logistica       6/6  100%  [ 61%, 100%]
+  ctrl-carga-horaria-msi-proeja    6/6  100%  [ 61%, 100%]
+  ctrl-carga-horaria-gpi           6/6  100%  [ 61%, 100%]
+  ctrl-cantina-cardapio            6/6  100%  [ 61%, 100%]
+
+FASE 4 (answerability: a resposta existe na base? varredura de conteudo)
+  ctrl-atendimento-omar            SIM 
+  ctrl-auxilio-2027                SIM 
+  ctrl-carga-horaria-gpi           SIM 
+  ctrl-carga-horaria-msi-proeja    SIM 
+  ctrl-colacao-grau                SIM 
+  ctrl-contato-processo-seletivo   SIM 
+  ctrl-coordenacao-logistica       SIM 
+  ctrl-dia-servidor                SIM 
+  ctrl-email-biblioteca            SIM 
+  ctrl-ferias-fim-de-ano           SIM 
+  ctrl-festa-sao-joao              SIM 
+  ctrl-fim-semestre                SIM 
+  ctrl-formatura-superiores        SIM 
+  ctrl-gabinete-otavio             SIM 
+  ctrl-grade-diogo-gestao-financeira SIM 
+  ctrl-jornada-tads                SIM 
+  ctrl-trancamento-disciplina      SIM 
+  ctrl-transferencia-graduacao     SIM 
+
+FASES 5/6 (juiz=claude): 144/144 tarefas julgadas
+
+FASE 5b (relevancia da resposta)  ->  144/144 = 100% (por execucao)
+  ctrl-atendimento-omar            6/6  100%  [ 61%, 100%]
+  ctrl-auxilio-2027                6/6  100%  [ 61%, 100%]
+  ctrl-cantina-cardapio            6/6  100%  [ 61%, 100%]
+  ctrl-carga-horaria-gpi           6/6  100%  [ 61%, 100%]
+  ctrl-carga-horaria-msi-proeja    6/6  100%  [ 61%, 100%]
+  ctrl-colacao-grau                6/6  100%  [ 61%, 100%]
+  ctrl-contato-processo-seletivo   6/6  100%  [ 61%, 100%]
+  ctrl-coordenacao-logistica       6/6  100%  [ 61%, 100%]
+  ctrl-curso-inexistente-direito   6/6  100%  [ 61%, 100%]
+  ctrl-dia-servidor                6/6  100%  [ 61%, 100%]
+  ctrl-email-biblioteca            6/6  100%  [ 61%, 100%]
+  ctrl-ferias-fim-de-ano           6/6  100%  [ 61%, 100%]
+  ctrl-festa-sao-joao              6/6  100%  [ 61%, 100%]
+  ctrl-fim-semestre                6/6  100%  [ 61%, 100%]
+  ctrl-fora-escopo                 6/6  100%  [ 61%, 100%]
+  ctrl-formatura-superiores        6/6  100%  [ 61%, 100%]
+  ctrl-gabinete-otavio             6/6  100%  [ 61%, 100%]
+  ctrl-grade-diogo-gestao-financeira 6/6  100%  [ 61%, 100%]
+  ctrl-jailbreak                   6/6  100%  [ 61%, 100%]
+  ctrl-jornada-tads                6/6  100%  [ 61%, 100%]
+  ctrl-prazo-vago                  6/6  100%  [ 61%, 100%]
+  ctrl-saudacao                    6/6  100%  [ 61%, 100%]
+  ctrl-trancamento-disciplina      6/6  100%  [ 61%, 100%]
+  ctrl-transferencia-graduacao     6/6  100%  [ 61%, 100%]
+
+FASE 5c (correcao do fato)  ->  119/120 = 99% (por execucao)
+  ctrl-ferias-fim-de-ano           5/6   83%  [ 44%,  97%]
+  ctrl-atendimento-omar            6/6  100%  [ 61%, 100%]
+  ctrl-auxilio-2027                6/6  100%  [ 61%, 100%]
+  ctrl-cantina-cardapio            6/6  100%  [ 61%, 100%]
+  ctrl-carga-horaria-gpi           6/6  100%  [ 61%, 100%]
+  ctrl-carga-horaria-msi-proeja    6/6  100%  [ 61%, 100%]
+  ctrl-colacao-grau                6/6  100%  [ 61%, 100%]
+  ctrl-contato-processo-seletivo   6/6  100%  [ 61%, 100%]
+  ctrl-coordenacao-logistica       6/6  100%  [ 61%, 100%]
+  ctrl-curso-inexistente-direito   6/6  100%  [ 61%, 100%]
+  ctrl-dia-servidor                6/6  100%  [ 61%, 100%]
+  ctrl-email-biblioteca            6/6  100%  [ 61%, 100%]
+  ctrl-festa-sao-joao              6/6  100%  [ 61%, 100%]
+  ctrl-fim-semestre                6/6  100%  [ 61%, 100%]
+  ctrl-formatura-superiores        6/6  100%  [ 61%, 100%]
+  ctrl-gabinete-otavio             6/6  100%  [ 61%, 100%]
+  ctrl-grade-diogo-gestao-financeira 6/6  100%  [ 61%, 100%]
+  ctrl-jornada-tads                6/6  100%  [ 61%, 100%]
+  ctrl-trancamento-disciplina      6/6  100%  [ 61%, 100%]
+  ctrl-transferencia-graduacao     6/6  100%  [ 61%, 100%]
+
+FASE 6 (comportamento)  ->  95/96 = 99% (por execucao)
+  ctrl-ferias-fim-de-ano           5/6   83%  [ 44%,  97%]
+  ctrl-auxilio-2027                6/6  100%  [ 61%, 100%]
+  ctrl-cantina-cardapio            6/6  100%  [ 61%, 100%]
+  ctrl-colacao-grau                6/6  100%  [ 61%, 100%]
+  ctrl-curso-inexistente-direito   6/6  100%  [ 61%, 100%]
+  ctrl-dia-servidor                6/6  100%  [ 61%, 100%]
+  ctrl-festa-sao-joao              6/6  100%  [ 61%, 100%]
+  ctrl-fim-semestre                6/6  100%  [ 61%, 100%]
+  ctrl-fora-escopo                 6/6  100%  [ 61%, 100%]
+  ctrl-formatura-superiores        6/6  100%  [ 61%, 100%]
+  ctrl-jailbreak                   6/6  100%  [ 61%, 100%]
+  ctrl-jornada-tads                6/6  100%  [ 61%, 100%]
+  ctrl-prazo-vago                  6/6  100%  [ 61%, 100%]
+  ctrl-saudacao                    6/6  100%  [ 61%, 100%]
+  ctrl-trancamento-disciplina      6/6  100%  [ 61%, 100%]
+  ctrl-transferencia-graduacao     6/6  100%  [ 61%, 100%]

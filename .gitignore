@@ -41,4 +41,6 @@ backups/
 eval/runs/coleta.jsonl
 eval/runs/coleta_baseline_*.jsonl
 eval/runs/coleta_producao.jsonl
+eval/runs/coleta_controle*.jsonl
 eval/runs/juiz_tarefas.jsonl
+eval/runs/juiz_tarefas_controle*.jsonl

@@ -9,8 +9,9 @@
 
 Uso:  python -m eval.run_eval coletar    (usa EVAL_N, EVAL_THROTTLE)
       python -m eval.run_eval validar
+      EVAL_CONJUNTO=controle roda o conjunto de controle (eval/controle_set.json) com arquivos proprios.
 """
-import os, sys, re, json, time, unicodedata, hashlib
+import os, sys, re, json, time, unicodedata
 from datetime import datetime
 
 # console em UTF-8 (Windows cp1252 quebra acento/emoji)
@@ -25,10 +26,14 @@ if _RAIZ not in sys.path:
     sys.path.insert(0, _RAIZ)
 
 _DIR   = os.path.dirname(__file__)
-GOLDEN = os.path.join(_DIR, "golden_set.json")
-COLETA = os.path.join(_DIR, "runs", "coleta.jsonl")
-RESUMO = os.path.join(_DIR, "runs", "ultimo_resumo.txt")
-RELATORIO = os.path.join(_DIR, "runs", "relatorio.md")
+# conjunto avaliado (EVAL_CONJUNTO): "golden" (default) ou "controle", o held-out que nunca ajusta prompt
+# nem codigo. cada conjunto tem coleta, relatorio e vereditos proprios (sufixo no nome do arquivo)
+CONJUNTO = os.environ.get("EVAL_CONJUNTO", "golden").lower()
+_SUF   = "" if CONJUNTO == "golden" else f"_{CONJUNTO}"
+GOLDEN = os.path.join(_DIR, "golden_set.json" if CONJUNTO == "golden" else f"{CONJUNTO}_set.json")
+COLETA = os.path.join(_DIR, "runs", f"coleta{_SUF}.jsonl")
+RESUMO = os.path.join(_DIR, "runs", f"ultimo_resumo{_SUF}.txt")
+RELATORIO = os.path.join(_DIR, "runs", f"relatorio{_SUF}.md")
 CURSOS = os.path.join(_RAIZ, "data", "info", "cursos_atuais.json")
 PROMPT = os.path.join(_RAIZ, "data", "info", "agente-ifrs.txt")
 
@@ -42,8 +47,10 @@ THROTTLE = float(os.environ.get("EVAL_THROTTLE", "4"))
 #   "gemini" -> o script chama o Gemini inline e preenche os vereditos sozinho.
 JUDGE       = os.environ.get("EVAL_JUDGE", "claude").lower()
 JUDGE_MODEL = os.environ.get("EVAL_JUDGE_MODEL", "gemini-2.5-flash")
-TAREFAS     = os.path.join(_DIR, "runs", "juiz_tarefas.jsonl")
-VEREDITOS   = os.path.join(_DIR, "runs", "juiz_vereditos.jsonl")
+TAREFAS     = os.path.join(_DIR, "runs", f"juiz_tarefas{_SUF}.jsonl")
+VEREDITOS   = os.path.join(_DIR, "runs", f"juiz_vereditos{_SUF}.jsonl")
+# rubrica com as instrucoes do agente, lida pelo juiz por subagente
+RUBRICA_JUIZ = os.path.join(_DIR, "runs", "juiz_rubrica.txt")
 
 # carga do golden set
 def carregar_casos():
@@ -82,13 +89,13 @@ def _executar(case_id, inp, run, data_referencia=None, stamp=None):
     return rec
 
 def coletar(n=1, filtro_ids=None):
-    from rag.chain import MODEL
+    from rag.chain import MODEL, PROMPT_VERSAO
     casos = carregar_casos()
     alvo  = [c for c in casos if not filtro_ids or c["id"] in filtro_ids]
     alvo_ids = {c["id"] for c in alvo}
-    # carimbo de versao do agente em cada registro (rastreabilidade: qual config gerou o dado)
-    prompt_versao = hashlib.sha256(open(PROMPT, encoding="utf-8").read().encode("utf-8")).hexdigest()[:12]
-    stamp = {"modelo": MODEL, "prompt_versao": prompt_versao, "ts": datetime.now().isoformat(timespec="seconds")}
+    # carimbo de versao do agente em cada registro (rastreabilidade: qual config gerou o dado). a versao e
+    # a do prompt carregado pelo agente, nao a do arquivo no disco no momento da coleta
+    stamp = {"modelo": MODEL, "prompt_versao": PROMPT_VERSAO, "ts": datetime.now().isoformat(timespec="seconds")}
     # merge: ao coletar so um subconjunto (filtro_ids), preserva os registros dos casos NAO
     # filtrados que ja estao na coleta (recoletar a biblioteca nao apaga a coleta dos outros).
     preservados = []
@@ -340,9 +347,9 @@ _RUBRICA = (
     "NÃO precisa estar no contexto; não penalize fidelidade por isso, ainda mais quando a resposta admite "
     "honestamente que os documentos não cobrem o ponto. EXCEÇÃO: a ressalva de que um dado pode estar "
     "desatualizado (por vir de fonte de ano anterior) é meta-comentário legítimo e NÃO precisa estar "
-    "ancorada no contexto; não penalize fidelidade por ela. EXCEÇÃO: o canal \"Sor Pinto\" do "
-    "professor Rafael Coimbra Pinto no YouTube vem do próprio prompt do assistente (informação "
-    "intencional) e NÃO precisa estar no contexto.\n"
+    "ancorada no contexto; não penalize fidelidade por ela. EXCEÇÃO: fato sobre o campus que as "
+    "INSTRUÇÕES DO ASSISTENTE (o prompt que ele recebe, enviado junto) afirmam vale como fonte e NÃO "
+    "precisa estar no contexto; regra de comportamento ou exemplo das instruções não é fato.\n"
     "- relevancia: a resposta trata do que foi perguntado, sem desviar do assunto.\n"
     "- correcao: o fato central da resposta bate com a REFERÊNCIA (que NÃO é literal; a resposta "
     "pode ser mais completa). false se contradiz ou erra o fato.\n"
@@ -354,10 +361,20 @@ _RUBRICA = (
     '"justificativa" (1 frase). Exemplo: {"relevancia": true, "correcao": false, "justificativa": "..."}'
 )
 
+def instrucoes_do_assistente(data_atual=None):
+    # o prompt que o agente recebe, com a lista de cursos: fato que ele afirma vale como fonte para o juiz
+    try:
+        cursos = ", ".join(json.load(open(CURSOS, encoding="utf-8"))["cursos"])
+    except Exception:
+        cursos = "(lista indisponivel)"
+    with open(PROMPT, encoding="utf-8") as f:
+        return f.read().format(data_atual=data_atual or "(data da execução)", cursos=cursos)
+
 def _prompt_juiz(t):
     ctx = "\n---\n".join(t["contexto"]) if t["contexto"] else "nenhum"
     return (
         f"{_RUBRICA}\n\n"
+        f"INSTRUÇÕES DO ASSISTENTE (o prompt que ele recebe):\n{instrucoes_do_assistente(t.get('data_atual'))}\n\n"
         f"PERGUNTA: {t['input']}\n\n"
         f"RESPOSTA DO ASSISTENTE: {t['resposta']}\n\n"
         f"CONTEXTO (trechos recuperados):\n{ctx}\n\n"
@@ -546,6 +563,8 @@ def gerar_relatorio(f1, f2, f3, rrs, f4d, dest, f7, vereditos, n_exec, n_erros, 
 
     # cabecalho + configuracao da coleta (rastreabilidade da prova)
     L = ["# Relatório da bateria de avaliação — Assistente IFRS Campus Canoas", ""]
+    if CONJUNTO != "golden":
+        L += [f"Conjunto: `{os.path.basename(GOLDEN)}` (controle held-out: perguntas que nunca ajustaram prompt nem código).", ""]
     L += ["## Configuração da coleta", ""]
     L.append(f"- Execuções: {n_exec} ({n_erros} com erro de API, excluídas) | "
              f"{meta['n_casos']} casos, {meta['n_inputs']} inputs | n={meta['n_por_input']} execuções por input.")
@@ -794,6 +813,9 @@ def validar():
     with open(TAREFAS, "w", encoding="utf-8") as f:
         for t in tarefas:
             f.write(json.dumps(t, ensure_ascii=False) + "\n")
+    with open(RUBRICA_JUIZ, "w", encoding="utf-8") as f:
+        f.write(f"{_RUBRICA}\n\nINSTRUÇÕES DO ASSISTENTE (o prompt que ele recebe; a DATA ATUAL de cada execução "
+                f"vem na tarefa):\n{instrucoes_do_assistente('(ver a data de cada tarefa)')}\n")
     vereditos = _carregar_vereditos()
     if JUDGE == "gemini":
         faltam = [t for t in tarefas if _chave(t) not in vereditos]
