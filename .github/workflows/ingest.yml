@@ -5,7 +5,9 @@ name: Ingest incremental
 
 on:
   schedule:
-    - cron: "0 6 * * 1"    # toda segunda 06:00 UTC (03:00 BRT), horario de baixo trafego
+    # todo dia 05:37 UTC (02:37 BRT). minuto fora da hora cheia porque o GitHub atrasa os agendamentos
+    # da hora cheia: o de 06:00 UTC comecou entre 11:02 e 13:53 UTC nas ultimas execucoes
+    - cron: "37 5 * * *"
   workflow_dispatch: {}     # gatilho manual (usado para testar o anti-bot no runner)
 
 # nunca deixa duas ingestoes rodando ao mesmo tempo
@@ -54,5 +56,6 @@ jobs:
             echo "Snapshot sem mudanca; nada a commitar."
           else
             git commit -m "ingest automatizado: atualiza snapshot + cursos"
+            git pull --rebase
             git push
           fi
