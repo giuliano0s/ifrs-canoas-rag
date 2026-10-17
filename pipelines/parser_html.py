@@ -12,12 +12,21 @@ from pipelines.config import HEADERS, PAGES_PARSED_PATH, PARSED_DIR, SAVE_INTERV
 from pipelines.dates import get_published_at
 
 
+def _email_cloudflare(codigo):
+    # endereco que o Cloudflare grava em hexadecimal, cifrado por XOR com o primeiro byte; None se invalido
+    try:
+        dados = bytes.fromhex(codigo)
+        return "".join(chr(b ^ dados[0]) for b in dados[1:]) or None
+    except (ValueError, IndexError):
+        return None
+
 def extract_page_content(soup):
-    # titulo + texto principal (main[role=main] sem ruidos). Retorna (title, text|None).
+    # titulo + texto principal (o <main> sem ruidos). Retorna (title, text|None).
     # usado pelo crawler (para o source_hash) e pelo parse_html_page, com a MESMA logica.
+    # o tema do site do campus marca o <main> com role=main; o do portal de ingresso, nao
     title_tag = soup.find("title")
     title     = title_tag.get_text(strip=True) if title_tag else ""
-    main = soup.find("main", role="main")
+    main = soup.find("main", role="main") or soup.find("main")
     if not main:
         return title, None
     for tag in main.find_all("div", class_="ultimos-posts"):
@@ -26,6 +35,12 @@ def extract_page_content(soup):
         tag.decompose()
     for tag in main.find_all("a", class_="sr-only"):
         tag.decompose()
+
+    # e-mail escondido pelo Cloudflare: o texto leva o endereco que o navegador mostra, no lugar de "[email protected]"
+    for tag in main.select("[data-cfemail]"):
+        email = _email_cloudflare(tag["data-cfemail"])
+        if email:
+            tag.replace_with(email)
     return title, main.get_text(separator="\n", strip=True)
 
 def parse_html_page(url, headers=HEADERS):

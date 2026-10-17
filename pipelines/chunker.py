@@ -7,6 +7,7 @@ doc-nível, consumido pelo rerank/cap do serving.
 
 import json
 import re
+from collections import Counter
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -135,6 +136,62 @@ def chunks_de_calendario(text, metadata):
     return [{**metadata, "text": blocos[_mes_do_evento(evento, ano)], "texto_busca": f"{cabecalho}: {evento}"}
             for evento in eventos]
 
+# linha que e so uma data ou o inicio de um periodo ("09/04/2026", "09/04 a", "21/04/2026")
+_DATA_EVENTO = re.compile(r"^\d{2}/\d{2}(?:/\d{4})?(?:\s+a)?$")
+MIN_EVENTOS_CRONOGRAMA = 8
+
+def eventos_de_cronograma(text):
+    """Le os eventos de um cronograma, em que cada data ou periodo ocupa linhas proprias antes do evento.
+
+    Args:
+        text: texto extraido da pagina.
+
+    Returns:
+        Lista de (datas, linhas): a data ou o periodo do evento ("09/04 a 21/04/2026") e as linhas de texto
+        dele ate a proxima data.
+    """
+    eventos, datas = [], []
+    for linha in (ln.strip() for ln in text.split("\n")):
+        if not linha:
+            continue
+        if _DATA_EVENTO.match(linha):
+            datas.append(linha)
+        elif datas:
+            eventos.append((" ".join(datas), [linha]))
+            datas = []
+        elif eventos:
+            eventos[-1][1].append(linha)
+    return eventos
+
+def chunks_de_cronograma(text, title, metadata):
+    """Fatia um cronograma em um chunk por evento.
+
+    Cada chunk e buscado pela frase do proprio evento (texto_busca: o titulo da pagina, a data e o nome do
+    evento) e entregue ao contexto com o cronograma inteiro (text), como os eventos do calendario: a pergunta
+    sobre uma etapa casa com o evento, e o modelo recebe junto as outras datas do processo.
+
+    Args:
+        text: texto extraido da pagina.
+        title: titulo da pagina, que nomeia o processo ("Cronograma - Processo Seletivo IFRS 2026/2").
+        metadata: metadata comum da pagina.
+
+    Returns:
+        Lista de chunks, todos com o mesmo text; vazia quando a pagina tem menos de MIN_EVENTOS_CRONOGRAMA eventos.
+    """
+    eventos = eventos_de_cronograma(text)
+    if len(eventos) < MIN_EVENTOS_CRONOGRAMA:
+        return []
+
+    # linha que abre varios eventos e rotulo de trilha ("PS Regular"), e o nome do evento vem na seguinte
+    aberturas = Counter(linhas[0] for _, linhas in eventos)
+    rotulos = {linha for linha, n in aberturas.items() if n >= 3}
+    cronograma = f"{title}\n{text}"
+    chunks = []
+    for datas, linhas in eventos:
+        nome = " ".join(linhas[:2]) if linhas[0] in rotulos and len(linhas) > 1 else linhas[0]
+        chunks.append({**metadata, "text": cronograma, "texto_busca": f"{title}: {datas} {nome}"})
+    return chunks
+
 def chunks_de_pdf(pdf):
     # chunks de um PDF parseado, com o metadata que o ingest persiste
     url = to_drive_view_url(pdf["source_url"])
@@ -207,7 +264,11 @@ def run_chunker(pages_parsed, pdfs_parsed, sheets_parsed):
             "campus_scope": classify_campus_scope(page["title"], page["text"], page["source_url"]),
             "curso_escopo": classify_curso_escopo(page["title"], page["text"], page["source_url"]),
         }
-        chunks.extend(chunk_document(page["text"], metadata))
+        # cronograma (de processo seletivo, de matricula) vira um chunk por evento; o resto, o fatiamento por tamanho
+        cronograma = []
+        if "cronograma" in (page["source_url"] + " " + page["title"]).lower():
+            cronograma = chunks_de_cronograma(page["text"], page["title"], metadata)
+        chunks.extend(cronograma or chunk_document(page["text"], metadata))
 
     # processa PDFs (ignora escaneados)
     for pdf in pdfs_parsed:

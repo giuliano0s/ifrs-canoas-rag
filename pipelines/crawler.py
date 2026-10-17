@@ -15,12 +15,12 @@ from urllib.parse import urljoin
 import gdown
 from bs4 import BeautifulSoup
 
-from pipelines.config import (HEADERS, BASE_URL, INCLUDE_SCANNED, PAGES_PATH, PDFS_PATH,
+from pipelines.config import (HEADERS, BASE_URL, INCLUDE_SCANNED, MIN_CHARS, PAGES_PATH, PDFS_PATH,
                               PII_PATH, RAW_DIR, RECHECK_PII, REINGEST, REPARSE, SCANNED_PATH, SHEETS_FALHAS,
                               SHEETS_PATH, WHITELIST_PATH, fetch)
 from pipelines.hashing import source_hash
 from pipelines.parser_html import extract_page_content
-from pipelines.urls import (build_download_url, gsheet_csv_url, is_drive_link,
+from pipelines.urls import (build_download_url, canonical_url, gsheet_csv_url, is_drive_link,
                             is_drive_url, is_gsheet_link, is_pdf_by_extension,
                             is_valid_page, should_ignore, to_drive_view_url)
 
@@ -176,11 +176,11 @@ def run_crawler(estado):
 
         soup = BeautifulSoup(response.text, "html.parser")
 
-        # classifica a pagina HTML pelo texto extraido (ignora listagens, que sao so navegacao)
-        if not ("/page/" in url or "/category/" in url):
+        # classifica a pagina HTML pelo texto extraido (ignora listagens e pagina sem conteudo, que sao so navegacao)
+        if not any(listagem in url for listagem in ("/page/", "/category/", "/tag/")):
             pages_all.append(url)
             title, text = extract_page_content(soup)
-            if text is not None:
+            if text is not None and len(text) >= MIN_CHARS:
                 sh = source_hash(text)
                 if _duplicata(url, sh, hash_base, vistos_hash):
                     n_dup += 1
@@ -195,7 +195,7 @@ def run_crawler(estado):
         # segue os links (sempre, para descobrir filhos novos); coleta planilhas e PDFs do Drive
         novos = 0
         for tag in soup.find_all("a", href=True):
-            full_url = urljoin(url, tag["href"]).split("#")[0]
+            full_url = canonical_url(urljoin(url, tag["href"]).split("#")[0])
             if full_url not in whitelist and should_ignore(full_url):
                 continue
             if full_url in visited or full_url in queued:

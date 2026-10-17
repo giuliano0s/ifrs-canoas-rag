@@ -175,8 +175,9 @@ def _date_score(hit):
     try:
         year = int(raw)
         # piso 0: um doc antigo (ano < MIN_YEAR) fica neutro, nunca com score NEGATIVO (que o
-        # empurraria para baixo de forma artificial). recencia vira contribuicao em [0, 1].
-        return max(0.0, (year - MIN_YEAR) / (max_year - MIN_YEAR))
+        # empurraria para baixo de forma artificial). teto 1: doc datado no ano seguinte (o processo
+        # seletivo do proximo ano) empata com o do ano corrente. recencia vira contribuicao em [0, 1].
+        return min(1.0, max(0.0, (year - MIN_YEAR) / (max_year - MIN_YEAR)))
     except (ValueError, TypeError):
         return 0.5
 

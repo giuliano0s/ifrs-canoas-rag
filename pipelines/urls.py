@@ -17,6 +17,19 @@ IGNORE_KEYWORDS = ["/10anos/", "covid", "apnps", "retornoseguro", "vacina",
                    "/paginateste/", "balanco-", "balanco_", "demonstracao-",
                    "demonstracao_", "ata-concamp", "ptd-", "ptd_", "plano-de-trabalho"]
 
+# parametros de rastreio de campanha, que nao mudam o recurso apontado
+_RASTREIO = re.compile(r"(?i)^(utm_\w+|fbclid|gclid)$")
+
+
+def canonical_url(url):
+    # endereco sem os parametros de rastreio, para o mesmo recurso nao entrar na base sob dois enderecos;
+    # os demais parametros ficam como vieram, sem recodificar
+    base, _, query = url.partition("?")
+    if not query:
+        return url
+    params = [p for p in query.split("&") if not _RASTREIO.match(p.split("=", 1)[0])]
+    return base + ("?" + "&".join(params) if params else "")
+
 
 def is_valid_page(url):
     # o site do campus (BASE_URL) e o portal de ingresso (INGRESSO_URL) sao dominios validos de crawl

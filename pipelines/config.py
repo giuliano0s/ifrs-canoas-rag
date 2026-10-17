@@ -18,11 +18,13 @@ from upstash_vector import Index
 load_dotenv()
 
 # anos válidos do crawler; override opcional via env ANOS_VALIDOS (CSV, ex: "2026" ou "2025,2026").
-# o default deriva da data (ano anterior + corrente) em vez de congelar um intervalo fixo, que
-# apodreceria na virada do ano sem ninguém notar.
+# o default é uma janela que anda com a data, em vez de um intervalo fixo que apodreceria na virada
+# do ano: os três anos anteriores, o corrente e o seguinte. O seguinte é o do portal de ingresso,
+# que nomeia cada processo pelo semestre de início das aulas e o abre meses antes (em out/2026 o
+# processo aberto é o 2027/1); pasta de upload nunca tem ano futuro.
 _anos_env    = os.getenv("ANOS_VALIDOS")
 ANOS_VALIDOS = ({int(a) for a in _anos_env.split(",") if a.strip()} if _anos_env
-                else {datetime.now().year - 1, datetime.now().year})
+                else set(range(datetime.now().year - 3, datetime.now().year + 2)))
 
 def _flag_env(nome, default):
     # le uma flag booleana da env (CSV "True"/"False"), preservando o default se nao setada
@@ -49,7 +51,7 @@ BASE_URL        = "https://ifrs.edu.br/canoas/"
 INGRESSO_URL    = "https://ingresso.ifrs.edu.br/"
 DRIVE_DOWNLOAD  = "https://drive.google.com/uc?export=download&id="
 CHUNK_SIZE      = 4000
-MIN_CHARS       = 150 # minimo de caracteres que um PDF "não-scan" possui
+MIN_CHARS       = 150 # minimo de caracteres de um documento com conteudo: PDF abaixo disso e escaneado, pagina e so navegacao
 SAVE_INTERVAL   = 50
 
 # maximo de caracteres para inferência de data

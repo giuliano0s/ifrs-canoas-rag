@@ -31,7 +31,6 @@ jobs:
       # geracao (estruturadores, data e visao das grades) no Luna; o Gemini fica so no embedding
       LLM_PROVIDER: openai
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      ANOS_VALIDOS: "2023,2024,2025,2026"
       PYTHONUNBUFFERED: "1"
     steps:
       - uses: actions/checkout@v4
