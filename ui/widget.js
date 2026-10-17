@@ -181,14 +181,14 @@
   `;
   document.body.appendChild(win);
 
-  // abre e fecha
-  btn.addEventListener("click", () => {
-    win.classList.toggle("open");
-  });
-
   const messages = win.querySelector("#ifrs-chat-messages");
   const input = win.querySelector("#ifrs-chat-input");
   const sendBtn = win.querySelector("#ifrs-chat-send");
+
+  // abre e fecha, com o cursor na caixa de texto ao abrir
+  btn.addEventListener("click", () => {
+    if (win.classList.toggle("open")) input.focus();
+  });
 
   // historico apenas em memoria, comeca vazio a cada carregamento
   let history = [];
