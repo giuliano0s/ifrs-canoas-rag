@@ -1,8 +1,8 @@
 """
 Pipeline de ingestão do IFRS RAG (orquestrador).
 Executa sequencialmente: crawler > parser HTML > parser PDF > parser planilhas >
-chunker > ingest > snapshot. Cada fase vive no seu módulo (pipelines/crawler.py,
-parser_html.py, parser_pdf.py, parser_sheets.py, chunker.py, ingest.py), com a
+chunker > fontes curadas > ingest > snapshot. Cada fase vive no seu módulo (pipelines/crawler.py,
+parser_html.py, parser_pdf.py, parser_sheets.py, chunker.py, fontes_curadas.py, ingest.py), com a
 configuração compartilhada em pipelines/config.py.
 
 O crawler sempre varre o site inteiro e detecta mudança pelo source_hash do conteúdo
@@ -32,6 +32,7 @@ from pipelines.parser_html import run_html_parser
 from pipelines.parser_pdf import run_pdf_parser
 from pipelines.parser_sheets import run_sheets_parser
 from pipelines.chunker import run_chunker
+from pipelines.fontes_curadas import run_fontes_curadas
 from pipelines.ingest import carregar_estado, run_ingest
 from pipelines.gerar_cursos_atuais import gerar as gerar_cursos_atuais
 from ui.clone_page import clone_page
@@ -54,7 +55,10 @@ def main():
     sheets_parsed = run_sheets_parser(sheets_dirty)
 
     chunks        = run_chunker(pages_parsed, pdfs_parsed, sheets_parsed)
-    run_ingest(chunks, estado, urls_mudadas)
+
+    # fontes curadas (data/info/fontes_curadas.json) entram no mesmo ingest, com o mesmo replace por hash
+    curadas, curadas_mudadas = run_fontes_curadas(estado)
+    run_ingest(chunks + curadas, estado, urls_mudadas | curadas_mudadas)
 
     # regenera o snapshot estatico da pagina servido pelo app
     print("\n" + "="*60)

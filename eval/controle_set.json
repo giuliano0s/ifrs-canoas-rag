@@ -358,11 +358,9 @@
     "https://docs.google.com/spreadsheets/d/e/2PACX-1vSe0FNxNDSYT0Zcd4AiYRPqUZri0OgIpuviesghmmDT_uctiIP5WNxkg7wDaXWnat_6O5EaW7BpQ20U/pubhtml?gid=791545582&single=true"
    ],
    "answer_spans": [
-    "Otávio Simões Mano atende na terça das 16h30min - 18h30min, sala F124",
-    "Otávio Simões Mano atende na quarta das 15h-18h, sala F124",
-    "Otávio Simões Mano atende na quinta das 11h-12h, sala F124"
+    "Otávio Simões Mano atende"
    ],
-   "notas": "Gold por conteúdo: planilha de atendimento docente 2026 (um registro por linha)."
+   "notas": "Gold por conteúdo: planilha de atendimento docente 2026 (um registro por linha). Re-curado em 15/10/2026: a ingestão diária reestruturou a planilha (uma linha por professor com todos os horários), e o trecho passou a ser o começo comum aos dois formatos."
   },
   {
    "id": "ctrl-atendimento-omar",

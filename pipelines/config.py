@@ -103,6 +103,7 @@ SCANNED_PATH       = PARSED_DIR / "pdfs_scanned.json"
 PII_PATH           = PARSED_DIR / "pdfs_pii.json"
 CHUNKS_PATH       = CHUNKS_DIR / "chunks.json"
 WHITELIST_PATH    = INFO_DIR / "whitelist.txt"
+FONTES_CURADAS_PATH = INFO_DIR / "fontes_curadas.json"
 
 SHEETS_FALHAS = []  # DEBUG: planilhas que falharam no parse, para relatar residuo no fim
 

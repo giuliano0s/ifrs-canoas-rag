@@ -13,8 +13,8 @@ from pipelines.config import REINGEST, google_client, index
 
 
 def carregar_estado():
-    # estado do que ja esta no Upstash, por URL: {url: {"source_hash":..., "ids":[...], "published_at":...}}
-    # o source_hash e o published_at sao iguais em todos os chunks de uma mesma URL
+    # estado do que ja esta no Upstash, por URL: {url: {"source_hash":..., "ids":[...], "published_at":..., "type":...}}
+    # o source_hash, o published_at e o type sao iguais em todos os chunks de uma mesma URL
     estado = {}
     cursor = ""
     while True:
@@ -22,7 +22,8 @@ def carregar_estado():
         for v in res.vectors:
             m = v.metadata or {}
             u = m.get("source_url", "")
-            e = estado.setdefault(u, {"source_hash": m.get("source_hash"), "ids": [], "published_at": m.get("published_at")})
+            e = estado.setdefault(u, {"source_hash": m.get("source_hash"), "ids": [], "published_at": m.get("published_at"),
+                                      "type": m.get("type")})
             e["ids"].append(v.id)
         cursor = res.next_cursor
         if cursor == "":
@@ -78,10 +79,12 @@ def ingest_chunks(chunks, batch_size=100):
             if chunk.get("is_schedule"):
                 meta["is_schedule"]     = True
                 meta["schedule_source"] = chunk.get("schedule_source")
-            # calendario por evento: o vetor e o da frase do evento, e o text e o bloco do mes
             if chunk.get("is_calendar"):
                 meta["is_calendar"] = True
-                meta["texto_busca"] = chunk.get("texto_busca")
+            # vetor de uma frase de busca (evento do calendario, fonte curada): a frase fica gravada ao lado
+            # do text que vai ao contexto
+            if chunk.get("texto_busca"):
+                meta["texto_busca"] = chunk["texto_busca"]
             # campo nulo nao e gravado: o filtro do Upstash nao seleciona nulo, e o filtro de campus
             # do atendimento depende do campo ausente nos chunks de Canoas
             meta = {chave: valor for chave, valor in meta.items() if valor is not None}
