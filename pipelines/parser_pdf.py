@@ -12,6 +12,7 @@ import fitz
 
 from pipelines.config import (FORMAT_ERRORS_PATH, MIN_CHARS, PAGES_PARSED_PATH,
                               PARSED_DIR, PDFS_PARSED_PATH, PII_PATH, SAVE_INTERVAL, SCANNED_PATH)
+from pipelines.chunker import e_canoas, secoes_de_campus, sem_outros_campi
 from pipelines.dates import extract_date_from_text, get_published_at
 from pipelines.urls import to_drive_view_url
 from rag import llm
@@ -699,14 +700,21 @@ def parse_pdf(pdf_info, content):
             print(f"  [GRADE] {url} -> {resultado['schedule_source']} | ano={ano}"
                   + (f" | {flags}" if vis_text else ""))
         elif not is_scanned and is_vagas_table(title, text, url):
-            # quadro de vagas: um registro por curso, amarrado ao campus da secao (gate anti-alucinacao)
-            resultado["is_vagas"] = True
+            # quadro de vagas: o LLM estrutura so a secao de Canoas, um registro por curso (gate
+            # anti-alucinacao); a dos outros campi e cortada. sem secao de Canoas ou sem registro valido,
+            # entra o texto do PDF sem os outros campi, e o PDF ganha source_hash e nao volta no run seguinte
             periodo = _periodo_from_url(url)
-            text = structure_vagas_table(text, periodo)
+            canoas  = "".join(trecho for campus, trecho in secoes_de_campus(text) or [] if campus and e_canoas(campus))
+            linhas  = structure_vagas_table(canoas, periodo) if canoas else ""
+            if linhas:
+                resultado["is_vagas"] = True
+                text = linhas
+            else:
+                text = sem_outros_campi(text)
             if periodo:
                 resultado["published_at"] = periodo.split("/")[0]
                 resultado["date_source"]  = "periodo_ingresso"
-            print(f"  [VAGAS] {url} -> {len(text.splitlines())} cursos | periodo={periodo}")
+            print(f"  [VAGAS] {url} -> {len(linhas.splitlines())} cursos de Canoas | periodo={periodo}")
         elif not is_scanned and is_calendar_pdf(url, text):
             # calendario: reextrai por blocos posicionais para amarrar evento ao mes correto
             text, conferencia = structure_calendar_text(extract_calendar_text(doc))

@@ -92,6 +92,17 @@ def secoes_de_campus(text):
         secoes.append((campus, text[pos:fim]))
     return [(c, t) for c, t in secoes if t.strip()]
 
+def e_canoas(campus):
+    return campus.lower().startswith("canoas")
+
+def sem_outros_campi(text):
+    # texto de um documento multi-campus sem as secoes dos outros campi: fica a de Canoas e o que nao
+    # pertence a campus nenhum (corpo do edital, anexos). sem secoes reconhecidas, o texto volta inteiro
+    secoes = secoes_de_campus(text)
+    if not secoes:
+        return text
+    return "".join(trecho for campus, trecho in secoes if campus is None or e_canoas(campus))
+
 _MESES_CAL = ("janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto",
               "setembro", "outubro", "novembro", "dezembro")
 _ANO_CAL = re.compile(r"(?i)^\s*ano do calend[aá]rio:\s*(20\d{2})")
@@ -202,13 +213,10 @@ def chunks_de_pdf(pdf):
         "published_at": pdf.get("published_at"),
         "source_hash":  pdf.get("source_hash"),
     }
-    # quadro de vagas: um chunk por curso, com campus_scope POR REGISTRO (o curso de Canoas fica
-    # None e sobrevive ao cap; os outros campi ficam "outro" e sao despriorizados). o campus esta
-    # EXPLICITO em cada linha e cada chunk e um curso atomico, entao nao ha bug de fronteira (o que
-    # derrubou o antigo refino por chunk). o structurer ja emitiu uma linha por curso.
+    # quadro de vagas: um chunk por curso de Canoas, o unico campus que o parser estrutura; linha de
+    # outro campus nao entra. o campus esta EXPLICITO em cada linha e cada chunk e um curso atomico
     if pdf.get("is_vagas"):
-        return [{**base_meta, "text": ln.strip(), "campus_scope": None if "canoas" in ln.lower() else "outro"}
-                for ln in pdf["text"].split("\n") if ln.strip()]
+        return [{**base_meta, "text": ln.strip()} for ln in pdf["text"].split("\n") if "canoas" in ln.lower()]
     metadata = {**base_meta,
                 "campus_scope": classify_campus_scope(pdf["title"], pdf["text"], url),
                 "curso_escopo": classify_curso_escopo(pdf["title"], pdf["text"], url)}
@@ -227,9 +235,9 @@ def chunks_de_pdf(pdf):
             return chunks_de_calendario(pdf["text"], metadata)
         return chunk_document(pdf["text"], metadata)
 
-    # edital multi-campus: cada secao de campus e fatiada a parte, e cada chunk dela leva o nome do
-    # campus no texto (o pedaco de continuacao de um curso deixa de ficar sem campus) e o campus_scope
-    # da secao, para o cap tirar do contexto o que nao e de Canoas
+    # edital multi-campus: entram o corpo sem campus e a secao de Canoas, fatiados a parte; a secao de
+    # outro campus e cortada. cada chunk da secao de Canoas leva o nome do campus no texto (o pedaco de
+    # continuacao de um curso deixa de ficar sem campus)
     # documento do site de Canoas nunca e dividido (mesma regra do classify_campus_scope)
     secoes = None if "/canoas/" in url else secoes_de_campus(pdf["text"])
     if not secoes:
@@ -238,11 +246,10 @@ def chunks_de_pdf(pdf):
     for campus, trecho in secoes:
         if campus is None:
             chunks.extend(chunk_document(trecho, metadata))
-            continue
-        escopo = None if "canoas" in campus.lower() else "outro"
-        for c in chunk_document(trecho, {**metadata, "campus_scope": escopo}):
-            c["text"] = f"[Edital, seção do Campus {campus}]\n{c['text']}"
-            chunks.append(c)
+        elif e_canoas(campus):
+            for c in chunk_document(trecho, {**metadata, "campus_scope": None}):
+                c["text"] = f"[Edital, seção do Campus {campus}]\n{c['text']}"
+                chunks.append(c)
     return chunks
 
 def run_chunker(pages_parsed, pdfs_parsed, sheets_parsed):
