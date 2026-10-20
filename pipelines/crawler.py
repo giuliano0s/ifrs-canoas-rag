@@ -200,6 +200,9 @@ def run_crawler(estado):
                 continue
             if full_url in visited or full_url in queued:
                 continue
+            # documento ja registrado como escaneado ou lista com nomes nao e baixado de novo, de qualquer dominio
+            if full_url not in whitelist and _pular_download(full_url):
+                continue
             if is_valid_page(full_url):
                 queue.append(full_url); queued.add(full_url); novos += 1
             elif is_gsheet_link(full_url):
@@ -208,7 +211,7 @@ def run_crawler(estado):
                 download_url = build_download_url(full_url)
                 if download_url not in queued:
                     drive_cands.append({"url": download_url, "parent": url}); queued.add(download_url); novos += 1
-            elif is_pdf_by_extension(full_url) and (full_url in whitelist or not _pular_download(full_url)):
+            elif is_pdf_by_extension(full_url):
                 queue.append(full_url); queued.add(full_url); novos += 1
         time.sleep(0.3)
 
