@@ -4,7 +4,7 @@
     {
       "url": "https://ingresso.ifrs.edu.br/#resultados",
       "titulo": "Listas com nomes de candidatos do processo seletivo de ingresso",
-      "texto": "Listas com nomes de candidatos do processo seletivo de ingresso de estudantes do IFRS, inclusive do Campus Canoas (aprovados, classificados, chamados na Primeira Chamada ou na Chamada Pública e inscrições homologadas): por privacidade dos dados pessoais, essas listas não ficam nesta base de documentos. Elas são publicadas no site ingresso.ifrs.edu.br, na página do processo seletivo do período: clique no nome do campus e depois no modo de ingresso abaixo de Primeira Chamada, ou use o Buscador de Resultados. Quem confere a aprovação é o próprio candidato, nesse site: sem as listas, não há como confirmar aqui se alguém foi aprovado, nem pelo nome nem pelo número de inscrição. Este aviso trata só das listas com nomes: as datas de cada etapa estão no cronograma do edital do período, e vagas, documentos, contatos e demais regras estão no próprio edital.",
+      "texto": "Para ver a lista de aprovados, classificados ou chamados do processo seletivo de ingresso de estudantes do IFRS, inclusive do Campus Canoas, o caminho é o site https://ingresso.ifrs.edu.br: 1) abra o site, que mostra o processo seletivo mais recente (os anteriores ficam em \"Processos Seletivos Anteriores\"); 2) clique em \"Resultados\"; 3) clique em \"Buscador Demais Campi\", onde fica o Campus Canoas, e pesquise pelo nome, CPF, número de inscrição ou pelo curso. As listas com nomes de candidatos não são mostradas aqui, por privacidade dos dados pessoais, e não há como confirmar aqui se alguém foi aprovado, nem pelo nome nem pelo número de inscrição: quem confere é o próprio candidato, no buscador. Este aviso trata só das listas com nomes: as datas de cada etapa estão no cronograma do processo seletivo, e vagas, documentos, contatos e demais regras estão no edital.",
       "textos_busca": [
         "lista de aprovados do processo seletivo de ingresso",
         "quem passou no processo seletivo do curso",
@@ -12,7 +12,7 @@
         "lista de inscrições homologadas do processo seletivo",
         "fui aprovado no processo seletivo? ver meu nome na lista"
       ],
-      "origem": "Edital nº 7/2026 do IFRS (ingresso no 2º semestre de 2026), itens 13.1 e 15.11 (onde o resultado é publicado); listas nominais fora da base pelo filtro de dados pessoais da ingestão (is_pii_nominal_list)",
+      "origem": "Página Chamadas do Processo Seletivo 2026/2 (https://ingresso.ifrs.edu.br/2026-2/chamadas/), que manda pesquisar no Buscador de Resultados por nome, CPF, número de inscrição ou curso, com o Campus Canoas em \"Buscador Demais Campi\"; Edital nº 7/2026, itens 13.1 e 15.11; listas nominais fora da base pelo filtro de dados pessoais da ingestão (is_pii_nominal_list)",
       "revisar_ate": "2027-10-17"
     }
   ]

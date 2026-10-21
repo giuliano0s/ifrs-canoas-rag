@@ -214,22 +214,29 @@
   // transforma URLs do texto em links clicaveis, preservando o resto como texto
   function linkify(text) {
     const frag = document.createDocumentFragment();
-    const urlRegex = /(https?:\/\/[^\s)\]]+)/g;
+    // endereco com protocolo, ou dominio do IFRS escrito sem ele ("ingresso.ifrs.edu.br")
+    const urlRegex = /https?:\/\/[^\s)\]]+|(?:[\w-]+\.)*ifrs\.edu\.br(?:\/[^\s)\]]*)?/g;
     let last = 0;
     let match;
     while ((match = urlRegex.exec(text)) !== null) {
+      // dominio sem protocolo colado a outro texto e parte de e-mail ou de outro endereco, nao link
+      const semProtocolo = !/^https?:/.test(match[0]);
+      if (semProtocolo && match.index > 0 && /[@\w.\/-]/.test(text[match.index - 1])) continue;
       if (match.index > last) {
         frag.appendChild(document.createTextNode(text.slice(last, match.index)));
       }
+      // pontuacao que fecha a frase fica fora do link
+      const url = match[0].replace(/[.,;:!?]+$/, "");
       const a = document.createElement("a");
-      a.href = match[0];
-      a.textContent = match[0];
+      a.href = semProtocolo ? "https://" + url : url;
+      a.textContent = url;
       a.target = "_blank";
       a.rel = "noopener noreferrer";
       a.style.color = "#007B3A";
       a.style.wordBreak = "break-all";
       frag.appendChild(a);
-      last = urlRegex.lastIndex;
+      last = match.index + url.length;
+      urlRegex.lastIndex = last;
     }
     if (last < text.length) {
       frag.appendChild(document.createTextNode(text.slice(last)));
@@ -244,7 +251,7 @@
     if (role === "bot" && text.includes("Fontes:")) {
         const parts = text.split("Fontes:");
         const mainText = document.createElement("span");
-        mainText.textContent = parts[0].trim();
+        mainText.appendChild(linkify(parts[0].trim()));
 
         const details = document.createElement("details");
         details.style.marginTop = "8px";
@@ -265,6 +272,8 @@
         details.appendChild(fontes);
         div.appendChild(mainText);
         div.appendChild(details);
+    } else if (role === "bot") {
+        div.appendChild(linkify(text));
     } else {
         div.textContent = text;
     }
