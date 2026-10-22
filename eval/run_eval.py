@@ -29,7 +29,19 @@ _DIR   = os.path.dirname(__file__)
 # conjunto avaliado (EVAL_CONJUNTO): "golden" (default) ou "controle", o held-out que nunca ajusta prompt
 # nem codigo. cada conjunto tem coleta, relatorio e vereditos proprios (sufixo no nome do arquivo)
 CONJUNTO = os.environ.get("EVAL_CONJUNTO", "golden").lower()
-_SUF   = "" if CONJUNTO == "golden" else f"_{CONJUNTO}"
+# raciocinio da coleta (EVAL_RACIOCINIO): "regra" (default, o de producao), "nunca" ou "sempre" (toda
+# resposta escrita depois de uma busca). os dois ultimos medem onde o raciocinio compensa; cada modo tem
+# coleta, vereditos e relatorio proprios (sufixo no nome do arquivo)
+RACIOCINIO = os.environ.get("EVAL_RACIOCINIO", "regra").lower()
+# modo comparado na secao de raciocinio do relatorio
+_MODO_OPOSTO = {"regra": "nunca", "nunca": "regra", "sempre": "nunca"}
+
+
+def _sufixo(modo):
+    return ("" if CONJUNTO == "golden" else f"_{CONJUNTO}") + ("" if modo == "regra" else f"_raciocinio-{modo}")
+
+
+_SUF   = _sufixo(RACIOCINIO)
 GOLDEN = os.path.join(_DIR, "golden_set.json" if CONJUNTO == "golden" else f"{CONJUNTO}_set.json")
 COLETA = os.path.join(_DIR, "runs", f"coleta{_SUF}.jsonl")
 RESUMO = os.path.join(_DIR, "runs", f"ultimo_resumo{_SUF}.txt")
@@ -64,26 +76,33 @@ def inputs_do_caso(caso):
 # ── COLETA: roda o agente e salva o trace (uma execucao por linha) ───────────────
 
 def _executar(case_id, inp, run, data_referencia=None, stamp=None):
-    # roda o ask real com retry; erro transitorio de API vira ERRO da execucao (nunca
+    # roda o agente real em streaming, com retry; erro transitorio de API vira ERRO da execucao (nunca
     # derruba a coleta). o registro guarda so a SAIDA; as expectativas vem do golden ao validar.
     # data_referencia (so casos temporais): sobrescreve a data de hoje do agente para o gold
-    # temporal nao apodrecer com o tempo; sem ela, o ask usa a data real.
-    from rag.chain import ask, registro_de_trace
-    trace, resposta, erro = {}, None, None
+    # temporal nao apodrecer com o tempo; sem ela, o agente usa a data real.
+    from rag.chain import ask_stream, registro_de_trace
+    trace, resposta, erro, latencia_ms, primeiro_texto_ms = {}, None, None, None, None
     for tent in range(3):
         try:
-            trace = {}
+            trace, resposta, primeiro_texto_ms = {}, None, None
+            inicio = time.perf_counter()
             # o dump de retrieval do chain sai em nivel DEBUG e o eval nao configura logging,
             # entao a coleta roda silenciosa por padrao (so WARNING+ apareceria)
-            resposta = ask(inp, trace=trace, data_atual=data_referencia)
+            for evento in ask_stream(inp, trace=trace, data_atual=data_referencia, raciocinio=RACIOCINIO):
+                if evento["tipo"] == "texto" and primeiro_texto_ms is None:
+                    primeiro_texto_ms = round((time.perf_counter() - inicio) * 1000)
+                if evento["tipo"] == "fim":
+                    resposta = evento["resposta"]
+            latencia_ms = round((time.perf_counter() - inicio) * 1000)
             erro = None
             break
         except Exception as e:
             erro = f"{type(e).__name__}: {str(e)[:120]}"
             time.sleep(8 * (tent + 1))
-    # mesmo builder da telemetria de producao (schema unico de coleta); aqui somamos o que e
-    # proprio do eval: case_id, run e o stamp de versao
-    rec = {"case_id": case_id, "run": run, **registro_de_trace(trace, inp, resposta, erro)}
+    # mesmo builder da telemetria de producao (schema unico de coleta, com os tempos nos mesmos campos);
+    # aqui somamos o que e proprio do eval: case_id, run e o stamp de versao
+    rec = {"case_id": case_id, "run": run, **registro_de_trace(trace, inp, resposta, erro),
+           "latencia_ms": latencia_ms, "primeiro_texto_ms": primeiro_texto_ms}
     if stamp:
         rec.update(stamp)  # modelo, prompt_versao, ts: versao do agente que gerou o registro
     return rec
@@ -95,7 +114,8 @@ def coletar(n=1, filtro_ids=None):
     alvo_ids = {c["id"] for c in alvo}
     # carimbo de versao do agente em cada registro (rastreabilidade: qual config gerou o dado). a versao e
     # a do prompt carregado pelo agente, nao a do arquivo no disco no momento da coleta
-    stamp = {"modelo": MODEL, "prompt_versao": PROMPT_VERSAO, "ts": datetime.now().isoformat(timespec="seconds")}
+    stamp = {"modelo": MODEL, "prompt_versao": PROMPT_VERSAO, "modo_raciocinio": RACIOCINIO,
+             "ts": datetime.now().isoformat(timespec="seconds")}
     # merge: ao coletar so um subconjunto (filtro_ids), preserva os registros dos casos NAO
     # filtrados que ja estao na coleta (recoletar a biblioteca nao apaga a coleta dos outros).
     preservados = []
@@ -540,6 +560,88 @@ def _meta_coleta(regs, f1):
     }
 
 
+def _percentil(vals, q):
+    vals = sorted(v for v in vals if v is not None)
+    return vals[min(len(vals) - 1, int(round(q * (len(vals) - 1))))] if vals else None
+
+
+def _limpa(v):
+    # execucao sem nenhuma reprovacao do juiz (criterios julgados todos true)
+    return all(v.get(c) is not False for c in ("fidelidade", "relevancia", "correcao", "comportamento"))
+
+
+def _secao_raciocinio(regs, vereditos):
+    """Secao do relatorio sobre o raciocinio: disparo da regra, uso, reserva por prazo, tempo, custo e o
+    veredito do juiz, por caso, comparado com a coleta do modo oposto (EVAL_RACIOCINIO) quando ela existe.
+
+    Args:
+        regs: execucoes da coleta deste modo.
+        vereditos: vereditos do juiz desta coleta, por chave.
+
+    Returns:
+        Linhas de markdown (vazia quando a coleta e anterior ao registro de raciocinio).
+    """
+    regs = [r for r in regs if not r.get("erro") and r.get("raciocinio")]
+    if not regs:
+        return []
+    oposto = _MODO_OPOSTO[RACIOCINIO]
+    coleta_op = os.path.join(_DIR, "runs", f"coleta{_sufixo(oposto)}.jsonl")
+    vered_op = os.path.join(_DIR, "runs", f"juiz_vereditos{_sufixo(oposto)}.jsonl")
+    regs_op = [json.loads(l) for l in open(coleta_op, encoding="utf-8") if l.strip()] if os.path.exists(coleta_op) else []
+    v_op = {_chave(json.loads(l)): json.loads(l) for l in open(vered_op, encoding="utf-8") if l.strip()} if os.path.exists(vered_op) else {}
+
+    # totais do modo
+    rz = [r["raciocinio"] for r in regs]
+    disparou = [r for r in regs if r["raciocinio"].get("regra")]
+    usado = [r for r in regs if r["raciocinio"].get("usado")]
+    reserva = [r for r in regs if r["raciocinio"].get("reserva")]
+    custos = [r.get("custo_usd") for r in regs if r.get("custo_usd") is not None]
+    L = ["## Raciocínio (regra, uso, reserva por prazo e efeito no juiz)", ""]
+    L.append(f"- Modo desta coleta: `{RACIOCINIO}` (EVAL_RACIOCINIO); comparado com `{oposto}`"
+             + ("." if regs_op else f" (sem coleta `{os.path.basename(coleta_op)}`: rode o coletar com EVAL_RACIOCINIO={oposto})."))
+    L.append(f"- Regra disparada em {len(disparou)}/{len(regs)} execuções; raciocínio usado em {len(usado)}; "
+             f"reserva por prazo em {len(reserva)}"
+             + (f" (corte médio em {sum(r['raciocinio']['corte_ms'] for r in reserva) / len(reserva) / 1000:.1f} s)" if reserva else "")
+             + f"; tokens de raciocínio por execução que raciocinou: "
+             + (f"{sum(x['tokens'] for x in rz if x.get('usado')) / max(1, len(usado)):.0f}." if usado else "n/a."))
+    if custos:
+        L.append(f"- Custo medido: US$ {1000 * sum(custos) / len(custos):.2f} por mil perguntas (cache como cobrado; "
+                 f"a chamada cortada pelo prazo não tem custo informado pela API).")
+    for rotulo, grupo in (("com raciocínio", [r for r in regs if r["raciocinio"].get("usado")]),
+                          ("sem raciocínio, com busca", [r for r in regs if not r["raciocinio"].get("usado") and r.get("acao_real") == "buscar"])):
+        if grupo:
+            p = lambda campo, q: _percentil([r.get(campo) for r in grupo], q)
+            if p("latencia_ms", .5) is not None:
+                L.append(f"- Tempo {rotulo} (n={len(grupo)}): primeiro texto p50 {p('primeiro_texto_ms', .5) / 1000:.1f} s, "
+                         f"p90 {p('primeiro_texto_ms', .9) / 1000:.1f} s; total p50 {p('latencia_ms', .5) / 1000:.1f} s, "
+                         f"p90 {p('latencia_ms', .9) / 1000:.1f} s, máximo {max(r['latencia_ms'] for r in grupo if r.get('latencia_ms')) / 1000:.1f} s.")
+    L.append("")
+
+    # por caso, so onde a regra disparou neste modo ou no oposto
+    def limpas(rs, vs):
+        julg = [vs[_chave(r)] for r in rs if _chave(r) in vs]
+        return f"{sum(_limpa(v) for v in julg)}/{len(julg)}" if julg else "-"
+    casos_regra = sorted({r["case_id"] for r in regs + regs_op if (r.get("raciocinio") or {}).get("regra")})
+    if casos_regra:
+        L.append(f"| caso | regra | disparou | usado | reserva | tokens rac. | 1º texto p50 | sem reprovação ({RACIOCINIO}) | sem reprovação ({oposto}) |")
+        L.append("|---|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|")
+        for c in casos_regra:
+            rs = [r for r in regs if r["case_id"] == c]
+            ro = [r for r in regs_op if r["case_id"] == c and not r.get("erro")]
+            regras = sorted({r["raciocinio"]["regra"] for r in rs + ro if (r.get("raciocinio") or {}).get("regra")})
+            u = [r for r in rs if r["raciocinio"].get("usado")]
+            pri = _percentil([r.get("primeiro_texto_ms") for r in rs], .5)
+            celulas = [c, ", ".join(regras),
+                       f"{sum(1 for r in rs if r['raciocinio'].get('regra'))}/{len(rs)}", str(len(u)),
+                       str(sum(1 for r in rs if r["raciocinio"].get("reserva"))),
+                       f"{sum(r['raciocinio']['tokens'] for r in u) / len(u):.0f}" if u else "-",
+                       f"{pri / 1000:.1f} s" if pri is not None else "-",
+                       limpas(rs, vereditos), limpas(ro, v_op)]
+            L.append("| " + " | ".join(celulas) + " |")
+        L.append("")
+    return L
+
+
 # ── RELATORIO: a PROVA para olhos externos. Regenerado a cada validar; maximo de detalhe,
 # sempre com IC de Wilson, versao(oes) da coleta, caveat do juiz e classificacao de cada falha. ──
 
@@ -745,6 +847,8 @@ def gerar_relatorio(f1, f2, f3, rrs, f4d, dest, f7, vereditos, n_exec, n_erros, 
                 L.append(f"- Exemplo do juiz: \"{motivo}\"")
             L.append("")
 
+    L += meta.get("secao_raciocinio", [])
+
     # tabela por caso: taxa em cada fase aplicavel (maximo de detalhe)
     L += ["## Tabela por caso (taxa por fase aplicável; '-' = não se aplica)", ""]
     L.append("| caso | ação esperada | existe? | F1 dec | F2 qry | F3 doc | F3 span | F5 fid | F5 rel | F5 cor | F6 comp | F7 cit |")
@@ -856,6 +960,7 @@ def validar():
     with open(RESUMO, "w", encoding="utf-8") as f:
         f.write(texto)
     meta = _meta_coleta(regs, f1)
+    meta["secao_raciocinio"] = _secao_raciocinio(regs, vereditos)
     relatorio = gerar_relatorio(f1, f2, f3, rrs, f4, dest, f7, vereditos, len(regs), erros, casos, meta)
     with open(RELATORIO, "w", encoding="utf-8") as f:
         f.write(relatorio)

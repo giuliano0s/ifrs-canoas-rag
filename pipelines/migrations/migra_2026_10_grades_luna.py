@@ -4,9 +4,9 @@ As grades da base foram lidas por visão com o gemini-2.5-flash, que troca o dia
 na imagem da grade PROFMAT 2026/2: "Quinta" onde a grade diz "Quarta"). O gate de horário/sala não
 pega dia trocado; o gate de dia (`_dias_conferem`, em parser_pdf) passou a conferir a coluna de cada
 disciplina pelas coordenadas da página. Esta migração relê as grades atuais da base com o provedor
-configurado (LLM_PROVIDER=openai) e substitui os chunks de grade, com backup completo para reverter.
+configurado (perfil de ingestao da OpenAI) e substitui os chunks de grade, com backup completo para reverter.
 
-USO (nesta ordem; requer UPSTASH_WRITE_API_KEY, OPENAI_API_KEY e LLM_PROVIDER=openai):
+USO (nesta ordem; requer UPSTASH_WRITE_API_KEY e OPENAI_API_KEY):
   python -m pipelines.migrations.migra_2026_10_grades_luna backup     # salva os chunks atuais e relê as grades (mostra o comparativo)
   python -m pipelines.migrations.migra_2026_10_grades_luna aplicar    # substitui os chunks de grade pela releitura
   python -m pipelines.migrations.migra_2026_10_grades_luna verificar
@@ -68,8 +68,8 @@ def _baixar(url):
 
 
 def backup():
-    if llm.PROVIDER != "openai":
-        sys.exit("defina LLM_PROVIDER=openai: a releitura e feita com o Luna")
+    if llm.PERFIS["ingestao"].provedor != "openai":
+        sys.exit("o perfil de ingestao em rag/llm.py precisa ser da OpenAI: a releitura e feita com o Luna")
     grades = _grades_na_base()
     BACKUP.parent.mkdir(exist_ok=True)
     BACKUP.write_text(json.dumps(grades, ensure_ascii=False), encoding="utf-8")

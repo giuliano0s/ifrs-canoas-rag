@@ -54,9 +54,15 @@ CURSO_PENALTY = 0.20  # penalidade no rerank para chunk de curso DIFERENTE do ci
                       # (metadata curso_escopo). SUAVE (0.20 < CAMPUS_PENALTY 0.35) e SEM cap: doc de
                       # outro curso pode ser pertinente, entao so desce, nao e expulso. fecha o erro de
                       # aplicar regra de um curso a outro (ex: regulamento de TCC da GPI dado como TADS).
-# modelo de GERAÇÃO em uso (Gemini ou OpenAI, conforme LLM_PROVIDER em rag/llm.py). Exposto aqui
-# porque o eval e a telemetria carimbam cada registro com o modelo que o gerou.
+# modelo de GERAÇÃO do atendimento (tabela PERFIS em rag/llm.py). Exposto aqui porque o eval e a
+# telemetria carimbam cada registro com o modelo que o gerou.
 MODEL = llm.modelo_ativo()
+
+# dado do contexto que liga o raciocinio na chamada que escreve a resposta: trecho de calendario, de
+# grade de horarios ou de evento datado (cronograma do ingresso e fontes curadas, buscados pela frase
+# do evento), as perguntas em que o 6 com raciocinio errou menos que o 5.6 no A/B de 21/10/2026.
+# nome da regra -> campo do metadata que a dispara
+REGRAS_RACIOCINIO = {"calendario": "is_calendar", "grade": "is_schedule", "evento_datado": "texto_busca"}
 
 # clientes: o index do Upstash e o cliente Gemini do EMBEDDING. O embedding NUNCA acompanha a troca
 # de provedor de geração (a base foi embeddada com gemini-embedding-001; outro espaço vetorial a
@@ -231,6 +237,8 @@ def _executar_busca(search_query, trace=None):
 
     # log de depuracao: pool coletado, reordenado, e quais chunks entraram no contexto final
     filtered_ids = {h.id for h in filtered}
+    marcas = sorted({regra for regra, campo in REGRAS_RACIOCINIO.items()
+                     for h in filtered if (h.metadata or {}).get(campo)})
 
     # captura estruturada da busca para o trace (eval/telemetria), quando solicitado
     if trace is not None:
@@ -247,6 +255,7 @@ def _executar_busca(search_query, trace=None):
             "chunks_textos": [h.metadata.get("text", "") for h in filtered],
             "sources": dict(sources),
             "source_years": dict(source_years),
+            "marcas": marcas,
         })
     # dump de depuracao do retrieval em DEBUG: contem a query do usuario e os chunks, entao
     # nao deve ir ao log de producao (la so WARNING+). a guarda evita montar as strings a toa.
@@ -274,9 +283,10 @@ def _executar_busca(search_query, trace=None):
         return None, {}
     sources_text = "\n".join([f"[{i}] {url}" for i, url in sources.items()])
     retorno = f"{context}\nFONTES:\n{sources_text}"
-    # info consumida no ask: anos das fontes (guard de data), contexto cru (guard) e o mapa
-    # {n: url} das fontes (backfill do bloco "Fontes:" quando o modelo cita [n] mas nao lista)
-    info = {"source_years": source_years, "contexto": context, "sources": dict(sources)}
+    # info consumida no ask: anos das fontes (guard de data), contexto cru (guard), o mapa {n: url} das
+    # fontes (backfill do bloco "Fontes:" quando o modelo cita [n] mas nao lista) e as marcas que
+    # disparam as regras de raciocinio
+    info = {"source_years": source_years, "contexto": context, "sources": dict(sources), "marcas": marcas}
     return retorno, info
 
 
@@ -285,6 +295,8 @@ def registro_de_trace(trace, query, resposta, erro=None):
     # e da telemetria de producao (input, acao, buscas, resposta). quem chama acrescenta o
     # que e proprio (case_id/run no eval; stamp/session_id na producao).
     t = trace or {}
+    chamadas = t.get("chamadas", [])
+    custos = [c["custo_usd"] for c in chamadas if c.get("custo_usd") is not None]
     return {
         "input": query,
         "erro": erro,
@@ -292,6 +304,31 @@ def registro_de_trace(trace, query, resposta, erro=None):
         "resposta": resposta,
         "buscas": t.get("buscas", []),
         "tokens": t.get("tokens"),
+        "chamadas": chamadas,
+        "raciocinio": resumo_raciocinio(chamadas),
+        "custo_usd": round(sum(custos), 6) if custos else None,
+    }
+
+
+def resumo_raciocinio(chamadas):
+    """Resume o raciocinio de um turno a partir do registro das chamadas ao modelo.
+
+    Args:
+        chamadas: lista trace["chamadas"], uma entrada por chamada (etapa, passo, regra e o uso do rag.llm).
+
+    Returns:
+        Dicionario com a regra que valeu ("calendario", "grade", "evento_datado" ou None), se o raciocinio
+        foi pedido, se a resposta saiu com ele, se o prazo estourou e caiu na reserva sem raciocinio, o
+        tempo ate o corte (ms) e os tokens de raciocinio do turno.
+    """
+    agente = [c for c in chamadas if c.get("etapa") == "agente"]
+    return {
+        "regra": next((c["regra"] for c in agente if c.get("regra")), None),
+        "pedido": any((c.get("reserva_de") or c.get("perfil")) == "atendimento_raciocinio" for c in agente),
+        "usado": any(c.get("esforco") not in (None, "none") for c in agente),
+        "reserva": any(c.get("reserva_de") for c in agente),
+        "corte_ms": max((c.get("corte_ms") or 0 for c in agente), default=0) or None,
+        "tokens": sum(c.get("raciocinio", 0) for c in chamadas),
     }
 
 
@@ -377,26 +414,37 @@ def _citacoes(texto):
     return ns
 
 
-def _somar_uso(uso, resposta):
-    # acumula os tokens de uma chamada no total da execucao (trace["tokens"])
-    if uso is not None and resposta is not None and resposta.uso:
-        uso["entrada"] += resposta.uso.get("entrada", 0)
-        uso["saida"] += resposta.uso.get("saida", 0)
+class _Gasto:
+    """Contabilidade de uma execucao: os tokens somados (trace["tokens"]) e o registro de cada chamada
+    ao modelo (trace["chamadas"]), com a etapa, o passo do agente e a regra de raciocinio que valia nele."""
+
+    def __init__(self):
+        self.tokens = {"entrada": 0, "saida": 0}
+        self.chamadas = []
+
+    def registrar(self, resposta, etapa, passo=None, regra=None):
+        if resposta is None:
+            return
+        uso = resposta.uso or {}
+        self.tokens["entrada"] += uso.get("entrada", 0)
+        self.tokens["saida"] += uso.get("saida", 0)
+        self.chamadas.append({"etapa": etapa, "passo": passo, "regra": regra, **uso})
 
 
-def _chamar_guard(prompt, fallback, uso=None):
+def _chamar_guard(prompt, fallback, gasto=None):
     # chamada LLM focada e barata do guard (temp baixa); em erro/vazio, mantem a resposta original.
     # passa pelo mesmo provedor do agente (rag.llm), sem ferramenta.
     try:
         r = llm.gerar([{"papel": "usuario", "texto": prompt}], temperatura=0.1)
-        _somar_uso(uso, r)
+        if gasto is not None:
+            gasto.registrar(r, "guard_temporal")
         return (r.texto or "").strip() or fallback
     except Exception as e:
         logger.warning(_safe(f"[GUARD] re-check falhou, mantendo resposta original: {e}"))
         return fallback
 
 
-def _guard_ressalva_temporal(corpo, fontes_anos, ano_atual, uso=None):
+def _guard_ressalva_temporal(corpo, fontes_anos, ano_atual, gasto=None):
     # A: o corpo cita fonte de ano anterior e traz numero. um re-check LLM julga SIM/NAO
     # se o dado muda com o tempo; em SIM, APPEND deterministico da ressalva (sem
     # reescrever, para nao arriscar dropar citacoes/numeros).
@@ -413,7 +461,7 @@ def _guard_ressalva_temporal(corpo, fontes_anos, ano_atual, uso=None):
         f"mudado desde {ano} (ex: contagem de servidores, numero de vagas, valores monetarios); NAO "
         f"se os dados sao estaveis (ex: carga horaria de curso, e-mail, regra de regimento, local). "
         f"Responda so SIM ou NAO.\n\nRESPOSTA:\n{corpo}")
-    if not _chamar_guard(prompt, "NAO", uso).strip().upper().startswith("SIM"):
+    if not _chamar_guard(prompt, "NAO", gasto).strip().upper().startswith("SIM"):
         return corpo
     return corpo.rstrip() + (
         f"\n\n(Observação: parte destes dados é de {ano} e pode estar desatualizada; confirme a "
@@ -489,7 +537,7 @@ def _vazou_prompt(corpo):
         return False
 
 
-def _aplicar_guards(corpo, fontes_anos, contexto, data_atual, uso=None):
+def _aplicar_guards(corpo, fontes_anos, contexto, data_atual, gasto=None):
     # orquestra as checagens pos-geracao sobre o corpo. fail-safe: qualquer erro devolve
     # o corpo original. no-op quando nao houve busca (sem fontes nem contexto).
     if not corpo:
@@ -501,13 +549,13 @@ def _aplicar_guards(corpo, fontes_anos, contexto, data_atual, uso=None):
             hoje = datetime.now().date()
         if contexto:
             corpo = _guard_soma_propria(corpo, contexto)
-        corpo = _guard_ressalva_temporal(corpo, fontes_anos, hoje.year, uso)
+        corpo = _guard_ressalva_temporal(corpo, fontes_anos, hoje.year, gasto)
     except Exception as e:
         logger.warning(_safe(f"[GUARD] erro inesperado, mantendo resposta original: {e}"))
     return corpo
 
 
-def _pos_processar(resposta, fontes_anos, contexto, sources_map, data_atual, uso=None):
+def _pos_processar(resposta, fontes_anos, contexto, sources_map, data_atual, gasto=None):
     # pos-processamento unico da resposta final: decompoe em (corpo, fontes), aplica os
     # guards sobre o corpo, garante as fontes citadas e recompoe na borda de saida
     corpo, fontes, tinha_bloco = _decompor_resposta(resposta)
@@ -518,7 +566,7 @@ def _pos_processar(resposta, fontes_anos, contexto, sources_map, data_atual, uso
         logger.warning("[GUARD] resposta substituida pela recusa de seguranca")
         return RECUSA_SEGURANCA
 
-    corpo = _aplicar_guards(corpo, fontes_anos, contexto, data_atual, uso)
+    corpo = _aplicar_guards(corpo, fontes_anos, contexto, data_atual, gasto)
     fontes = _backfill_fontes(corpo, fontes, tinha_bloco, sources_map)
     return _compor_resposta(corpo, fontes)
 
@@ -577,15 +625,19 @@ class _Previa:
         return trecho
 
 
-def ask_stream(query, history=None, max_steps=3, trace=None, data_atual=None):
+def ask_stream(query, history=None, max_steps=3, trace=None, data_atual=None, raciocinio="regra"):
     """Roda o agente e transmite a resposta enquanto ela e gerada.
 
     Args:
         query: pergunta do aluno.
         history: conversa anterior [{"role", "content"}], vinda do widget.
         max_steps: buscas permitidas antes de forcar a resposta em texto.
-        trace: dict opcional preenchido com acao, buscas, resposta e tokens (eval e telemetria).
+        trace: dict opcional preenchido com acao, buscas, resposta, tokens e o registro de cada chamada
+            ao modelo (eval e telemetria).
         data_atual: "DD/MM/AAAA" fixada pelo eval nos casos temporais; None usa a data de hoje.
+        raciocinio: "regra" (producao: a chamada que escreve a resposta usa o perfil com raciocinio
+            quando o contexto traz uma marca de REGRAS_RACIOCINIO), "nunca" ou "sempre" (toda chamada
+            depois de uma busca); os dois ultimos servem ao eval para medir o efeito da regra.
 
     Yields:
         Eventos: {"tipo": "status", "texto"} ao buscar; {"tipo": "texto", "delta"} com a previa em
@@ -595,9 +647,10 @@ def ask_stream(query, history=None, max_steps=3, trace=None, data_atual=None):
     history = history or []
 
     # inicializa o trace opcional (eval/telemetria); em producao trace=None e nada muda
-    uso = {"entrada": 0, "saida": 0}
+    gasto = _Gasto()
     if trace is not None:
-        trace.update({"input": query, "acao": "nao_buscar", "buscas": [], "resposta": None, "tokens": uso})
+        trace.update({"input": query, "acao": "nao_buscar", "buscas": [], "resposta": None,
+                      "tokens": gasto.tokens, "chamadas": gasto.chamadas})
 
     # monta a conversa no FORMATO NEUTRO (historico + pergunta atual); o adaptador do provedor
     # ativo (rag.llm) traduz para o SDK dele, entao o loop nao conhece Gemini nem OpenAI
@@ -614,23 +667,29 @@ def ask_stream(query, history=None, max_steps=3, trace=None, data_atual=None):
     temperatura = float(os.getenv("AGENT_TEMP", "0.7"))
 
     # acumuladores: anos das fontes e contexto cru (guard de data) + o mapa {n: url} da ultima
-    # busca (backfill do bloco "Fontes:" via _backfill_fontes)
-    fontes_anos, contexto_acumulado, sources_map = {}, "", {}
+    # busca (backfill do bloco "Fontes:" via _backfill_fontes) + as marcas das regras de raciocinio
+    fontes_anos, contexto_acumulado, sources_map, marcas = {}, "", {}, set()
 
     # loop de investigacao: o modelo pergunta, busca ou responde ate produzir texto; no ultimo passo
     # a ferramenta sai da chamada e a resposta em texto e forcada
     for passo in range(max_steps + 1):
         ferramentas = [llm.FERRAMENTA_BUSCA] if passo < max_steps else None
+
+        # perfil da chamada: com raciocinio quando a regra pede (marca no contexto ja buscado)
+        regra = next((nome for nome in REGRAS_RACIOCINIO if nome in marcas), None)
+        com_raciocinio = regra is not None if raciocinio == "regra" else (raciocinio == "sempre" and passo > 0)
+        perfil = "atendimento_raciocinio" if com_raciocinio else "atendimento"
+
         previa, r = _Previa(contexto_acumulado), None
         for tipo, valor in llm.gerar_fluxo(mensagens, sistema=sistema, ferramentas=ferramentas,
-                                           temperatura=temperatura):
+                                           temperatura=temperatura, perfil=perfil):
             if tipo == "fim":
                 r = valor
                 continue
             trecho = previa.receber(valor)
             if trecho:
                 yield {"tipo": "texto", "delta": trecho}
-        _somar_uso(uso, r)
+        gasto.registrar(r, "agente", passo, regra)
 
         # sem chamada de ferramenta: e uma pergunta de clarificacao ou resposta final
         if not r.chamada:
@@ -638,7 +697,7 @@ def ask_stream(query, history=None, max_steps=3, trace=None, data_atual=None):
             if trecho:
                 yield {"tipo": "texto", "delta": trecho}
             resposta = _pos_processar((r.texto or "").strip(), fontes_anos, contexto_acumulado,
-                                      sources_map, data_atual, uso)
+                                      sources_map, data_atual, gasto)
             if trace is not None:
                 trace["resposta"] = resposta
             yield {"tipo": "fim", "resposta": resposta}
@@ -662,15 +721,17 @@ def ask_stream(query, history=None, max_steps=3, trace=None, data_atual=None):
             fontes_anos = info.get("source_years") or {}
             contexto_acumulado += info.get("contexto") or ""
             sources_map = info.get("sources") or {}
+            marcas.update(info.get("marcas") or [])
 
         mensagens.append({"papel": "modelo", "chamada": r.chamada})
         mensagens.append({"papel": "ferramenta", "nome": r.chamada["nome"], "resultado": context})
 
 
-def ask(query, history=None, max_steps=3, trace=None, data_atual=None):
+def ask(query, history=None, max_steps=3, trace=None, data_atual=None, raciocinio="regra"):
     # mesma execucao do ask_stream, devolvendo so a resposta final (eval e chamadas sem streaming)
     resposta = None
-    for evento in ask_stream(query, history=history, max_steps=max_steps, trace=trace, data_atual=data_atual):
+    for evento in ask_stream(query, history=history, max_steps=max_steps, trace=trace, data_atual=data_atual,
+                             raciocinio=raciocinio):
         if evento["tipo"] == "fim":
             resposta = evento["resposta"]
     return resposta

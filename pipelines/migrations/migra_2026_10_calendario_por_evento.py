@@ -16,7 +16,7 @@ Três defeitos na base, todos da ingestão antiga:
 A releitura só substitui o texto da base quando a conferência sai sem data omitida nem inventada; senão,
 o texto estruturado da base fica, já fatiado por evento.
 
-USO (nesta ordem; requer UPSTASH_WRITE_API_KEY, GEMINI_API_KEY_T1, OPENAI_API_KEY e LLM_PROVIDER=openai):
+USO (nesta ordem; requer UPSTASH_WRITE_API_KEY, GEMINI_API_KEY_T1 e OPENAI_API_KEY):
   python -m pipelines.migrations.migra_2026_10_calendario_por_evento backup     # salva os chunks atuais, relê e monta o plano (sem escrita)
   python -m pipelines.migrations.migra_2026_10_calendario_por_evento aplicar    # substitui os chunks pelo plano
   python -m pipelines.migrations.migra_2026_10_calendario_por_evento verificar
@@ -115,8 +115,8 @@ def _releitura(url, chunks):
 
 
 def backup():
-    if llm.PROVIDER != "openai":
-        sys.exit("defina LLM_PROVIDER=openai: a releitura e feita com o Luna")
+    if llm.PERFIS["ingestao"].provedor != "openai":
+        sys.exit("o perfil de ingestao em rag/llm.py precisa ser da OpenAI: a releitura e feita com o Luna")
     calendarios = _calendarios_na_base()
     BACKUP.parent.mkdir(exist_ok=True)
     BACKUP.write_text(json.dumps(calendarios, ensure_ascii=False), encoding="utf-8")

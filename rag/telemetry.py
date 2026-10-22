@@ -58,6 +58,19 @@ def _sem_eco(texto, achados):
     return texto
 
 
+def _tags_raciocinio(resumo):
+    # marcas do turno para filtrar no Langfuse: regra que pediu raciocinio, se ele foi usado e se o
+    # prazo estourou e a resposta saiu da reserva sem raciocinio
+    tags = []
+    if resumo.get("regra"):
+        tags.append(f"regra:{resumo['regra']}")
+    if resumo.get("usado"):
+        tags.append("raciocinio")
+    if resumo.get("reserva"):
+        tags.append("reserva")
+    return tags
+
+
 # registra um turno de chat no Langfuse (sink duravel: o Vercel tem FS read-only) usando o MESMO
 # schema da coleta do eval, via registro_de_trace. e uma "extensao" da coleta, carimbada com a
 # versao viva do prompt: perguntas reais viram candidatas a caso de golden depois da curadoria.
@@ -94,7 +107,8 @@ def registrar_chat(query, history, trace, resposta, latencia_ms, erro=None, sess
             "user_id": user_id,
             "origem": "producao",
         })
-        cli.trace(name="chat", input=query, output=resposta, session_id=session_id, user_id=user_id, metadata=rec)
+        cli.trace(name="chat", input=query, output=resposta, session_id=session_id, user_id=user_id, metadata=rec,
+                  tags=_tags_raciocinio(rec.get("raciocinio") or {}))
         cli.flush()
     except Exception:
         pass

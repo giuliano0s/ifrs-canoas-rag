@@ -21,7 +21,7 @@ senão, a planilha da base fica. A página onde cada planilha foi publicada vem 
 reaplicada depois de uma correção no parser: o backup guarda só o estado anterior à primeira aplicação,
 o plano é refeito, e o aplicar apaga o que está na base e não está no plano novo.
 
-USO (nesta ordem; requer UPSTASH_WRITE_API_KEY, GEMINI_API_KEY_T1, OPENAI_API_KEY e LLM_PROVIDER=openai):
+USO (nesta ordem; requer UPSTASH_WRITE_API_KEY, GEMINI_API_KEY_T1 e OPENAI_API_KEY):
   python -m pipelines.migrations.migra_2026_10_planilhas_auto_contidas backup     # salva as planilhas da base (só na primeira vez), relê e monta o plano (sem escrita)
   python -m pipelines.migrations.migra_2026_10_planilhas_auto_contidas aplicar    # grava o plano
   python -m pipelines.migrations.migra_2026_10_planilhas_auto_contidas verificar
@@ -88,8 +88,8 @@ def _plano_da_planilha(url, parent):
 
 
 def backup():
-    if llm.PROVIDER != "openai":
-        sys.exit("defina LLM_PROVIDER=openai: a releitura e feita com o Luna")
+    if llm.PERFIS["ingestao"].provedor != "openai":
+        sys.exit("o perfil de ingestao em rag/llm.py precisa ser da OpenAI: a releitura e feita com o Luna")
     # o backup guarda o estado anterior a primeira aplicacao; uma releitura posterior reaproveita ele
     if BACKUP.exists():
         planilhas = json.loads(BACKUP.read_text(encoding="utf-8"))

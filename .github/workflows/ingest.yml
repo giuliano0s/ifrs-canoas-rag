@@ -28,8 +28,7 @@ jobs:
       UPSTASH_WRITE_API_KEY: ${{ secrets.UPSTASH_WRITE_API_KEY }}
       UPSTASH_API_KEY: ${{ secrets.UPSTASH_API_KEY }}
       GEMINI_API_KEY_T1: ${{ secrets.GEMINI_API_KEY_T1 }}
-      # geracao (estruturadores, data e visao das grades) no Luna; o Gemini fica so no embedding
-      LLM_PROVIDER: openai
+      # geracao (estruturadores, data e visao das grades) no perfil de ingestao de rag/llm.py; o Gemini fica so no embedding
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       PYTHONUNBUFFERED: "1"
     steps:
