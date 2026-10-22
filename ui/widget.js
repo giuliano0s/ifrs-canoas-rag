@@ -211,6 +211,13 @@
     ? crypto.randomUUID()
     : String(Date.now()) + Math.random().toString(16).slice(2);
 
+  // codigo de depuracao no inicio da conversa: o aluno copia e envia junto do erro, e o registro
+  // da telemetria e achado pela sessao (esta conversa) ou pelo usuario (este dispositivo)
+  const debug = document.createElement("div");
+  debug.style.cssText = "font-size:11px;color:#888;margin:6px 0 2px;word-break:break-all;user-select:all;";
+  debug.textContent = `Código de depuração (envie se encontrar um erro): sessão ${sessionId}` + (userId ? ` | usuário ${userId}` : "");
+  messages.appendChild(debug);
+
   // transforma URLs do texto em links clicaveis, preservando o resto como texto
   function linkify(text) {
     const frag = document.createDocumentFragment();
