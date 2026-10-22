@@ -38,6 +38,11 @@ def _nucleo(titulo):
     t = re.split(r" Integrado ao Ensino| – Modalidade| - Modalidade", t)[0]
     return t.strip()
 
+def _com_nivel(titulo):
+    # nome do curso com o nivel, como a pagina o escreve (ex: "Curso Técnico em Administração Integrado
+    # ao Ensino Médio"): e o que vai ao prompt, para o agente nao tomar curso tecnico por graduacao
+    return re.sub(r"\s+", " ", (titulo or "").split(" - Campus")[0]).strip()
+
 def gerar(index=None, out=_OUT):
     # le do Upstash (read-only basta) e coleta as paginas de curso individuais
     if index is None:
@@ -51,15 +56,17 @@ def gerar(index=None, out=_OUT):
             m = v.metadata or {}
             u = m.get("source_url", "")
             if _SITE_CANOAS.match(u) and _PADRAO_CURSO.search(u) and u not in por_url:
-                por_url[u] = _nucleo(m.get("title", ""))
+                por_url[u] = (_nucleo(m.get("title", "")), _com_nivel(m.get("title", "")))
         cursor = res.next_cursor
         if cursor == "":
             break
 
-    cursos = sorted({t for t in por_url.values() if t})
+    # "cursos" (so o nucleo) e o criterio da Fase 2 do eval; "cursos_com_nivel" vai ao prompt do agente
+    cursos = sorted({n for n, _ in por_url.values() if n})
+    com_nivel = sorted({c for n, c in por_url.values() if n and c})
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w", encoding="utf-8") as f:
-        json.dump({"cursos": cursos, "urls": sorted(por_url)}, f, ensure_ascii=False, indent=2)
+        json.dump({"cursos": cursos, "cursos_com_nivel": com_nivel, "urls": sorted(por_url)}, f, ensure_ascii=False, indent=2)
     print(f"[cursos_atuais] {len(cursos)} cursos -> {out}")
     return cursos
 

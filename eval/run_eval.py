@@ -395,7 +395,8 @@ _RUBRICA = (
 def instrucoes_do_assistente(data_atual=None):
     # o prompt que o agente recebe, com a lista de cursos: fato que ele afirma vale como fonte para o juiz
     try:
-        cursos = ", ".join(json.load(open(CURSOS, encoding="utf-8"))["cursos"])
+        dados = json.load(open(CURSOS, encoding="utf-8"))
+        cursos = ", ".join(dados.get("cursos_com_nivel") or dados["cursos"])
     except Exception:
         cursos = "(lista indisponivel)"
     with open(PROMPT, encoding="utf-8") as f:

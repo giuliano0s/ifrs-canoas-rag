@@ -11,6 +11,18 @@
     "Manutenção e Suporte em Informática",
     "Matemática - Licenciatura"
   ],
+  "cursos_com_nivel": [
+    "Bacharelado em Engenharia Eletrônica",
+    "Curso Superior de Matemática - Licenciatura",
+    "Curso Superior de Tecnologia em Análise e Desenvolvimento de Sistemas",
+    "Curso Superior de Tecnologia em Automação Industrial",
+    "Curso Superior de Tecnologia em Logística",
+    "Curso Técnico em Administração Integrado ao Ensino Médio",
+    "Curso Técnico em Comércio Integrado ao Ensino Médio – Modalidade de Educação de Jovens e Adultos",
+    "Curso Técnico em Desenvolvimento de Sistemas Integrado ao Ensino Médio",
+    "Curso Técnico em Eletrônica Integrado ao Ensino Médio",
+    "Curso Técnico em Manutenção e Suporte em Informática Integrado ao Ensino Médio – Modalidade de Educação de Jovens e Adultos"
+  ],
   "urls": [
     "https://ifrs.edu.br/canoas/bacharelado-em-engenharia-eletrica-eletronica-2/",
     "https://ifrs.edu.br/canoas/bacharelado-em-engenharia-eletrica-eletronica/",

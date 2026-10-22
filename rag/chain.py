@@ -81,7 +81,8 @@ PROMPT_VERSAO = hashlib.sha256(agent_prompt.encode("utf-8")).hexdigest()[:12]
 _cursos_path = os.path.join(os.path.dirname(__file__), "../data/info/cursos_atuais.json")
 try:
     with open(_cursos_path, "r", encoding="utf-8") as f:
-        cursos_atuais = ", ".join(json.load(f).get("cursos", []))
+        dados = json.load(f)
+        cursos_atuais = ", ".join(dados.get("cursos_com_nivel") or dados.get("cursos", []))
 except Exception:
     cursos_atuais = "(lista indisponivel)"
 
@@ -504,6 +505,95 @@ def _guard_soma_propria(corpo, contexto):
     return sem_total.strip() if sem_total != corpo else corpo
 
 
+# D: nivel de ensino da data. o modelo as vezes da a um nivel a data que o calendario traz so para o outro
+# (a formatura dos Tecnicos Integrados, 16 a 17/12, apresentada como a dos cursos superiores). regra
+# deterministica sobre o texto: a data da frase tem que aparecer no contexto em alguma linha do mesmo nivel
+_NIVEL_SUPERIOR_RX = re.compile(r"\bsuperior|gradua[cç][aã]o|licenciatura|bacharelado|tecnologia", re.I)
+_NIVEL_MEDIO_RX = re.compile(r"integrad|ensino m[eé]dio|proeja|t[eé]cnic[oa]s? em\b", re.I)
+_NOME_NIVEL = {"superior": "cursos superiores", "medio": "cursos técnicos integrados ao ensino médio"}
+_MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro",
+          "novembro", "dezembro"]
+# "16 de dezembro", "16 a 17 de dezembro de 2026", "16 e 17 de dezembro"
+_DATA_EXTENSO_RX = re.compile(
+    rf"\b(\d{{1,2}})(?:\s*(?:a|e)\s*(\d{{1,2}}))?\s+de\s+({'|'.join(_MESES)})(?:\s+de\s+(\d{{4}}))?", re.I)
+_DATA_NUMERICA_RX = re.compile(r"\b(\d{1,2})/(\d{1,2})(?:/(\d{2,4}))?\b")
+
+
+def _nivel_unico(texto):
+    # "superior" ou "medio" quando o texto cita so um dos dois niveis; None quando cita os dois ou nenhum
+    superior = bool(_NIVEL_SUPERIOR_RX.search(texto))
+    medio = bool(_NIVEL_MEDIO_RX.search(texto))
+    return "superior" if superior and not medio else "medio" if medio and not superior else None
+
+
+def _datas_do_texto(texto):
+    # (dia, mes, ano ou None, trecho) de cada data do texto; faixa "16 a 17 de dezembro" rende os dois dias
+    datas = []
+    for m in _DATA_EXTENSO_RX.finditer(texto):
+        mes, ano = _MESES.index(m.group(3).lower()) + 1, int(m.group(4)) if m.group(4) else None
+        datas += [(int(dia), mes, ano, m.group(0)) for dia in (m.group(1), m.group(2)) if dia]
+    for m in _DATA_NUMERICA_RX.finditer(texto):
+        ano = int(m.group(3)) if m.group(3) else None
+        ano = ano + 2000 if ano is not None and ano < 100 else ano
+        datas.append((int(m.group(1)), int(m.group(2)), ano, m.group(0)))
+    return datas
+
+
+def _nivel_da_data(dia, mes, ano, linhas):
+    # nivel(is) das linhas do contexto que trazem a data: lista de "superior"/"medio", e None para linha
+    # sem nivel explicito (que torna a data indefinida)
+    niveis = []
+    for linha in linhas:
+        if any(d == dia and m == mes and (a is None or ano is None or a == ano) for d, m, a, _ in _datas_do_texto(linha)):
+            niveis.append(_nivel_unico(linha))
+    return niveis
+
+
+def _guard_nivel_da_data(corpo, contexto):
+    """Troca a frase que atribui a um nivel de ensino uma data que o contexto traz so para o outro nivel.
+
+    A frase cita um unico nivel (superior ou medio) e uma data; a data e dada como errada quando toda
+    linha do contexto que a traz tem nivel explicito e nenhuma e do nivel da frase. Linha sem nivel, ou
+    de ambos, deixa a data indefinida e a frase passa. A frase errada vira "No calendario, <data> e a data
+    de <rotulo da linha>, e nao dos <nivel>; a data para os <nivel> nao consta nos documentos", com as
+    citacoes [n] dela.
+
+    Args:
+        corpo: texto da resposta, sem o bloco "Fontes:".
+        contexto: texto dos trechos recuperados.
+
+    Returns:
+        O corpo com as frases erradas trocadas; o proprio corpo quando nenhuma e.
+    """
+    linhas = [linha.strip() for linha in (contexto or "").split("\n") if linha.strip()]
+    partes = re.split(r"((?<=[.!?])[ \t]+|\n+)", corpo)
+    for posicao, frase in enumerate(partes):
+        nivel = _nivel_unico(frase)
+        datas = _datas_do_texto(frase) if nivel else []
+        if not datas:
+            continue
+        erradas, confirmada = [], False
+        for dia, mes, ano, trecho in datas:
+            niveis = _nivel_da_data(dia, mes, ano, linhas)
+            if nivel in niveis:
+                confirmada = True
+            elif niveis and None not in niveis:
+                erradas.append((trecho, dia, mes, ano))
+        if confirmada or not erradas:
+            continue
+
+        # rotulo da linha que traz a data: o texto antes dos dois pontos, ou o inicio da linha
+        trecho, dia, mes, ano = erradas[0]
+        linha = next(l for l in linhas if any(d == dia and m == mes and (a is None or ano is None or a == ano)
+                                              for d, m, a, _ in _datas_do_texto(l)))
+        rotulo = linha.split(":")[0].strip() if ":" in linha[:140] else linha[:140].strip()
+        citacoes = " ".join(re.findall(r"\[\d+\]", frase))
+        partes[posicao] = (f"No calendário, {trecho} é a data de “{rotulo}”, e não dos {_NOME_NIVEL[nivel]}; "
+                           f"a data para os {_NOME_NIVEL[nivel]} não consta nos documentos"
+                           + (f" {citacoes}" if citacoes else "") + ".")
+    return "".join(partes)
+
+
 # ── guard de seguranca: vazamento do prompt ──────────────────────────────────────
 # o vazamento e medido por sequencias de 8 palavras do prompt (sem acento, minusculas) que a resposta
 # repete. respostas legitimas repetem ate 11 (frases que o proprio prompt manda dizer, como a correcao
@@ -549,6 +639,7 @@ def _aplicar_guards(corpo, fontes_anos, contexto, data_atual, gasto=None):
             hoje = datetime.now().date()
         if contexto:
             corpo = _guard_soma_propria(corpo, contexto)
+            corpo = _guard_nivel_da_data(corpo, contexto)
         corpo = _guard_ressalva_temporal(corpo, fontes_anos, hoje.year, gasto)
     except Exception as e:
         logger.warning(_safe(f"[GUARD] erro inesperado, mantendo resposta original: {e}"))
@@ -583,7 +674,7 @@ STATUS_BUSCA = "Buscando nos documentos do campus..."
 class _Previa:
     """Libera ao aluno, em frases inteiras, o texto que o modelo esta gerando.
 
-    Cada frase sai assim que termina, passa pela checagem de soma propria (C), e a previa para no bloco
+    Cada frase sai assim que termina, passa pelas checagens de soma propria (C) e de nivel da data (D), e a previa para no bloco
     "Fontes:". Se o texto ja exibido somado a frase repetir LIMITE_PREVIA sequencias do prompt, a previa
     para de liberar e a resposta final decide: recusa, se vazou, ou o texto inteiro de uma vez.
     """
@@ -619,9 +710,10 @@ class _Previa:
         trecho = self.gerado[self.liberado:corte]
         self.liberado = corte
         if self.contexto:
-            cortado = _guard_soma_propria(trecho, self.contexto)
-            if cortado != trecho:
-                trecho = cortado + trecho[len(trecho.rstrip()):]
+            for checagem in (_guard_soma_propria, _guard_nivel_da_data):
+                corrigido = checagem(trecho, self.contexto)
+                if corrigido != trecho:
+                    trecho = corrigido + trecho[len(trecho.rstrip()):]
         return trecho
 
 
