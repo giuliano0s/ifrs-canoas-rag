@@ -75,9 +75,9 @@ def main():
     except Exception as e:
         print(f"Falha ao gerar cursos_atuais (ingestao ja concluida): {e}")
 
-    # DEBUG: residuo de planilhas nao ingeridas, com o motivo
+    # DEBUG: residuo de planilhas fora da base ou ingeridas com aviso, com o motivo
     if SHEETS_FALHAS:
-        print(f"\n[RESIDUO] {len(SHEETS_FALHAS)} planilha(s) nao ingeridas:")
+        print(f"\n[RESIDUO] {len(SHEETS_FALHAS)} planilha(s) fora da base ou com aviso:")
         for url, motivo in SHEETS_FALHAS:
             print(f"  [{motivo}] {url}")
 

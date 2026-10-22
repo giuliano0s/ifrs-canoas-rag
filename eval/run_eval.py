@@ -219,20 +219,30 @@ def fase3_rr(rec, caso):
             return 1.0 / (i + 1)
     return 0.0
 
+def _casa_span(span, blob, chunks):
+    # span literal casa no texto inteiro; lista de trechos tem que caber num mesmo chunk (registro de
+    # planilha, que o estruturador pode escrever em outra ordem a cada releitura). blob e chunks ja normalizados
+    if isinstance(span, str):
+        return _norm(span) in blob
+    partes = [_norm(parte) for parte in span]
+    return any(all(parte in chunk for parte in partes) for chunk in chunks)
+
 def fase3_span(rec, caso):
     # N/A se sem answer_spans ou nao buscou; senao: algum span aparece nos chunks recuperados
     spans = caso.get("answer_spans", [])
     if not spans or not rec.get("buscas"):
         return None
-    textos = _norm(" \n ".join(t for b in rec.get("buscas", []) for t in b.get("chunks_textos", [])))
-    return any(_norm(s) in textos for s in spans)
+    brutos = [t for b in rec.get("buscas", []) for t in b.get("chunks_textos", [])]
+    blob, chunks = _norm(" \n ".join(brutos)), [_norm(t) for t in brutos]
+    return any(_casa_span(s, blob, chunks) for s in spans)
 
 # ── FASE 4: answerability (a resposta existe na base, independe do retrieval) ─────
 
 _BASE_TEXTO = None
+_BASE_CHUNKS = None
 def _base_texto():
-    # concatena o texto de TODOS os chunks da base (leitura read-only). Cacheado.
-    global _BASE_TEXTO
+    # concatena o texto de TODOS os chunks da base (leitura read-only) e guarda cada chunk normalizado. Cacheado.
+    global _BASE_TEXTO, _BASE_CHUNKS
     if _BASE_TEXTO is None:
         from upstash_vector import Index
         from dotenv import load_dotenv
@@ -246,6 +256,7 @@ def _base_texto():
             if cursor == "":
                 break
         _BASE_TEXTO = _norm(" ".join(partes))
+        _BASE_CHUNKS = [_norm(parte) for parte in partes]
     return _BASE_TEXTO
 
 def fase4(caso):
@@ -255,7 +266,7 @@ def fase4(caso):
     if not spans:
         return None
     blob = _base_texto()
-    return any(_norm(s) in blob for s in spans)
+    return any(_casa_span(s, blob, _BASE_CHUNKS) for s in spans)
 
 # ── FASE 7: citacao (os [n] citados estao entre as fontes do contexto) ───────────
 

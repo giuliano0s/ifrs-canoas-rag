@@ -44,7 +44,7 @@ def extract_page_content(soup):
     return title, main.get_text(separator="\n", strip=True)
 
 def parse_html_page(url, headers=HEADERS):
-    # baixa e extrai UMA pagina (usado pelo resolve_sheet_date para inferir a data do pai)
+    # baixa e extrai UMA pagina (usado pelo parser de planilhas para o assunto e a data da pagina pai)
     try:
         response = fetch(url, timeout=10, headers=headers)
         response.raise_for_status()

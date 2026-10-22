@@ -358,9 +358,9 @@
     "https://docs.google.com/spreadsheets/d/e/2PACX-1vSe0FNxNDSYT0Zcd4AiYRPqUZri0OgIpuviesghmmDT_uctiIP5WNxkg7wDaXWnat_6O5EaW7BpQ20U/pubhtml?gid=791545582&single=true"
    ],
    "answer_spans": [
-    "Otávio Simões Mano atende"
+    ["Otávio Simões Mano", "F124"]
    ],
-   "notas": "Gold por conteúdo: planilha de atendimento docente 2026 (um registro por linha). Re-curado em 15/10/2026: a ingestão diária reestruturou a planilha (uma linha por professor com todos os horários), e o trecho passou a ser o começo comum aos dois formatos."
+   "notas": "Gold por conteúdo: planilha de atendimento docente 2026 (um registro por linha). Re-curado em 15/10/2026: a ingestão diária reestruturou a planilha (uma linha por professor com todos os horários), e o trecho passou a ser o começo comum aos dois formatos. Re-curado em 21/10/2026, pelo conteúdo: a planilha foi reestruturada com o assunto em cada registro e a sala e o e-mail antes do horário; o trecho do gabarito passa a ser uma lista de partes que precisam estar no mesmo registro, em qualquer ordem."
   },
   {
    "id": "ctrl-atendimento-omar",
@@ -384,9 +384,9 @@
     "https://docs.google.com/spreadsheets/d/e/2PACX-1vSe0FNxNDSYT0Zcd4AiYRPqUZri0OgIpuviesghmmDT_uctiIP5WNxkg7wDaXWnat_6O5EaW7BpQ20U/pubhtml?gid=791545582&single=true"
    ],
    "answer_spans": [
-    "Omar Júnior Garcia Silveira atende na quarta das 9h30-11h30 e 13h30-15h30, sala A16"
+    ["Omar Júnior Garcia Silveira", "quarta das 9h30-11h30 e 13h30-15h30", "A16"]
    ],
-   "notas": "Gold por conteúdo: planilha de atendimento docente 2026; único Omar na planilha."
+   "notas": "Gold por conteúdo: planilha de atendimento docente 2026; único Omar na planilha. Re-curado em 21/10/2026, pelo conteúdo: a planilha foi reestruturada com o assunto em cada registro e a sala e o e-mail antes do horário; o trecho do gabarito passa a ser uma lista de partes que precisam estar no mesmo registro, em qualquer ordem."
   },
   {
    "id": "ctrl-email-biblioteca",

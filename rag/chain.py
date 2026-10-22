@@ -422,13 +422,19 @@ def _guard_ressalva_temporal(corpo, fontes_anos, ano_atual, uso=None):
 
 _SOMA_RX = re.compile(
     r"(totaliz\w*|somand\w*|ao todo|no total|um total de|total geral de)\D{0,40}?(\d+(?:\.\d{3})*)", re.I)
+# vagas atribuidas a um grupo de cursos ("300 vagas nos cursos tecnicos", "66 vagas em cursos superiores"):
+# total pela forma, mesmo sem a palavra total. calibrado nas 3.360 respostas coletadas ate 21/10/2026:
+# 14 disparos com o numero fora do contexto, todos somas do modelo no total-vagas-campus, nenhum fora dele
+_VAGAS_GRUPO_RX = re.compile(
+    r"\b(\d+(?:\.\d{3})*)\s+(?=vagas\s+(?:\w+\s+){0,3}?(?:n[oa]s|em|para\s+os|entre\s+os|d[oa]s)\s+(?:\w+\s+){0,2}?cursos\b)", re.I)
 
 
 def _guard_soma_propria(corpo, contexto):
-    # C: total calculado pelo modelo ("totalizando 112", "somando ... 66 vagas", "um total de 344")
-    # cujo numero nao existe no contexto. deterministico, frase a frase (ponto ou quebra de linha):
-    # corta a oracao da soma a partir da virgula que a introduz, mantendo as citacoes [n] dela, ou
-    # remove a frase quando ela e so a soma
+    # C: total calculado pelo modelo cujo numero nao existe no contexto. deterministico, frase a frase
+    # (ponto ou quebra de linha). total anunciado por palavra ("totalizando 112", "somando ... 66 vagas",
+    # "um total de 344"): corta a oracao da soma a partir da virgula que a introduz, mantendo as citacoes
+    # [n] dela, ou remove a frase quando ela e so a soma. total pela forma ("oferece 300 vagas nos cursos
+    # tecnicos: ..."): sai so o numero, e a frase fica com o detalhamento por curso que costuma vir depois
     numeros_ctx = set(re.findall(r"\d+", (contexto or "").replace(".", "")))
     partes = re.split(r"((?<=[.!?])[ \t]+|\n+)", corpo)
     saida, cortou = [], False
@@ -442,9 +448,12 @@ def _guard_soma_propria(corpo, contexto):
         if virgula >= 0:
             citacoes = " ".join(re.findall(r"\[\d+\]", frase[virgula:]))
             saida.append(frase[:virgula].rstrip() + (f" {citacoes}" if citacoes else "") + ".")
-    if not cortou:
-        return corpo
-    return re.sub(r"\n{3,}", "\n\n", "".join(saida)).strip()
+    if cortou:
+        corpo = re.sub(r"\n{3,}", "\n\n", "".join(saida)).strip()
+
+    # total pela forma, com o numero fora do contexto
+    sem_total = _VAGAS_GRUPO_RX.sub(lambda m: m.group(0) if m.group(1).replace(".", "") in numeros_ctx else "", corpo)
+    return sem_total.strip() if sem_total != corpo else corpo
 
 
 # ── guard de seguranca: vazamento do prompt ──────────────────────────────────────

@@ -95,6 +95,15 @@ def secoes_de_campus(text):
 def e_canoas(campus):
     return campus.lower().startswith("canoas")
 
+def campus_citado(texto):
+    # campus do IFRS que o texto nomeia como "Campus X" (ex: o titulo "1a CHAMADA | Campus Alvorada - Processo
+    # Seletivo IFRS 2025/1" de uma pagina do portal de ingresso), ou None
+    for achado in re.finditer(r"Campus\s+([A-ZÁÉÍÓÚÂÊÔÃÕÇ][^|\-–,()\n]{1,40})", texto or ""):
+        nome = achado.group(1).strip()
+        if _campus_do_ifrs(nome):
+            return nome
+    return None
+
 def sem_outros_campi(text):
     # texto de um documento multi-campus sem as secoes dos outros campi: fica a de Canoas e o que nao
     # pertence a campus nenhum (corpo do edital, anexos). sem secoes reconhecidas, o texto volta inteiro
@@ -252,6 +261,24 @@ def chunks_de_pdf(pdf):
                 chunks.append(c)
     return chunks
 
+def chunks_de_planilha(sheet):
+    # a planilha e uma LISTA DE REGISTROS (o structure_sheet produz uma frase por linha, um por
+    # professor/setor, ja com o assunto da planilha e o cabecalho da secao, para cada chunk se sustentar
+    # sozinho), entao cada registro vira seu proprio chunk (por_linha=True). Sem isso, o splitter por
+    # tamanho empacota ~20 registros num chunk de 4000 chars, e uma consulta a UM registro ("contato do
+    # professor X") disputa dentro do blocao e o dado certo nao chega ao contexto (mesmo motivo do
+    # por_linha da grade)
+    metadata = {
+        "source_url":   sheet["source_url"],
+        "title":        sheet["title"],
+        "type":         "sheet",
+        "published_at": sheet.get("published_at"),
+        "source_hash":  sheet.get("source_hash"),
+        "campus_scope": classify_campus_scope(sheet.get("title", ""), sheet["text"], sheet["source_url"]),
+        "curso_escopo": classify_curso_escopo(sheet.get("title", ""), sheet["text"], sheet["source_url"]),
+    }
+    return chunk_document(sheet["text"], metadata, por_linha=True)
+
 def run_chunker(pages_parsed, pdfs_parsed, sheets_parsed):
     print("\n" + "="*60)
     print("FASE 4 — CHUNKER")
@@ -282,22 +309,9 @@ def run_chunker(pages_parsed, pdfs_parsed, sheets_parsed):
         if not pdf["is_scanned"]:
             chunks.extend(chunks_de_pdf(pdf))
 
-    # processa planilhas (Google Sheets estruturados em frases). por_linha=True: a planilha e uma
-    # LISTA DE REGISTROS (o structure_sheet_text produz uma frase por linha, um por professor/setor),
-    # entao cada registro vira seu proprio chunk. Sem isso, o splitter por tamanho empacota ~20
-    # registros num chunk de 4000 chars, e uma consulta a UM registro ("contato do professor X")
-    # disputa dentro do blocao e o dado certo nao chega ao contexto (mesmo motivo do por_linha da grade).
+    # processa planilhas (Google Sheets estruturados em registros)
     for sheet in sheets_parsed:
-        metadata = {
-            "source_url":   sheet["source_url"],
-            "title":        sheet["title"],
-            "type":         "sheet",
-            "published_at": sheet.get("published_at"),
-            "source_hash":  sheet.get("source_hash"),
-            "campus_scope": classify_campus_scope(sheet.get("title", ""), sheet["text"], sheet["source_url"]),
-            "curso_escopo": classify_curso_escopo(sheet.get("title", ""), sheet["text"], sheet["source_url"]),
-        }
-        chunks.extend(chunk_document(sheet["text"], metadata, por_linha=True))
+        chunks.extend(chunks_de_planilha(sheet))
 
     CHUNKS_PATH.write_text(json.dumps(chunks, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Total de chunks: {len(chunks)}")

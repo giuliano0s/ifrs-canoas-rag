@@ -64,10 +64,10 @@
         "https://docs.google.com/spreadsheets/d/e/2PACX-1vSe0FNxNDSYT0Zcd4AiYRPqUZri0OgIpuviesghmmDT_uctiIP5WNxkg7wDaXWnat_6O5EaW7BpQ20U/pubhtml?gid=791545582&single=true"
       ],
       "answer_spans": [
-        "Ígor Lorenzato Almeida atende na quinta das 18h - 20h",
-        "Ígor Abrahão Paranhos atende na terça das 17h - 19h"
+        ["Ígor Lorenzato Almeida", "quinta das 18h - 20h"],
+        ["Ígor Abrahão Paranhos", "terça das 17h - 19h"]
       ],
-      "notas": "CORRIGIDO após revisão manual: (1) há DOIS Igors na base (Ígor Lorenzato Almeida e Ígor Abrahão Paranhos), então 'horário do Igor' É ambíguo e o agente acerta ao distinguir os dois. (2) atendimento (planilha gid=791545582, salas F117/F124) é DIFERENTE de monitoria (planilha gid=708551225, labs D10/D06); o gold anterior confundia os dois. Spans conferidos no conteúdo da planilha de atendimento. acao_esperada segue 'buscar' (listar os dois é o comportamento ideal). [Re-curado 04/08/2026: a planilha de atendimento MUDOU na fonte (era quinta 18-20 + sexta 13-15; agora quarta 18-20 + quinta 13-15). Gold com span literal de fonte mutavel apodrece: agora lista ALTERNATIVAS (any-match), com a sala F117 como a mais estavel. Re-curar quando a planilha mudar de novo.] [Re-curado 03/10/2026: a planilha de atendimento foi esvaziada na fonte para o novo semestre (6 docentes, nenhum Igor; conferido na planilha publicada e na base). O caso passa a ser de NAO-ALUCINACAO: existe_na_base=false, sem answer_spans; o gold_url segue a planilha, que e onde o dado deveria estar.] RE-CURADO em 21/10/2026: a planilha de atendimento voltou a trazer os dois Igors (o caso tinha virado de não-alucinação em 03/10, quando a planilha foi esvaziada); o gabarito volta a ser o horário de cada um."
+      "notas": "CORRIGIDO após revisão manual: (1) há DOIS Igors na base (Ígor Lorenzato Almeida e Ígor Abrahão Paranhos), então 'horário do Igor' É ambíguo e o agente acerta ao distinguir os dois. (2) atendimento (planilha gid=791545582, salas F117/F124) é DIFERENTE de monitoria (planilha gid=708551225, labs D10/D06); o gold anterior confundia os dois. Spans conferidos no conteúdo da planilha de atendimento. acao_esperada segue 'buscar' (listar os dois é o comportamento ideal). [Re-curado 04/08/2026: a planilha de atendimento MUDOU na fonte (era quinta 18-20 + sexta 13-15; agora quarta 18-20 + quinta 13-15). Gold com span literal de fonte mutavel apodrece: agora lista ALTERNATIVAS (any-match), com a sala F117 como a mais estavel. Re-curar quando a planilha mudar de novo.] [Re-curado 03/10/2026: a planilha de atendimento foi esvaziada na fonte para o novo semestre (6 docentes, nenhum Igor; conferido na planilha publicada e na base). O caso passa a ser de NAO-ALUCINACAO: existe_na_base=false, sem answer_spans; o gold_url segue a planilha, que e onde o dado deveria estar.] RE-CURADO em 21/10/2026: a planilha de atendimento voltou a trazer os dois Igors (o caso tinha virado de não-alucinação em 03/10, quando a planilha foi esvaziada); o gabarito volta a ser o horário de cada um. Re-curado de novo em 21/10/2026, pelo conteúdo: a planilha foi reestruturada com o assunto em cada registro e a sala e o e-mail antes do horário; cada trecho do gabarito passa a ser uma lista de partes que precisam estar no mesmo registro, em qualquer ordem."
     },
     {
       "id": "atendimento-vago",
@@ -773,9 +773,9 @@
         "https://ingresso.ifrs.edu.br/#resultados"
       ],
       "answer_spans": [
-        "não ficam nesta base de documentos"
+        ["listas com nomes de candidatos", "privacidade"]
       ],
-      "notas": "Caso da telemetria do teste público (13/10/2026). Listas nominais de candidatos ficam fora da base por decisão (filtro de dados pessoais), e o trecho do Edital nº 7/2026 com o caminho (itens 13.1 e 15.11) não é recuperado para esta pergunta, nem com o edital cortado por item (simulado em 14/10). Desde 17/10/2026 a resposta vem da fonte curada https://ingresso.ifrs.edu.br/#resultados (data/info/fontes_curadas.json), que a busca põe em 1º lugar nas consultas de pedido de nomes. Uma regra no prompt foi testada antes e descartada: piorava respostas vizinhas (formatura e trancamento no conjunto de controle).",
+      "notas": "Caso da telemetria do teste público (13/10/2026). Listas nominais de candidatos ficam fora da base por decisão (filtro de dados pessoais), e o trecho do Edital nº 7/2026 com o caminho (itens 13.1 e 15.11) não é recuperado para esta pergunta, nem com o edital cortado por item (simulado em 14/10). Desde 17/10/2026 a resposta vem da fonte curada https://ingresso.ifrs.edu.br/#resultados (data/info/fontes_curadas.json), que a busca põe em 1º lugar nas consultas de pedido de nomes. Uma regra no prompt foi testada antes e descartada: piorava respostas vizinhas (formatura e trancamento no conjunto de controle). Re-curado em 22/10/2026, pelo conteúdo: o texto da fonte curada deixou de dizer \"não ficam nesta base de documentos\" (21/10), e o trecho do gabarito passou a ser as partes que as duas versões do texto trazem.",
       "origem": "producao",
       "trace_id": "da710abb-28cc-4c3b-af53-d4dec9b97763"
     },
