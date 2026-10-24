@@ -15,10 +15,10 @@ def _cliente():
     global _client, _estado
     if _estado is None:
         pub, sec = os.getenv("LANGFUSE_PUBLIC_KEY"), os.getenv("LANGFUSE_SECRET_KEY")
-        host = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
+        base_url = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
         try:
             from langfuse import Langfuse
-            _client = Langfuse(public_key=pub, secret_key=sec, host=host) if (pub and sec) else None
+            _client = Langfuse(public_key=pub, secret_key=sec, base_url=base_url) if (pub and sec) else None
         except Exception:
             _client = None
         _estado = _client is not None
@@ -76,12 +76,17 @@ def _tags_raciocinio(resumo):
 # versao viva do prompt: perguntas reais viram candidatas a caso de golden depois da curadoria.
 # payload LEVE: guarda os ids dos chunks (url#i), nao o texto cru; o harvest reconstroi o texto
 # localmente com index.fetch(ids). tudo dentro de try: falha de telemetria nunca afeta a resposta.
+# o turno e UMA observacao raiz "chat": pergunta e resposta no input/output dela, o registro completo
+# no metadata dela; sessao, usuario, versao do prompt e marcas vao por propagate_attributes, que no
+# modelo do Langfuse v4 carimba toda observacao do turno (o metadata propagado aceita so texto curto,
+# por isso o registro fica na raiz e nao e propagado).
 def registrar_chat(query, history, trace, resposta, latencia_ms, erro=None, session_id=None, user_id=None,
                    primeiro_texto_ms=None):
     cli = _cliente()
     if cli is None:
         return
     try:
+        from langfuse import propagate_attributes
         from rag.chain import registro_de_trace, MODEL, PROMPT_VERSAO
 
         # nada do que o aluno digitou sai com dado pessoal: pergunta, queries de busca e eco na resposta
@@ -107,8 +112,12 @@ def registrar_chat(query, history, trace, resposta, latencia_ms, erro=None, sess
             "user_id": user_id,
             "origem": "producao",
         })
-        cli.trace(name="chat", input=query, output=resposta, session_id=session_id, user_id=user_id, metadata=rec,
-                  tags=_tags_raciocinio(rec.get("raciocinio") or {}))
+
+        # raiz do turno criada dentro do escopo de propagacao; o flush envia antes da funcao serverless congelar
+        with propagate_attributes(trace_name="chat", session_id=session_id, user_id=user_id, version=PROMPT_VERSAO,
+                                  tags=_tags_raciocinio(rec.get("raciocinio") or {})):
+            cli.start_observation(name="chat", as_type="span", input=query, output=resposta, metadata=rec,
+                                  level="ERROR" if erro else None, status_message=erro).end()
         cli.flush()
     except Exception:
         pass

@@ -14,7 +14,7 @@ google-genai==2.6.0
 openai==2.9.0
 
 # Telemetria (Langfuse): opcional, no-op sem as chaves LANGFUSE_*
-langfuse==2.60.10
+langfuse==5.0.4
 
 # UI
 flask==3.1.3
