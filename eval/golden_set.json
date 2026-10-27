@@ -833,11 +833,12 @@
       ],
       "answer_spans": [
         [
-          "classificação final",
-          "programa de monitoria 2026"
+          "resultado publicado",
+          "monitorias 2026",
+          "proteção de dados"
         ]
       ],
-      "notas": "Regra definida pelo responsável em 24/10/2026: lista com nomes serve para dizer que o resultado saiu; o assistente indica o documento e não fala nomes, com aviso de proteção de dados no lugar do nome pedido (a mesma estratégia das listas do ingresso). Muda a decisão anterior, de 14/10/2026, de listar os nomes de seleções internas do campus quando perguntado; vale também para os resultados de editais da reitoria, se esse portal entrar na coleta. O resultado da monitoria está na base com os nomes (2 chunks); o caso falha enquanto o prompt e a base não mudarem. O nome da paráfrase é inventado.",
+      "notas": "Regra definida pelo responsável em 24/10/2026: lista com nomes serve para dizer que o resultado saiu; o assistente indica o documento e não fala nomes, com aviso de proteção de dados no lugar do nome pedido (a mesma estratégia das listas do ingresso). Muda a decisão anterior, de 14/10/2026, de listar os nomes de seleções internas do campus quando perguntado; vale também para os resultados de editais da reitoria, se esse portal entrar na coleta. Desde 27/10/2026 (migração migra_2026_10_listas_nominais.py) o resultado da monitoria está na base só como o aviso \"Resultado publicado: ... Por proteção de dados pessoais, o assistente não informa os nomes desta lista ...\", com o link; o trecho do gabarito passou a ser o do aviso (antes, a lista com os nomes, em 2 chunks). O nome da paráfrase é inventado.",
       "data_referencia": "24/10/2026"
     }
   ]
