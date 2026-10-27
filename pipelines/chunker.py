@@ -222,6 +222,9 @@ def chunks_de_pdf(pdf):
         "published_at": pdf.get("published_at"),
         "source_hash":  pdf.get("source_hash"),
     }
+    # lista de pessoas: um chunk so, o aviso sem nomes, marcado para a migracao e a auditoria o reconhecerem
+    if pdf.get("lista_nomes"):
+        return [{**base_meta, "lista_nomes": True, "text": pdf["text"]}]
     # quadro de vagas: um chunk por curso de Canoas, o unico campus que o parser estrutura; linha de
     # outro campus nao entra. o campus esta EXPLICITO em cada linha e cada chunk e um curso atomico
     if pdf.get("is_vagas"):
@@ -298,6 +301,10 @@ def run_chunker(pages_parsed, pdfs_parsed, sheets_parsed):
             "campus_scope": classify_campus_scope(page["title"], page["text"], page["source_url"]),
             "curso_escopo": classify_curso_escopo(page["title"], page["text"], page["source_url"]),
         }
+        # lista de pessoas: um chunk so, o aviso sem nomes, marcado
+        if page.get("lista_nomes"):
+            chunks.append({**metadata, "lista_nomes": True, "text": page["text"]})
+            continue
         # cronograma (de processo seletivo, de matricula) vira um chunk por evento; o resto, o fatiamento por tamanho
         cronograma = []
         if "cronograma" in (page["source_url"] + " " + page["title"]).lower():

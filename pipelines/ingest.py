@@ -81,6 +81,9 @@ def ingest_chunks(chunks, batch_size=100):
                 meta["schedule_source"] = chunk.get("schedule_source")
             if chunk.get("is_calendar"):
                 meta["is_calendar"] = True
+            # aviso que substitui uma lista de pessoas (pipelines/listas_nomes.py)
+            if chunk.get("lista_nomes"):
+                meta["lista_nomes"] = True
             # vetor de uma frase de busca (evento do calendario, fonte curada): a frase fica gravada ao lado
             # do text que vai ao contexto
             if chunk.get("texto_busca"):

@@ -13,7 +13,7 @@ from rag import llm
 from rag.cursos_escopo import curso_da_query, nome_curso
 import time
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 load_dotenv()
 
@@ -175,7 +175,7 @@ def build_context(hits, min_score=MIN_SCORE, top_n=CONTEXT_K):
 
 
 def _date_score(hit):
-    max_year = datetime.now().year
+    max_year = hoje_brasilia().year
     raw = hit.metadata.get("published_at")
     if not raw:
         return 0.5
@@ -308,6 +308,8 @@ def registro_de_trace(trace, query, resposta, erro=None):
         "chamadas": chamadas,
         "raciocinio": resumo_raciocinio(chamadas),
         "custo_usd": round(sum(custos), 6) if custos else None,
+        # checagens pos-geracao que mudaram o texto do modelo (A, C, D, E, F)
+        "checagens": t.get("checagens", []),
     }
 
 
@@ -594,6 +596,164 @@ def _guard_nivel_da_data(corpo, contexto):
     return "".join(partes)
 
 
+# E: "hoje" e "amanha" no dia errado. o modelo as vezes toma a data do relogio da API (UTC) pela data do
+# pedido e chama de hoje o dia seguinte ("as inscricoes vao ate 25/10, hoje e o ultimo dia" num dia 24).
+# regra deterministica: a data dita como hoje (ou amanha) tem que ser a data atual do pedido (ou a seguinte)
+_HOJE_E_RX = re.compile(r"\b(hoje|amanh[ãa])\s+(?:é|será)\s+(?:dia\s+)?", re.I)
+_PRAZO_HOJE_RX = re.compile(
+    r"(?:(?:portanto|ou seja|logo),?\s+)?\b(hoje|amanh[ãa])\s+é\s+o\s+último\s+dia"
+    r"|\bo\s+último\s+dia\s+é\s+(hoje|amanh[ãa])\b"
+    r"|\b(termina|terminam|encerra|encerram|vence|vencem|acaba|acabam|fecha|fecham)\s+(hoje|amanh[ãa])\b", re.I)
+
+
+def _dia_dito(palavra, hoje):
+    return hoje if palavra.lower() == "hoje" else hoje + timedelta(days=1)
+
+
+def _data_completa(dia, mes, ano, hoje, frase=""):
+    # data citada como date. sem o ano: o ano unico citado na frase ("a Etapa 2 de 2026, de 26 de janeiro a
+    # 16 de fevereiro"); sem ele, o ano corrente, trocado pelo vizinho so na virada do ano (a data no ano
+    # corrente a mais de 6 meses e no vizinho a menos de 2: "12 a 14 de janeiro" dito em dezembro). None
+    # para data impossivel
+    def montar(opcao):
+        try:
+            return datetime(opcao, mes, dia).date()
+        except ValueError:
+            return None
+    if ano:
+        return montar(ano)
+    anos_da_frase = set(re.findall(r"\b(20\d{2})\b", frase))
+    if len(anos_da_frase) == 1:
+        return montar(int(anos_da_frase.pop()))
+    data = montar(hoje.year)
+    if data and abs((data - hoje).days) > 180:
+        vizinhas = [vizinha for vizinha in (montar(hoje.year - 1), montar(hoje.year + 1))
+                    if vizinha and abs((vizinha - hoje).days) <= 60]
+        if vizinhas:
+            return vizinhas[0]
+    return data
+
+
+def _guard_hoje(corpo, hoje):
+    """Corrige a frase que chama de hoje (ou amanha) um dia que nao e o da data atual do pedido.
+
+    Duas formas: "hoje e o ultimo dia", "o ultimo dia e hoje" ou "termina hoje" numa frase cujas datas nao
+    incluem a de hoje, em que a palavra vira a data da frase mais proxima de hoje; e, em frase sem prazo,
+    "hoje e <data>" com a data errada, que passa a trazer a data atual no mesmo formato. Frase com a data
+    certa passa.
+
+    Args:
+        corpo: texto da resposta, sem o bloco "Fontes:".
+        hoje: data atual do pedido (date).
+
+    Returns:
+        O corpo com as frases erradas corrigidas; o proprio corpo quando nenhuma e.
+    """
+    partes = re.split(r"((?<=[.!?])[ \t]+|\n+)", corpo)
+    for posicao, frase in enumerate(partes):
+        if not re.search(r"\b(hoje|amanh[ãa])\b", frase, re.I) or not _datas_do_texto(frase):
+            continue
+
+        # "hoje e o ultimo dia" e "termina hoje": vale se alguma data da frase for o dia dito; senao a palavra
+        # vira a data mais proxima (e a mesma data repetida logo depois, "termina hoje, 25/10", sai)
+        prazo = _PRAZO_HOJE_RX.search(frase)
+        if prazo:
+            palavra = prazo.group(1) or prazo.group(2) or prazo.group(4)
+            certo = _dia_dito(palavra, hoje)
+            candidatas = []
+            for dia, mes, ano, trecho in _datas_do_texto(frase):
+                data = _data_completa(dia, mes, ano, certo, frase)
+                if data:
+                    candidatas.append((abs((data - certo).days), trecho))
+            if candidatas and min(candidatas)[0] != 0:
+                trecho = min(candidatas)[1]
+                troca = f"{prazo.group(3)} em {trecho}" if prazo.group(3) else f"o último dia é {trecho}"
+                resto = re.sub(rf"^,?\s*{re.escape(trecho)}", "", frase[prazo.end():])
+                frase = frase[:prazo.start()] + troca + resto
+            partes[posicao] = frase
+            continue
+
+        # "hoje e <data>", em frase sem prazo: a data logo depois da palavra tem que ser a do dia dito
+        for m in list(_HOJE_E_RX.finditer(frase)):
+            depois = frase[m.end():]
+            data = _DATA_EXTENSO_RX.match(depois) or _DATA_NUMERICA_RX.match(depois)
+            if not data:
+                continue
+            extenso = data.re is _DATA_EXTENSO_RX
+            dia = int(data.group(1))
+            mes = _MESES.index(data.group(3).lower()) + 1 if extenso else int(data.group(2))
+            ano = data.group(4) if extenso else data.group(3)
+            certo = _dia_dito(m.group(1), hoje)
+            if dia != certo.day or mes != certo.month or (ano and int(ano) % 100 != certo.year % 100):
+                novo = f"{certo.day} de {_MESES[certo.month - 1]} de {certo.year}" if extenso else certo.strftime("%d/%m/%Y")
+                frase = frase[:m.end()] + depois.replace(data.group(0), novo, 1)
+        partes[posicao] = frase
+    return "".join(partes)
+
+
+# F: prazo dado como encerrado sem ter encerrado, e o contrario ("as inscricoes vao de 9 a 25 de outubro,
+# entao o prazo ja encerrou" num dia 24). regra deterministica: a data citada logo antes da afirmacao tem que
+# concordar com ela; a data atual citada pelo proprio modelo ("como a data atual e ...") nao conta
+_JA_FECHOU_RX = re.compile(
+    r"\bj[áa]\s+(?:encerrou|encerraram|passou|passaram|terminou|terminaram|foi\s+encerrad[oa]|foram\s+encerrad[oa]s"
+    r"|est(?:á|a|ão|ao)\s+encerrad[oa]s?)|\bn[ãa]o\s+est(?:á|a|(ão|ao))\s+mais\s+(abert[oa]s?)", re.I)
+_AINDA_ABERTO_RX = re.compile(
+    r"\bainda\s+est(?:á|a|(ão|ao))\s+abert[oa]s?|\bcontinua(m)?\s+abert[oa]s?|\bainda\s+d[áa]\s+tempo"
+    r"|\bainda\s+est(?:á|a|ão|ao)\s+dentro\s+do\s+prazo", re.I)
+_DATA_ATUAL_ANTES_RX = re.compile(r"(data\s+atual|hoje|estamos\s+em|atualmente|neste\s+momento)[^.;]{0,15}$", re.I)
+
+
+def _data_antes(frase, posicao, hoje):
+    # ultima data citada antes da posicao (a maior, numa faixa), sem as que o modelo apresenta como a data atual
+    melhor = None
+    for dia, mes, ano, trecho in _datas_do_texto(frase[:posicao]):
+        inicio = frase[:posicao].rfind(trecho)
+        if _DATA_ATUAL_ANTES_RX.search(frase[:inicio]):
+            continue
+        data = _data_completa(dia, mes, ano, hoje, frase)
+        if data is None:
+            continue
+        if melhor is None or (inicio, data) > melhor:
+            melhor = (inicio, data)
+    return melhor[1] if melhor else None
+
+
+def _guard_prazo(corpo, hoje):
+    """Corrige a frase que da como encerrado um prazo que ainda nao passou, ou como aberto um que ja passou.
+
+    A data de referencia e a ultima citada antes da afirmacao ("de 9 a 25 de outubro, entao ja encerrou"
+    olha o 25), sem contar a data atual que o proprio modelo cita. "Ja encerrou" com data depois de hoje vira
+    "ainda nao encerrou"; "ainda esta aberto" com data antes de hoje vira "ja encerrou". Data de hoje passa.
+
+    Args:
+        corpo: texto da resposta, sem o bloco "Fontes:".
+        hoje: data atual do pedido (date).
+
+    Returns:
+        O corpo com as frases contraditorias corrigidas; o proprio corpo quando nenhuma e.
+    """
+    partes = re.split(r"((?<=[.!?])[ \t]+|\n+)", corpo)
+    for posicao, frase in enumerate(partes):
+        fechou = _JA_FECHOU_RX.search(frase)
+        if fechou:
+            data = _data_antes(frase, fechou.start(), hoje)
+            if data and data > hoje:
+                trecho = fechou.group(0)
+                if fechou.group(2):
+                    novo = f"ainda {'estão' if fechou.group(1) else 'está'} {fechou.group(2)}"
+                else:
+                    novo = re.sub(r"^j[áa]\s+", "ainda não ", trecho, flags=re.I)
+                frase = frase[:fechou.start()] + novo + frase[fechou.end():]
+        aberto = _AINDA_ABERTO_RX.search(frase)
+        if aberto:
+            data = _data_antes(frase, aberto.start(), hoje)
+            if data and data < hoje:
+                plural = bool(aberto.group(1) or aberto.group(2))
+                frase = frase[:aberto.start()] + ("já encerraram" if plural else "já encerrou") + frase[aberto.end():]
+        partes[posicao] = frase
+    return "".join(partes)
+
+
 # ── guard de seguranca: vazamento do prompt ──────────────────────────────────────
 # o vazamento e medido por sequencias de 8 palavras do prompt (sem acento, minusculas) que a resposta
 # repete. respostas legitimas repetem ate 11 (frases que o proprio prompt manda dizer, como a correcao
@@ -627,26 +787,67 @@ def _vazou_prompt(corpo):
         return False
 
 
-def _aplicar_guards(corpo, fontes_anos, contexto, data_atual, gasto=None):
+def hoje_brasilia():
+    """Data de hoje no horario de Brasilia (UTC-3, sem horario de verao desde 2019).
+
+    O servidor do Vercel roda em UTC e, entre 21h e 0h, ja estaria no dia seguinte.
+    """
+    return datetime.now(timezone(timedelta(hours=-3))).date()
+
+
+def _data_do_pedido(data_atual):
+    # data atual do pedido ("dd/mm/aaaa"); sem ela, a de hoje em Brasilia
+    try:
+        return datetime.strptime(data_atual, "%d/%m/%Y").date()
+    except (ValueError, TypeError):
+        return hoje_brasilia()
+
+
+def _checar_texto(texto, contexto, hoje, alteracoes=None):
+    """Aplica as checagens deterministicas de texto, na mesma ordem na resposta final e na previa.
+
+    Ordem: E (hoje no dia errado), F (prazo contra a data citada), C (soma propria) e D (nivel da data).
+    E e F precisam da data do pedido; C e D, do contexto recuperado.
+
+    Args:
+        texto: corpo da resposta, ou trecho da previa.
+        contexto: texto dos trechos recuperados (vazio sem busca).
+        hoje: data atual do pedido (date), ou None.
+        alteracoes: lista que recebe a letra de cada checagem que mudou o texto, quando dada.
+
+    Returns:
+        O texto depois das checagens.
+    """
+    etapas = (("E", lambda atual: _guard_hoje(atual, hoje) if hoje else atual),
+              ("F", lambda atual: _guard_prazo(atual, hoje) if hoje else atual),
+              ("C", lambda atual: _guard_soma_propria(atual, contexto) if contexto else atual),
+              ("D", lambda atual: _guard_nivel_da_data(atual, contexto) if contexto else atual))
+    for letra, etapa in etapas:
+        novo = etapa(texto)
+        if novo != texto and alteracoes is not None:
+            alteracoes.append(letra)
+        texto = novo
+    return texto
+
+
+def _aplicar_guards(corpo, fontes_anos, contexto, data_atual, gasto=None, alteracoes=None):
     # orquestra as checagens pos-geracao sobre o corpo. fail-safe: qualquer erro devolve
     # o corpo original. no-op quando nao houve busca (sem fontes nem contexto).
     if not corpo:
         return corpo
     try:
-        try:
-            hoje = datetime.strptime(data_atual, "%d/%m/%Y").date()
-        except (ValueError, TypeError):
-            hoje = datetime.now().date()
-        if contexto:
-            corpo = _guard_soma_propria(corpo, contexto)
-            corpo = _guard_nivel_da_data(corpo, contexto)
-        corpo = _guard_ressalva_temporal(corpo, fontes_anos, hoje.year, gasto)
+        hoje = _data_do_pedido(data_atual)
+        corpo = _checar_texto(corpo, contexto, hoje, alteracoes)
+        ressalvado = _guard_ressalva_temporal(corpo, fontes_anos, hoje.year, gasto)
+        if ressalvado != corpo and alteracoes is not None:
+            alteracoes.append("A")
+        corpo = ressalvado
     except Exception as e:
         logger.warning(_safe(f"[GUARD] erro inesperado, mantendo resposta original: {e}"))
     return corpo
 
 
-def _pos_processar(resposta, fontes_anos, contexto, sources_map, data_atual, gasto=None):
+def _pos_processar(resposta, fontes_anos, contexto, sources_map, data_atual, gasto=None, alteracoes=None):
     # pos-processamento unico da resposta final: decompoe em (corpo, fontes), aplica os
     # guards sobre o corpo, garante as fontes citadas e recompoe na borda de saida
     corpo, fontes, tinha_bloco = _decompor_resposta(resposta)
@@ -657,7 +858,7 @@ def _pos_processar(resposta, fontes_anos, contexto, sources_map, data_atual, gas
         logger.warning("[GUARD] resposta substituida pela recusa de seguranca")
         return RECUSA_SEGURANCA
 
-    corpo = _aplicar_guards(corpo, fontes_anos, contexto, data_atual, gasto)
+    corpo = _aplicar_guards(corpo, fontes_anos, contexto, data_atual, gasto, alteracoes)
     fontes = _backfill_fontes(corpo, fontes, tinha_bloco, sources_map)
     return _compor_resposta(corpo, fontes)
 
@@ -674,13 +875,17 @@ STATUS_BUSCA = "Buscando nos documentos do campus..."
 class _Previa:
     """Libera ao aluno, em frases inteiras, o texto que o modelo esta gerando.
 
-    Cada frase sai assim que termina, passa pelas checagens de soma propria (C) e de nivel da data (D), e a previa para no bloco
+    Cada frase sai assim que termina, passa pelas mesmas checagens de texto da resposta final
+    (_checar_texto: E, F, C e D, nessa ordem), e a previa para no bloco
     "Fontes:". Se o texto ja exibido somado a frase repetir LIMITE_PREVIA sequencias do prompt, a previa
     para de liberar e a resposta final decide: recusa, se vazou, ou o texto inteiro de uma vez.
+    A previa tambem corta em ":", para mostrar texto mais cedo; uma frase partida ali so e corrigida
+    pelas checagens E e F na resposta final, que substitui a previa.
     """
 
-    def __init__(self, contexto):
+    def __init__(self, contexto, hoje=None):
         self.contexto = contexto
+        self.hoje = hoje
         self.gerado = ""
         self.liberado = 0  # caracteres do texto gerado que ja viraram previa
         self.parou = False
@@ -709,11 +914,9 @@ class _Previa:
             return ""
         trecho = self.gerado[self.liberado:corte]
         self.liberado = corte
-        if self.contexto:
-            for checagem in (_guard_soma_propria, _guard_nivel_da_data):
-                corrigido = checagem(trecho, self.contexto)
-                if corrigido != trecho:
-                    trecho = corrigido + trecho[len(trecho.rstrip()):]
+        corrigido = _checar_texto(trecho, self.contexto, self.hoje)
+        if corrigido != trecho:
+            trecho = corrigido.rstrip() + trecho[len(trecho.rstrip()):]
         return trecho
 
 
@@ -752,8 +955,9 @@ def ask_stream(query, history=None, max_steps=3, trace=None, data_atual=None, ra
 
     # data por request (nao no import): instancia serverless quente nao congela a data.
     # override opcional: o eval fixa a data de referencia nos casos temporais; em producao
-    # vem None e usa a data real de hoje.
-    data_atual = data_atual or datetime.now().strftime("%d/%m/%Y")
+    # vem None e usa a data de hoje no horario de Brasilia
+    data_atual = data_atual or hoje_brasilia().strftime("%d/%m/%Y")
+    hoje = _data_do_pedido(data_atual)
 
     sistema = agent_prompt.format(data_atual=data_atual, cursos=cursos_atuais)
     temperatura = float(os.getenv("AGENT_TEMP", "0.7"))
@@ -772,7 +976,7 @@ def ask_stream(query, history=None, max_steps=3, trace=None, data_atual=None, ra
         com_raciocinio = regra is not None if raciocinio == "regra" else (raciocinio == "sempre" and passo > 0)
         perfil = "atendimento_raciocinio" if com_raciocinio else "atendimento"
 
-        previa, r = _Previa(contexto_acumulado), None
+        previa, r = _Previa(contexto_acumulado, hoje), None
         for tipo, valor in llm.gerar_fluxo(mensagens, sistema=sistema, ferramentas=ferramentas,
                                            temperatura=temperatura, perfil=perfil):
             if tipo == "fim":
@@ -788,10 +992,13 @@ def ask_stream(query, history=None, max_steps=3, trace=None, data_atual=None, ra
             trecho = previa.receber("", fim=True)
             if trecho:
                 yield {"tipo": "texto", "delta": trecho}
+            # letras das checagens que mudaram o texto do modelo, para a telemetria e o eval
+            alteracoes = []
             resposta = _pos_processar((r.texto or "").strip(), fontes_anos, contexto_acumulado,
-                                      sources_map, data_atual, gasto)
+                                      sources_map, data_atual, gasto, alteracoes)
             if trace is not None:
                 trace["resposta"] = resposta
+                trace["checagens"] = alteracoes
             yield {"tipo": "fim", "resposta": resposta}
             return
 

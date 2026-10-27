@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 
 from pipelines.config import HEADERS, PAGES_PARSED_PATH, PARSED_DIR, SAVE_INTERVAL, fetch
 from pipelines.dates import get_published_at
+from pipelines.listas_nomes import aviso_lista, destino
 
 
 def _email_cloudflare(codigo):
@@ -63,6 +64,16 @@ def run_html_parser(pages_dirty):
 
     PARSED_DIR.mkdir(parents=True, exist_ok=True)
     print(f"HTMLs a processar (novo+mudado): {len(pages_dirty)}")
+
+    # pagina que e lista de pessoas entra so como aviso de que o resultado saiu, com o link e sem nomes
+    listas = 0
+    for page in pages_dirty:
+        decisao, _ = destino(page.get("text", ""), page.get("source_url", ""), page.get("title", ""), pagina=True)
+        if decisao:
+            page["text"] = aviso_lista(page["source_url"], page.get("title", ""))
+            page["lista_nomes"] = True
+            listas += 1
+    print(f"HTMLs que sao lista de pessoas (viram aviso): {listas}")
 
     # enriquecimento de datas (o crawler ja entregou o texto extraido de cada pagina dirty)
     sem_data = [p for p in pages_dirty if "published_at" not in p]

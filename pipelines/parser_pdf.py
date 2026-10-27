@@ -14,6 +14,7 @@ from pipelines.config import (FORMAT_ERRORS_PATH, MIN_CHARS, PAGES_PARSED_PATH,
                               PARSED_DIR, PDFS_PARSED_PATH, PII_PATH, SAVE_INTERVAL, SCANNED_PATH)
 from pipelines.chunker import e_canoas, secoes_de_campus, sem_outros_campi
 from pipelines.dates import extract_date_from_text, get_published_at
+from pipelines.listas_nomes import aviso_lista, destino
 from pipelines.urls import to_drive_view_url
 from rag import llm
 
@@ -569,24 +570,11 @@ def structure_schedule_vision(doc, max_pages=30):
     return "\n".join(linhas), {"paginas": min(doc.page_count, max_pages), "puladas": puladas,
                                "suspeitas": suspeitas, "truncado": truncado, "coordenadas": por_coordenadas}
 
-# ── gate de PII e quadro de vagas de processo seletivo ───────────────────────────
-_INSCR_RX = re.compile(r"\b\d{6,9}\b")
+# ── quadro de vagas de processo seletivo ─────────────────────────────────────────
 _SEP_WS = re.compile(r"\s+")
 
 def _norm_ws(s):
     return _SEP_WS.sub(" ", (s or "").lower())
-
-def is_pii_nominal_list(text, url="", title=""):
-    # gate de PII FAIL-CLOSED: barra lista nominal de candidatos (ensalamento, homologados,
-    # classificados). sinal robusto = densidade de numero de inscricao (6-9 digitos): listas reais
-    # tem dezenas a centenas; editais 1-2; provas 0-2 (vao vazio na faixa 3-7, medido no corpus).
-    # deteccao por CONTEUDO, nao por nome de arquivo, que engana (Campus-Canoas.pdf era ensalamento).
-    n_inscr = len(set(_INSCR_RX.findall(text or "")))
-    if n_inscr >= 8:
-        return True
-    marc = re.search(r"homologad|classificad|ensalament|inscri\w* aceitas|resultado|lista|convocac",
-                     (url + " " + title).lower())
-    return bool(marc) and n_inscr >= 3
 
 def is_vagas_table(title, text, url):
     # quadro de vagas de processo seletivo: marcador "quadro de vagas" na URL/titulo + corpo com
@@ -669,12 +657,19 @@ def parse_pdf(pdf_info, content):
             "size_kb":    pdf_info["size_kb"],
             "parent":     pdf_info.get("parent", ""),
         }
-        # gate de PII (fail-closed): lista nominal de candidatos NUNCA entra na base; o texto e
-        # descartado (nem fica no resultado). qualquer incerteza pende para barrar, nao para vazar.
-        if not is_scanned and is_pii_nominal_list(text, url, title):
+        # gate de PII (fail-closed), pela regra unica de pipelines/listas_nomes.py: lista de pessoas nunca
+        # entra com os nomes. a do processo seletivo de ingresso fica fora da base (a fonte curada leva ao
+        # portal); a de outra origem entra so como aviso de que o resultado saiu, com o link
+        decisao, _ = destino(text, url, title) if not is_scanned else (None, None)
+        if decisao == "fora":
+            doc.close()
             resultado["pii_blocked"] = True
             resultado["text"] = ""
+            return resultado
+        if decisao == "aviso":
             doc.close()
+            resultado["lista_nomes"] = True
+            resultado["text"] = aviso_lista(url, title)
             return resultado
 
         # grade de horario -> visao (pixelrag); quadro de vagas -> structurer por registro;
