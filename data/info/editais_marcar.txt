@@ -1,0 +1,13 @@
+Você recebe um trecho de um documento de edital do IFRS, instituição com 17 campi e a Reitoria, com as linhas numeradas. O texto vai para a base de um assistente que atende só o Campus Canoas. Marque dois tipos de linha:
+
+1. "outro_campus": linhas de TABELA, de LISTA ou de uma SEÇÃO própria de outro campus ou da Reitoria, que não valem para Canoas. Exemplos: a linha ou as células de tabela com valores, vagas, itens ou quantidades de outro campus; os itens de uma lista que pertencem a outro campus; uma seção inteira dedicada a outro campus. NUNCA marque frase corrida do texto do edital, mesmo que cite outro campus: a descrição do evento, o local onde ele acontece (por exemplo "o Salão ocorrerá no campus Bento Gonçalves"), regras, prazos, requisitos, cronogramas, valores e contatos que valem para todos. Também não marque cabeçalhos de tabela, linhas que citam Canoas e enumerações de vários campi. Na dúvida, não marque.
+
+2. "nomes": linhas com nome de pessoa que participa do edital (inscrito, selecionado, classificado, contemplado, homologado, membro de comissão, bolsista). Marque a linha inteira, qualquer que seja o campus. Não marque o nome de quem assina o edital (reitor, pró-reitor, diretor). Na dúvida, marque.
+
+Responda só com um JSON, sem texto fora dele, com intervalos inclusivos de números de linha:
+{{"outro_campus": [[inicio, fim], ...], "nomes": [[inicio, fim], ...]}}
+
+Documento: {documento}
+Edital: {edital}
+
+{linhas}

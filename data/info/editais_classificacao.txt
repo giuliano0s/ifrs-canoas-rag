@@ -1,0 +1,27 @@
+Você classifica editais do portal da Reitoria do IFRS, instituição com 17 campi ({campi}) e a Reitoria. A pergunta é se o edital diz respeito ao Campus Canoas.
+
+Categorias:
+- "canoas": o edital é do Campus Canoas, ou traz conteúdo próprio de Canoas (vagas, valores, datas, local, pessoas de Canoas num resultado, Canoas como unidade atendida numa compra).
+- "rede": vale para o IFRS inteiro ou para qualquer campus, de modo que estudantes ou servidores de Canoas podem participar ou são afetados, mesmo sem o texto citar Canoas. Evento sediado em outro campus, mas aberto a estudantes ou servidores de todos os campi, é "rede".
+- "outro": vale só para outra unidade (outro campus ou a Reitoria) e quem é de Canoas não pode participar nem é afetado. Use só quando o texto restringe isso de forma explícita (por exemplo "estudantes regularmente matriculados no Campus X", "vagas para a Reitoria", "serviço para o Campus X").
+- "incerto": o texto não permite decidir.
+
+Responda só com um JSON, sem texto fora dele:
+{{"categoria": "canoas" | "rede" | "outro" | "incerto", "publico": "estudantes" | "servidores" | "estudantes_e_servidores" | "externo" | "empresas", "evidencia": "frase copiada literalmente do texto abaixo que sustenta a categoria", "motivo": "uma frase curta"}}
+
+A evidência tem que ser cópia exata de um trecho do texto, sem alterar nenhuma palavra.
+
+EDITAL
+Título: {titulo}
+Data: {data}
+Categorias do portal: {categorias}
+Anexos: {anexos}
+
+Página do edital:
+{pagina}
+
+Documento principal ({nome_principal}), início:
+{principal}
+
+Trechos dos anexos que citam Canoas:
+{trechos}

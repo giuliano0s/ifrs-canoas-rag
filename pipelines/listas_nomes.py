@@ -23,6 +23,8 @@ _SITUACAO = re.compile(
 _MARCADOR = re.compile(
     r"classifica|resultado|homolog|lista|convoca|chamada|inscrit|inscri[çc][õo]es\s+aceitas|heteroidentifica"
     r"|contemplad|selecionad|ensalament|aprovad", re.I)
+# no nome do arquivo em que um LLM achou nome de pessoa, "divulgacao" tambem anuncia lista (dias das entrevistas)
+_MARCADOR_NO_ARQUIVO = re.compile(_MARCADOR.pattern + r"|divulga", re.I)
 _PALAVRA = r"[A-ZÁÉÍÓÚÂÊÔÃÕÇ][a-záéíóúâêôãõçü]+|[A-ZÁÉÍÓÚÂÊÔÃÕÇ]{2,}"
 # nome de pessoa: 3 a 6 palavras com inicial maiuscula na mesma linha
 _NOME = re.compile(rf"\b(?:{_PALAVRA})(?:[ \t]+(?:de|da|do|dos|das|e|DE|DA|DO|DOS|DAS|E))?(?:[ \t]+(?:{_PALAVRA})){{2,5}}\b")
@@ -44,6 +46,8 @@ _INSTITUCIONAL = re.compile(
 _INGRESSO = re.compile(r"^https?://ingresso\.ifrs\.edu\.br/", re.I)
 # sinais por mil caracteres: listas reais ficam acima, documentos que so citam de passagem ficam abaixo
 DENSIDADE_MINIMA = 2.0
+# motivos que dependem so de sequencias com cara de nome de pessoa, sem numero de inscricao
+MOTIVOS_POR_NOME = {"nomes_e_situacao", "resultado_curto", "nomes_em_densidade"}
 
 AVISO_LISTA = ("Resultado publicado: {titulo}. Por proteção de dados pessoais, o assistente não informa os nomes "
                "desta lista nem confirma se uma pessoa está nela; quem quer saber confere no documento oficial: {url}")
@@ -141,14 +145,20 @@ def e_do_ingresso(url):
     return bool(_INGRESSO.match(url or ""))
 
 
-def destino(texto, url="", titulo="", pagina=False):
-    """Decide o que fazer com um documento: o unico lugar da regra, usado pelos parsers e pela migracao.
+def destino(texto, url="", titulo="", pagina=False, linhas=0, nomes_marcados=None):
+    """Decide o que fazer com um documento: o unico lugar da regra, usado pelos parsers, pela migracao e
+    pela coleta dos editais da Reitoria.
 
     Args:
         texto: texto extraido do documento.
         url: endereco do documento.
         titulo: titulo do documento.
         pagina: True para pagina HTML.
+        linhas: total de linhas do documento, quando um LLM marcou as linhas com nome de pessoa.
+        nomes_marcados: linhas com nome de pessoa marcadas pelo LLM, ou None quando nenhum LLM leu o
+            documento. Sao mais um sinal: 10% ou mais das linhas, ou algum nome num documento cujo endereco
+            anuncia resultado, tambem fazem lista. Zero desfaz os sinais que dependem so do formato de nome
+            (titulo de projeto e assinatura tambem tem iniciais maiusculas); os de numero de inscricao ficam.
 
     Returns:
         (None, None) quando nao e lista de pessoas; ("fora", motivo) para PDF do processo seletivo de
@@ -157,6 +167,11 @@ def destino(texto, url="", titulo="", pagina=False):
         porque so o PDF tem registro que impede o crawler de rele-lo todo dia.
     """
     motivo = motivo_lista(texto, url, titulo, pagina)
+    if motivo in MOTIVOS_POR_NOME and nomes_marcados == 0 and linhas:
+        motivo = None
+    if not motivo and nomes_marcados and linhas:
+        if nomes_marcados / linhas >= 0.10 or _MARCADOR_NO_ARQUIVO.search(url.rsplit("/", 1)[-1]):
+            motivo = "nomes_marcados"
     if not motivo:
         return None, None
     return ("fora" if e_do_ingresso(url) and not pagina else "aviso"), motivo

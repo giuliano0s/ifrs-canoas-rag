@@ -7,7 +7,7 @@ importa de nenhum deles, o que mantém o grafo de dependências acíclico.
 
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import requests
@@ -49,6 +49,18 @@ BASE_URL        = "https://ifrs.edu.br/canoas/"
 # entra no crawl como dominio valido (is_valid_page) semeado pela whitelist; o gate de PII barra as
 # listas nominais de candidatos e o filtro de ano limita ao periodo corrente (/AAAA-S/).
 INGRESSO_URL    = "https://ingresso.ifrs.edu.br/"
+# portal de editais da Reitoria: uma tabela com todos os editais do IFRS; entram os que dizem respeito a
+# Canoas (pipelines/editais_reitoria.py) com data nos ultimos 12 meses, janela que anda com a data de cada
+# execucao; o edital que sai dela sai da base (override do inicio via env, dd/mm/aaaa)
+EDITAIS_URL     = "https://ifrs.edu.br/editais/"
+EDITAIS_DESDE   = (datetime.strptime(os.getenv("EDITAIS_DESDE"), "%d/%m/%Y") if os.getenv("EDITAIS_DESDE")
+                   else datetime.combine(datetime.now().date() - timedelta(days=365), datetime.min.time()))
+# unidades do IFRS: os 17 campi, a Reitoria e as unidades em implantação. fonte única para a coleta dos
+# editais da Reitoria (regex de unidade e texto dos prompts)
+CAMPI_IFRS      = ("Alvorada", "Bento Gonçalves", "Canoas", "Caxias do Sul", "Erechim", "Farroupilha", "Feliz",
+                   "Ibirubá", "Osório", "Porto Alegre", "Restinga", "Rio Grande", "Rolante", "Sertão", "Vacaria",
+                   "Veranópolis", "Viamão")
+OUTRAS_UNIDADES = ("Reitoria", "Gramado", "Zona Norte")
 DRIVE_DOWNLOAD  = "https://drive.google.com/uc?export=download&id="
 CHUNK_SIZE      = 4000
 MIN_CHARS       = 150 # minimo de caracteres de um documento com conteudo: PDF abaixo disso e escaneado, pagina e so navegacao
@@ -103,6 +115,8 @@ SHEETS_PARSED_PATH = PARSED_DIR / "sheets_parsed.json"
 FORMAT_ERRORS_PATH = PARSED_DIR / "pdfs_format_errors.json"
 SCANNED_PATH       = PARSED_DIR / "pdfs_scanned.json"
 PII_PATH           = PARSED_DIR / "pdfs_pii.json"
+# registro dos editais da Reitoria (versionado): decisao, veredito, hash do grupo e ids dos chunks por edital
+EDITAIS_REITORIA_PATH = PARSED_DIR / "editais_reitoria.json"
 CHUNKS_PATH       = CHUNKS_DIR / "chunks.json"
 WHITELIST_PATH    = INFO_DIR / "whitelist.txt"
 FONTES_CURADAS_PATH = INFO_DIR / "fontes_curadas.json"

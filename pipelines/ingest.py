@@ -13,8 +13,8 @@ from pipelines.config import REINGEST, google_client, index
 
 
 def carregar_estado():
-    # estado do que ja esta no Upstash, por URL: {url: {"source_hash":..., "ids":[...], "published_at":..., "type":...}}
-    # o source_hash, o published_at e o type sao iguais em todos os chunks de uma mesma URL
+    # estado do que ja esta no Upstash, por URL: {url: {"source_hash":..., "ids":[...], "published_at":..., "type":...,
+    # "edital_url":...}}; esses campos sao iguais em todos os chunks de uma mesma URL
     estado = {}
     cursor = ""
     while True:
@@ -23,7 +23,7 @@ def carregar_estado():
             m = v.metadata or {}
             u = m.get("source_url", "")
             e = estado.setdefault(u, {"source_hash": m.get("source_hash"), "ids": [], "published_at": m.get("published_at"),
-                                      "type": m.get("type")})
+                                      "type": m.get("type"), "edital_url": m.get("edital_url")})
             e["ids"].append(v.id)
         cursor = res.next_cursor
         if cursor == "":
@@ -84,6 +84,9 @@ def ingest_chunks(chunks, batch_size=100):
             # aviso que substitui uma lista de pessoas (pipelines/listas_nomes.py)
             if chunk.get("lista_nomes"):
                 meta["lista_nomes"] = True
+            # edital da Reitoria a que o anexo pertence (pipelines/editais_reitoria.py): a unidade de troca
+            if chunk.get("edital_url"):
+                meta["edital_url"] = chunk["edital_url"]
             # vetor de uma frase de busca (evento do calendario, fonte curada): a frase fica gravada ao lado
             # do text que vai ao contexto
             if chunk.get("texto_busca"):

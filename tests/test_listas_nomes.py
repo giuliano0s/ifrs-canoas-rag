@@ -43,6 +43,19 @@ def testar():
     assert destino(hetero, INGRESSO, pagina=True)[0] == "aviso"
     assert destino(monitoria, CAMPUS)[0] == "aviso"
     assert destino("Edital de seleção de bolsistas. Inscrições até 30/10.", CAMPUS) == (None, None)
+
+    # um LLM leu as linhas: nenhum nome desfaz o sinal de formato de nome (lista de projetos homologados), mas
+    # nao o de numero de inscricao; nome achado num arquivo de divulgacao faz lista
+    projetos = ("torna pública a homologação das propostas\nGrupo de Pesquisa Situação da proposta\n"
+                "Grupo de Manufatura Aplicada Homologada\nRede Sul de Inovação Agroecológica Homologada\n"
+                "(Assinado digitalmente em 06/05/2026 10:17)\nFLAVIA SANTOS TWARDOWSKI PINTO\nPRO-REITOR(A)")
+    url_projetos = "https://ifrs.edu.br/wp-content/uploads/2026/05/RESULTADO-FINAL-DAS-PROPOSTAS-HOMOLOGADAS.pdf"
+    assert destino(projetos, url_projetos)[0] == "aviso"
+    assert destino(projetos, url_projetos, linhas=7, nomes_marcados=0) == (None, None)
+    assert destino(hetero, INGRESSO, linhas=22, nomes_marcados=0)[0] == "fora"
+    entrevistas = "https://ifrs.edu.br/wp-content/uploads/2026/03/DIVULGACAO-DOS-DIAS-E-HORARIOS-DAS-ENTREVISTAS.pdf"
+    assert destino("Entrevistas no dia 10/03, sala 2.", entrevistas, linhas=49, nomes_marcados=2)[0] == "aviso"
+    assert destino("Entrevistas no dia 10/03, sala 2.", entrevistas, linhas=49, nomes_marcados=0) == (None, None)
     # o aviso diz onde conferir e nao traz nome
     aviso = aviso_lista(CAMPUS, "Resultado Final da Seleção de Monitores")
     assert "proteção de dados" in aviso and CAMPUS in aviso and not motivo_lista(aviso, CAMPUS)

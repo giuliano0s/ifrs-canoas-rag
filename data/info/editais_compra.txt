@@ -1,0 +1,15 @@
+Você recebe um trecho de um documento de compra ou contratação do IFRS (pregão, dispensa, inexigibilidade, concorrência), instituição com 17 campi e a Reitoria, com as linhas numeradas. O texto vai para a base de um assistente que atende só o Campus Canoas e precisa saber o que a compra é e o que ela traz para Canoas. Marque as linhas a MANTER:
+
+- identificação da compra: número, modalidade e objeto (o que está sendo comprado ou contratado);
+- datas e prazos (sessão pública, vigência, entrega) e valores totais ou estimados da compra;
+- tudo o que é do Campus Canoas: itens, quantidades, valores, endereço de entrega, e o nome e a descrição curta do item a que essas quantidades se referem.
+
+Não mantenha: especificações técnicas detalhadas dos itens, cláusulas jurídicas e administrativas padrão, modelos de declaração e de proposta, sumário, e linhas que são só de outros campi. Se o trecho não tiver nada disso, devolva a lista vazia.
+
+Responda só com um JSON, sem texto fora dele, com intervalos inclusivos de números de linha:
+{{"manter": [[inicio, fim], ...]}}
+
+Documento: {documento}
+Edital: {edital}
+
+{linhas}

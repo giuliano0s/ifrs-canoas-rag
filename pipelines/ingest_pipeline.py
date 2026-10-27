@@ -1,9 +1,9 @@
 """
 Pipeline de ingestão do IFRS RAG (orquestrador).
 Executa sequencialmente: crawler > parser HTML > parser PDF > parser planilhas >
-chunker > fontes curadas > ingest > snapshot. Cada fase vive no seu módulo (pipelines/crawler.py,
-parser_html.py, parser_pdf.py, parser_sheets.py, chunker.py, fontes_curadas.py, ingest.py), com a
-configuração compartilhada em pipelines/config.py.
+chunker > fontes curadas > ingest > editais da Reitoria > snapshot. Cada fase vive no seu módulo
+(pipelines/crawler.py, parser_html.py, parser_pdf.py, parser_sheets.py, chunker.py, fontes_curadas.py,
+ingest.py, editais_reitoria.py), com a configuração compartilhada em pipelines/config.py.
 
 O crawler sempre varre o site inteiro e detecta mudança pelo source_hash do conteúdo
 bruto baixado (HTML: texto do main; PDF: bytes; planilha: CSV), comparado ao gravado no
@@ -34,6 +34,7 @@ from pipelines.parser_sheets import run_sheets_parser
 from pipelines.chunker import run_chunker
 from pipelines.fontes_curadas import run_fontes_curadas
 from pipelines.ingest import carregar_estado, run_ingest
+from pipelines.editais_reitoria import run_editais_reitoria
 from pipelines.gerar_cursos_atuais import gerar as gerar_cursos_atuais
 from ui.clone_page import clone_page
 
@@ -59,6 +60,16 @@ def main():
     # fontes curadas (data/info/fontes_curadas.json) entram no mesmo ingest, com o mesmo replace por hash
     curadas, curadas_mudadas = run_fontes_curadas(estado)
     run_ingest(chunks + curadas, estado, urls_mudadas | curadas_mudadas)
+
+    # editais da Reitoria que dizem respeito a Canoas; o que ja esta na base por outro caminho, inclusive o
+    # gravado agora, nao e gravado de novo
+    try:
+        na_base = dict(estado)
+        for chunk in chunks + curadas:
+            na_base.setdefault(chunk["source_url"], {"source_hash": chunk.get("source_hash"), "ids": []})
+        run_editais_reitoria(na_base)
+    except Exception as e:
+        print(f"Falha nos editais da Reitoria (ingestao do campus ja concluida): {e}")
 
     # regenera o snapshot estatico da pagina servido pelo app
     print("\n" + "="*60)

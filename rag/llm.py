@@ -100,7 +100,7 @@ def _data_url(png):
 
 
 # ── adaptador Gemini ────────────────────────────────────────────────────────────
-def _gerar_gemini(mensagens, sistema, ferramentas, temperatura, leve, perfil, prazo=None):
+def _gerar_gemini(mensagens, sistema, ferramentas, temperatura, leve, perfil, prazo=None, max_saida=None):
     from google.genai import types
     cliente = _cliente_gemini()
 
@@ -119,6 +119,8 @@ def _gerar_gemini(mensagens, sistema, ferramentas, temperatura, leve, perfil, pr
                 name=m["nome"], response={"documentos": m["resultado"]})]))
 
     cfg = {"temperature": temperatura}
+    if max_saida:
+        cfg["max_output_tokens"] = max_saida
     if sistema:
         cfg["system_instruction"] = sistema
     if ferramentas:
@@ -159,12 +161,12 @@ def _cliente_gemini():
 
 
 # ── adaptador OpenAI ────────────────────────────────────────────────────────────
-def _gerar_openai(mensagens, sistema, ferramentas, temperatura, leve, perfil, prazo=None):
+def _gerar_openai(mensagens, sistema, ferramentas, temperatura, leve, perfil, prazo=None, max_saida=None):
     # sem raciocinio: chat.completions com temperatura; com raciocinio: API Responses.
     # o luna ja e o modelo barato, entao leve nao muda o modelo aqui
     if perfil.raciocinio == "none":
-        return _gerar_openai_chat(mensagens, sistema, ferramentas, temperatura, perfil, prazo)
-    return _gerar_openai_responses(mensagens, sistema, ferramentas, perfil, prazo)
+        return _gerar_openai_chat(mensagens, sistema, ferramentas, temperatura, perfil, prazo, max_saida)
+    return _gerar_openai_responses(mensagens, sistema, ferramentas, perfil, prazo, max_saida)
 
 
 def _uso_openai(usage):
@@ -182,7 +184,7 @@ def _uso_openai(usage):
             "raciocinio": getattr(det_saida, "reasoning_tokens", 0) or 0}
 
 
-def _kwargs_openai_chat(mensagens, sistema, ferramentas, temperatura, perfil, prazo=None):
+def _kwargs_openai_chat(mensagens, sistema, ferramentas, temperatura, perfil, prazo=None, max_saida=None):
     # pedido do chat.completions no formato da OpenAI, a partir da conversa neutra
     msgs = []
     if sistema:
@@ -217,12 +219,14 @@ def _kwargs_openai_chat(mensagens, sistema, ferramentas, temperatura, perfil, pr
 
     if prazo:
         kwargs["timeout"] = prazo
+    if max_saida:
+        kwargs["max_completion_tokens"] = max_saida
     return kwargs
 
 
-def _gerar_openai_chat(mensagens, sistema, ferramentas, temperatura, perfil, prazo=None):
+def _gerar_openai_chat(mensagens, sistema, ferramentas, temperatura, perfil, prazo=None, max_saida=None):
     r = _cliente_openai().chat.completions.create(**_kwargs_openai_chat(mensagens, sistema, ferramentas,
-                                                                         temperatura, perfil, prazo))
+                                                                         temperatura, perfil, prazo, max_saida))
     escolha = r.choices[0].message
     uso = _uso_openai(r.usage)
     chamadas = getattr(escolha, "tool_calls", None)
@@ -262,7 +266,7 @@ def _fluxo_openai_chat(mensagens, sistema, ferramentas, temperatura, perfil):
         yield "fim", Resposta(texto="".join(texto).strip(), chamada=None, uso=uso)
 
 
-def _kwargs_openai_responses(mensagens, sistema, ferramentas, perfil, prazo=None):
+def _kwargs_openai_responses(mensagens, sistema, ferramentas, perfil, prazo=None, max_saida=None):
     # pedido da API Responses a partir da conversa neutra; chamada e devolucao casam pelo call_id posicional
     itens = []
     n_call = 0
@@ -292,6 +296,8 @@ def _kwargs_openai_responses(mensagens, sistema, ferramentas, perfil, prazo=None
 
     if prazo:
         kwargs["timeout"] = prazo
+    if max_saida:
+        kwargs["max_output_tokens"] = max_saida
     return kwargs
 
 
@@ -304,8 +310,9 @@ def _resposta_openai_responses(r):
     return Resposta(texto=(r.output_text or "").strip(), chamada=None, uso=uso)
 
 
-def _gerar_openai_responses(mensagens, sistema, ferramentas, perfil, prazo=None):
-    r = _cliente_openai().responses.create(**_kwargs_openai_responses(mensagens, sistema, ferramentas, perfil, prazo))
+def _gerar_openai_responses(mensagens, sistema, ferramentas, perfil, prazo=None, max_saida=None):
+    r = _cliente_openai().responses.create(**_kwargs_openai_responses(mensagens, sistema, ferramentas, perfil, prazo,
+                                                                      max_saida))
     return _resposta_openai_responses(r)
 
 
@@ -464,10 +471,12 @@ def _carimbar(resposta, nome, inicio):
 # ── entradas usadas pelo serving e pela ingestão ────────────────────────────────
 _ADAPTADORES = {"gemini": _gerar_gemini, "openai": _gerar_openai}
 
-def gerar(mensagens, sistema=None, ferramentas=None, temperatura=0.7, leve=False, prazo=None, perfil="atendimento"):
+def gerar(mensagens, sistema=None, ferramentas=None, temperatura=0.7, leve=False, prazo=None, perfil="atendimento",
+          max_saida=None):
     # ponto único de geração: devolve Resposta(texto, chamada, uso) qualquer que seja o provedor do perfil.
     # leve=True pede o modelo barato do provedor (estruturadores e inferência de data da ingestão);
-    # prazo troca o tempo maximo da chamada (o cliente da OpenAI usa 20 s, o tempo do atendimento)
+    # prazo troca o tempo maximo da chamada (o cliente da OpenAI usa 20 s, o tempo do atendimento);
+    # max_saida limita os tokens da resposta, para um laco de repeticao do modelo falhar rapido
     p = PERFIS[perfil]
     adaptador = _ADAPTADORES.get(p.provedor)
     if adaptador is None:
@@ -476,7 +485,8 @@ def gerar(mensagens, sistema=None, ferramentas=None, temperatura=0.7, leve=False
     # queda e 5xx sao refeitos aqui (2 novas tentativas, 1s e 2s); limite e credito sobem na hora
     for tentativa in range(3):
         try:
-            return _carimbar(adaptador(mensagens, sistema, ferramentas, temperatura, leve, p, prazo), perfil, inicio)
+            return _carimbar(adaptador(mensagens, sistema, ferramentas, temperatura, leve, p, prazo, max_saida),
+                             perfil, inicio)
         except Exception as e:
             classe = _classificar(e)
             if classe is None:
