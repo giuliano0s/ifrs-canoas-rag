@@ -4475,9 +4475,12 @@
  "https://ifrs.edu.br/editais/pregao-n-403-2026-srp-aquisicao-de-equipamentos-de-laboratorios-para-o-ifrs/": {
   "titulo": "Pregão n° 403/2026 – SRP – Aquisição de equipamentos de laboratórios para o IFRS",
   "data": "27/10/2026",
-  "categorias": [],
-  "atualizacao": "27/10/2026 15:52",
-  "hash": "93bfc83e22a48d7fb06010c2d390338155b457deae45ae9ce3c4b77630e64460",
+  "categorias": [
+   "Licitação",
+   "Pregão Eletrônico"
+  ],
+  "atualizacao": "28/10/2026 08:06",
+  "hash": "17b1ff954e2efbcbde74536d3f8e0b5997c42533b03c33882247765a74ce23cb",
   "veredito": {
    "categoria": "rede",
    "publico": "empresas",
@@ -4508,6 +4511,10 @@
    "https://ifrs.edu.br/wp-content/uploads/2026/10/1.-EDITAL-E-ANEXOS.pdf#16",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/1.-EDITAL-E-ANEXOS.pdf#17",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/1.-EDITAL-E-ANEXOS.pdf#18",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/1.-EDITAL-E-ANEXOS.pdf#19",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/1.-EDITAL-E-ANEXOS.pdf#20",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/1.-EDITAL-E-ANEXOS.pdf#21",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/1.-EDITAL-E-ANEXOS.pdf#22",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/2.-Termo-de-Ciencia.docx#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/3.-Anexo-V_-Modelo-Proposta.docx#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/4.-Lista-de-Itens-PE-de-Equipamentos-de-Laboratorio-2026-editavel.xlsx#0",
