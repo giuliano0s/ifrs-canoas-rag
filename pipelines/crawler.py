@@ -7,6 +7,7 @@ já com o conteúdo baixado. Também deduplica conteúdo idêntico sob URLs dife
 
 import json
 import os
+import re
 import tempfile
 import time
 from collections import deque
@@ -15,6 +16,7 @@ from urllib.parse import urljoin
 import gdown
 from bs4 import BeautifulSoup
 
+from pipelines.chunker import campus_da_pagina, e_canoas
 from pipelines.config import (HEADERS, BASE_URL, INCLUDE_SCANNED, MIN_CHARS, PAGES_PATH, PDFS_PATH,
                               PII_PATH, RAW_DIR, RECHECK_PII, REINGEST, REPARSE, SCANNED_PATH, SHEETS_FALHAS,
                               SHEETS_PATH, WHITELIST_PATH, fetch)
@@ -23,6 +25,10 @@ from pipelines.parser_html import extract_page_content
 from pipelines.urls import (build_download_url, canonical_url, gsheet_csv_url, is_drive_link,
                             is_drive_url, is_gsheet_link, is_pdf_by_extension,
                             is_valid_page, should_ignore, to_drive_view_url)
+
+
+# pagina de um curso no portal de ingresso (/<periodo>/cursos/<curso>/), que sempre traz o campo do campus
+_PAGINA_DE_CURSO = re.compile(r"^https://ingresso\.ifrs\.edu\.br/[^/]+/cursos/[^/?]+/$")
 
 
 def download_pdf_bytes(url, headers):
@@ -134,7 +140,8 @@ def run_crawler(estado):
                 or (not RECHECK_PII and chave in pii_conhecidos))
 
     # BFS: baixa cada URL, segue os links (acha filhos novos) e classifica HTML e PDF direto ali mesmo
-    n_erro = n_bloq = 0
+    n_erro = n_bloq = n_outro_campus = 0
+    cursos_sem_campus = []
     while queue:
         url = queue.popleft()
         if url in visited:
@@ -176,11 +183,16 @@ def run_crawler(estado):
 
         soup = BeautifulSoup(response.text, "html.parser")
 
-        # classifica a pagina HTML pelo texto extraido (ignora listagens e pagina sem conteudo, que sao so navegacao)
+        # classifica a pagina pelo texto; ficam fora listagem, pagina sem conteudo e pagina do portal de outro campus
         if not any(listagem in url for listagem in ("/page/", "/category/", "/tag/")):
             pages_all.append(url)
             title, text = extract_page_content(soup)
-            if text is not None and len(text) >= MIN_CHARS:
+            campus = campus_da_pagina(url, title, text)
+            if not campus and _PAGINA_DE_CURSO.match(url):
+                cursos_sem_campus.append(url)
+            if campus and not e_canoas(campus):
+                n_outro_campus += 1
+            elif text is not None and len(text) >= MIN_CHARS:
                 sh = source_hash(text)
                 if _duplicata(url, sh, hash_base, vistos_hash):
                     n_dup += 1
@@ -217,6 +229,12 @@ def run_crawler(estado):
 
     print(f"\nCrawl: {len(visited)} URLs visitadas | {n_erro} erros, {n_bloq} bloqueados")
     print(f"HTML: {st_html['nova']} novas, {st_html['mudada']} mudadas, {st_html['inalterada']} inalteradas")
+    print(f"Páginas do portal de ingresso de outro campus (fora da base): {n_outro_campus}")
+    # pagina de curso do portal sem o campo do campus: o tema mudou e a regra de outro campus deixou de valer
+    if cursos_sem_campus:
+        prefixo = "::warning title=Portal de ingresso::" if os.getenv("GITHUB_ACTIONS") == "true" else "AVISO: "
+        print(f"{prefixo}{len(cursos_sem_campus)} páginas de curso do portal sem o campo do campus, "
+              f"ex.: {cursos_sem_campus[0]}")
     print(f"PDF direto: {st_pdfd['nova']} novas, {st_pdfd['mudada']} mudadas, {st_pdfd['inalterada']} inalteradas")
 
     # pos-passo: baixa, hasheia e classifica os PDFs do Drive e as planilhas (nao baixados no BFS)

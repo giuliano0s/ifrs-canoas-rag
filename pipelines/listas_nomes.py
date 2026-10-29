@@ -4,8 +4,10 @@ Lista do processo seletivo de ingresso nunca entra na base: quem pergunta é lev
 Lista de outra origem (seleções do campus, editais da reitoria) entra só como aviso: diz que o resultado foi
 publicado e onde conferir, sem nenhum nome. Detecção por regra e fail-closed: na dúvida, é lista.
 
-Sinais: número de inscrição em qualquer formato ("73.317-77", "74.303325", "300401"), CPF inteiro ou
-mascarado, palavras de situação (deferida, ausente, eliminado...) e sequências com cara de nome de pessoa.
+Sinais: número de inscrição em qualquer formato ("73.317-77", "70.54-59", "74.303325", "300401"), CPF inteiro ou
+mascarado, a tabela de resultado (coluna do candidato, coluna da inscrição e uma coluna de resultado ou de agenda,
+com ao menos um registro), a ficha de candidato preenchida ("Nome do Candidato: ... Inscrição: 70285262"), palavras de situação (deferida, ausente, eliminado...) e sequências com cara de nome
+de pessoa.
 """
 
 import re
@@ -15,7 +17,35 @@ _NAO_IDENTIFICADOR = re.compile(
     r"\b\d{5}\.\d{6}/\d{4}-\d{2}\b|\b\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}\b|uasg\W{0,3}\d+|\bcep\W{0,3}[\d.\-]+"
     r"|\(\d{2}\)\s*\d{4,5}-?\d{4}|portaria\s+(?:n[ºo°.]*\s*)?[\d./]+|\bmatr[íi]cula\W{0,3}[#\d]+", re.I)
 _IDENTIFICADOR = re.compile(
-    r"\b\d{2,3}\.\d{3}-\d{1,3}\b|\b\d{2}\.\d{6}\b|\b\d{3}\.\d{3}\.\d{3}-\d{2}\b|\b\d{2,3}\*{2,}[\d.\-]{3,}|\b\d{6,9}\b")
+    r"\b\d{2,3}\.\d{2,3}-\d{1,3}\b|\b\d{2}\.\d{6}\b|\b\d{3}\.\d{3}\.\d{3}-\d{2}\b|\b\d{2,3}\*{2,}[\d.\-]{3,}|\b\d{6,9}\b")
+# cabecalho da tabela de resultado, como sai do PDF ("Nome\nNúmero de\nInscrição\nCota de\nAvaliação",
+# "Inscrição/Candidato\nAcesso", "N.º inscrição\nCandidato\n(Ordem alfabética)\nData da prova"): a coluna do
+# candidato e a da inscricao lado a lado e uma terceira de resultado ou de agenda, o que a separa da capa de prova e
+# do formulario, que trazem so os dois campos em branco
+_COLUNA_CANDIDATO = r"(?:nome(?:\s+d[oa]s?\s+candidat[oa]s?(?:\(a\)|/a)?)?|candidat[oa]s?(?:\(a\)|/a)?)"
+_COLUNA_INSCRICAO = r"(?:n[uú]mero\s+d[ae]\s+inscri[cç][aã]o|n\.?[ºo°]\.?\s*(?:d[ae]\s+)?inscri[cç][aã]o|inscri[cç][aã]o)"
+_COLUNA_RESULTADO = (r"(?:cota|acesso|vaga|resultado|situa[cç][aã]o|classifica|pontua|nota|aprova|data|dia|hor[aá]rio"
+                     r"|local|sala|curso|modalidade|turno|status|entrevista|reserva|conceito|m[eé]dia|parecer"
+                     r"|v[ií]nculo|item\s+de\s+avalia)")
+_ENTRE_COLUNAS = r"(?:[\s/\-–]+\([^()\n]{1,40}\))?[\s/\-–]+"
+_TABELA_DE_RESULTADO = re.compile(
+    rf"(?i)(?<![\w:])(?:{_COLUNA_CANDIDATO}{_ENTRE_COLUNAS}{_COLUNA_INSCRICAO}"
+    rf"|{_COLUNA_INSCRICAO}{_ENTRE_COLUNAS}{_COLUNA_CANDIDATO}){_ENTRE_COLUNAS}{_COLUNA_RESULTADO}")
+# registro da tabela: uma linha so com o numero de inscricao ou o ordinal do candidato, logo depois do cabecalho
+# (a maior distancia medida e de 266 caracteres), para o numero de pagina de uma tabela vazia nao contar
+_LINHA_DE_REGISTRO = re.compile(r"(?m)^[ \t]*(?:\d{1,3}|\d{4,6}-\d|\d{2,3}\.\d{2,6}(?:-\d{1,3})?|\d{6,9})[ \t]*$")
+JANELA_DO_REGISTRO = 400
+# entre o cabecalho e o registro: linha de preenchimento de formulario, ou o aviso de tabela vazia
+_SEM_REGISTRO = re.compile(r"_{3,}|n[ãa]o\s+(?:h[áa]|houve)\s+(?:candidat|inscrit|convocad)", re.I)
+# ficha de candidato preenchida ("Nome do Candidato: <valor> Inscrição: 70285262", resposta a recurso de prova), nas
+# duas ordens: o rotulo do candidato com um valor e o da inscricao com um numero nos formatos de inscricao achados na
+# base (um ano como "2026/1" nao e inscricao); o formulario em branco traz linha de preenchimento e nenhum numero
+_NUMERO_DE_INSCRICAO = r"(?:\d{2,3}\.\d{2,3}-\d{1,3}|\d{2}\.\d{3}\.\d{3}|\d{2}\.\d{6}|\d{4,6}-\d{2}|\d{6,9})(?![\d/])"
+_ROTULO_CANDIDATO = r"(?:nome\s+d[oa](?:\(a\))?\s+)?candidat[oa](?:\(a\)|/a)?\s*:"
+_ROTULO_INSCRICAO = r"(?:n[ºo°]\.?\s*(?:d[ae]\s+)?|n[uú]mero\s+d[ae]\s+)?inscri[cç][aã]o\s*(?:n[ºo°]\.?)?\s*:"
+_FICHA_DE_CANDIDATO = re.compile(
+    rf"(?i){_ROTULO_CANDIDATO}\s*[^\s_:][^:_]{{1,80}}?\s{_ROTULO_INSCRICAO}\s*{_NUMERO_DE_INSCRICAO}"
+    rf"|{_ROTULO_INSCRICAO}\s*{_NUMERO_DE_INSCRICAO}\s+{_ROTULO_CANDIDATO}\s*[^\s_:]")
 _SITUACAO = re.compile(
     r"\b(?:deferid[oa]s?|indeferid[oa]s?|homologad[oa]s?|n[ãa]o\s+homologad[oa]|classificad[oa]s?|desclassificad[oa]s?"
     r"|aprovad[oa]s?|reprovad[oa]s?|ausentes?|eliminad[oa]s?|contemplad[oa]s?|selecionad[oa]s?|suplentes?"
@@ -81,6 +111,15 @@ def _nomes(texto):
     return fins
 
 
+def _tabela_de_resultado(texto):
+    # algum cabecalho de tabela de resultado com um registro na janela logo depois dele
+    for cabecalho in _TABELA_DE_RESULTADO.finditer(texto):
+        registro = _LINHA_DE_REGISTRO.search(texto, cabecalho.end(), cabecalho.end() + JANELA_DO_REGISTRO)
+        if registro and not _SEM_REGISTRO.search(texto, cabecalho.start(), registro.start()):
+            return True
+    return False
+
+
 def _seguidos_de_situacao(fins, texto, alcance=150):
     # quantos nomes ou numeros (pela posicao final) tem uma palavra de situacao logo depois: a linha de uma lista
     return sum(1 for fim in fins if _SITUACAO.search(texto[fim:fim + alcance]))
@@ -96,7 +135,9 @@ def motivo_lista(texto, url="", titulo="", pagina=False):
         pagina: True para pagina HTML, que segue regras mais estritas que o PDF de resultado.
 
     Returns:
-        "identificadores" (8 ou mais numeros de inscricao ou CPF), "identificador_e_situacao" (marcador de
+        "identificadores" (8 ou mais numeros de inscricao ou CPF), "tabela_de_resultado" (cabecalho com as colunas
+        do candidato, da inscricao e de resultado ou agenda, e ao menos um registro logo depois), "ficha_de_candidato"
+        (o rotulo do nome do candidato preenchido e a inscricao com numero), "identificador_e_situacao" (marcador de
         resultado com ao menos um numero e uma palavra de situacao), "marcador_e_identificadores" (marcador
         com 3 ou mais numeros), "nomes_e_situacao" (marcador com 2 ou mais nomes seguidos de situacao),
         "resultado_curto" (resultado anunciado no endereco ou titulo, ate 4 mil caracteres, com nomes e
@@ -108,6 +149,10 @@ def motivo_lista(texto, url="", titulo="", pagina=False):
     identificadores = len(_identificadores(texto))
     if identificadores >= 8 and identificadores / mil >= DENSIDADE_MINIMA:
         return "identificadores"
+    if _tabela_de_resultado(texto):
+        return "tabela_de_resultado"
+    if _FICHA_DE_CANDIDATO.search(texto):
+        return "ficha_de_candidato"
     marcador = bool(_MARCADOR.search(f"{url} {titulo} {texto[:800]}"))
     if not marcador:
         return None

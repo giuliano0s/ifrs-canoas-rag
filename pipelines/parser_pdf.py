@@ -12,7 +12,7 @@ import fitz
 
 from pipelines.config import (FORMAT_ERRORS_PATH, MIN_CHARS, PAGES_PARSED_PATH,
                               PARSED_DIR, PDFS_PARSED_PATH, PII_PATH, SAVE_INTERVAL, SCANNED_PATH)
-from pipelines.chunker import e_canoas, secoes_de_campus, sem_outros_campi
+from pipelines.chunker import campus_do_pdf, e_canoas, secoes_de_campus, sem_outros_campi
 from pipelines.dates import extract_date_from_text, get_published_at
 from pipelines.listas_nomes import aviso_lista, destino
 from pipelines.urls import to_drive_view_url
@@ -671,6 +671,13 @@ def parse_pdf(pdf_info, content):
             resultado["lista_nomes"] = True
             resultado["text"] = aviso_lista(url, title)
             return resultado
+        # PDF do portal de outro campus (timbre "Campus X", sem citar Canoas) sai antes de qualquer chamada a LLM
+        campus = campus_do_pdf(url, text) if not is_scanned else None
+        if campus and not e_canoas(campus):
+            doc.close()
+            resultado["outro_campus"] = campus
+            resultado["text"] = ""
+            return resultado
 
         # grade de horario -> visao (pixelrag); quadro de vagas -> structurer por registro;
         # calendario -> reextracao posicional. Todos com o doc ainda ABERTO (a visao renderiza paginas).
@@ -743,7 +750,7 @@ def run_pdf_parser(pdfs_dirty, estado):
     pii_conhecidos = set(json.loads(PII_PATH.read_text(encoding="utf-8"))) if PII_PATH.exists() else set()
     print(f"PDFs a processar (novo+mudado): {len(pdfs_dirty)}")
 
-    results, pdf_errors, n_scan, n_fmt, pii_urls = [], [], 0, 0, []
+    results, pdf_errors, n_scan, n_fmt, pii_urls, outro_campus_urls = [], [], 0, 0, [], []
     for i, rec in enumerate(pdfs_dirty):
         url = rec["url"]
         result = parse_pdf(rec, rec["content"])
@@ -751,6 +758,8 @@ def run_pdf_parser(pdfs_dirty, estado):
             pdf_errors.append(url); continue
         if result.get("format_error"):
             format_errors.add(url); n_fmt += 1; continue
+        if result.get("outro_campus"):
+            outro_campus_urls.append(url); continue
         if result.get("pii_blocked"):
             # lista nominal de candidatos barrada pelo gate de PII: nao entra na base e e REGISTRADA
             # para o crawler pular o download nos proximos runs (sem chunk, ela nunca ganha
@@ -783,9 +792,10 @@ def run_pdf_parser(pdfs_dirty, estado):
         "pdfs_processados": len(pdfs_dirty),
         "parseados_ok": len(results),
         "por_estruturacao": por_estrut,
-        "nao_entraram": {"escaneado": n_scan, "erro_formato": n_fmt,
-                         "pii_barrado": len(pii_urls), "erro_download_ou_parse": len(pdf_errors)},
-        "amostras": {"pii_barrado": pii_urls[:15], "erro_download_ou_parse": pdf_errors[:15]},
+        "nao_entraram": {"escaneado": n_scan, "erro_formato": n_fmt, "pii_barrado": len(pii_urls),
+                         "outro_campus": len(outro_campus_urls), "erro_download_ou_parse": len(pdf_errors)},
+        "amostras": {"pii_barrado": pii_urls[:15], "outro_campus": outro_campus_urls[:15],
+                     "erro_download_ou_parse": pdf_errors[:15]},
         # leitura que entrou mas pede olho humano: grade que saiu do layout lido pelas coordenadas
         # (caiu na visao) e calendario com data omitida ou inventada em relacao ao PDF
         "a_conferir": {
@@ -799,7 +809,7 @@ def run_pdf_parser(pdfs_dirty, estado):
     (PARSED_DIR / "pdfs_parse_report.json").write_text(
         json.dumps(relatorio, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"\nParsed: {len(results)} PDFs {por_estrut} | NAO entraram: escaneado={n_scan} "
-          f"formato={n_fmt} PII={len(pii_urls)} download/parse={len(pdf_errors)}")
+          f"formato={n_fmt} PII={len(pii_urls)} outro_campus={len(outro_campus_urls)} download/parse={len(pdf_errors)}")
     print(f"  relatorio em {(PARSED_DIR / 'pdfs_parse_report.json')}")
 
     # enriquecimento de datas (so nos PDFs dirty, nao escaneados)

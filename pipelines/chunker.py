@@ -7,11 +7,12 @@ doc-nível, consumido pelo rerank/cap do serving.
 
 import json
 import re
+import unicodedata
 from collections import Counter
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from pipelines.config import CHUNK_SIZE, CHUNKS_DIR, CHUNKS_PATH
+from pipelines.config import CAMPI_IFRS, CHUNK_SIZE, CHUNKS_DIR, CHUNKS_PATH, INGRESSO_URL, OUTRAS_UNIDADES
 from pipelines.urls import to_drive_view_url
 from rag.cursos_escopo import classify_curso_escopo  # fonte unica do escopo de curso (ingestao + serving)
 
@@ -102,6 +103,75 @@ def campus_citado(texto):
         nome = achado.group(1).strip()
         if _campus_do_ifrs(nome):
             return nome
+    return None
+
+# estrutura do portal de ingresso que liga uma pagina a um campus: o campo da pagina de curso (o nome do campus
+# na linha seguinte) e o endereco /<periodo>/campus/<campus>/
+_CAMPO_DO_CURSO = re.compile(r"(?mi)^[ \t]*Curso oferecido no Campus:[ \t]*\n?[ \t]*([^\n]+?)[ \t]*$")
+_URL_DE_CAMPUS = re.compile(r"^[^/]+/campus/([^/]+)/")
+
+def _sem_acento(texto):
+    return unicodedata.normalize("NFKD", texto or "").encode("ascii", "ignore").decode().lower()
+
+# unidade do IFRS nomeada como "Campus X" ou "Campus Avançado X" (titulo de pagina, timbre de PDF), sobre o texto
+# sem acento e minusculo
+_UNIDADE_NOMEADA = re.compile(r"\bcampus\s+(?:avancado\s+)?(" + "|".join(
+    re.escape(nome) for nome in sorted({_sem_acento(u) for u in CAMPI_IFRS + OUTRAS_UNIDADES}, key=len, reverse=True))
+    + r")\b")
+LINHAS_DO_TIMBRE = 12
+
+def _unidade_nomeada(trecho, inteiro):
+    # "canoas" quando o documento inteiro cita Canoas; senao a primeira unidade nomeada "Campus X" no trecho
+    if "canoas" in _sem_acento(inteiro):
+        return "canoas"
+    achado = _UNIDADE_NOMEADA.search(_sem_acento(trecho))
+    return achado.group(1) if achado else None
+
+def campus_da_pagina(url, titulo, texto):
+    """Campus a que uma pagina do portal de ingresso pertence, pela estrutura do portal.
+
+    Args:
+        url: endereco da pagina.
+        titulo: titulo da pagina.
+        texto: texto extraido da pagina.
+
+    Returns:
+        O campus do campo da pagina de curso ou do endereco, como a pagina o escreve ("Farroupilha", "riogrande");
+        sem eles, a unidade nomeada "Campus X" no titulo ("zona norte"), ou "canoas" quando o titulo cita Canoas.
+        None quando a pagina nao e do portal de ingresso ou nao pertence a um campus so (listagem, edital geral).
+    """
+    if not (url or "").startswith(INGRESSO_URL):
+        return None
+    achado = _CAMPO_DO_CURSO.search(texto or "") or _URL_DE_CAMPUS.match(url[len(INGRESSO_URL):])
+    if achado:
+        return achado.group(1).strip()
+    return _unidade_nomeada(titulo or "", titulo or "")
+
+def campus_do_pdf(url, texto):
+    """Campus a que um PDF do portal de ingresso pertence, pelo timbre ou pelo titulo.
+
+    Args:
+        url: endereco do PDF.
+        texto: texto extraido do PDF.
+
+    Returns:
+        A unidade nomeada numa das primeiras LINHAS_DO_TIMBRE linhas com texto, numa linha so com "Campus X" (o
+        timbre) ou numa linha toda em maiusculas (o titulo, "... NO CAMPUS ZONA NORTE"), como "porto alegre" ou
+        "viamao"; "canoas" quando o PDF cita Canoas em qualquer ponto; None quando o PDF nao e do portal de ingresso
+        ou nenhuma dessas linhas nomeia campus (edital geral, frase do corpo que cita um campus).
+    """
+    if not (url or "").startswith(INGRESSO_URL):
+        return None
+    if "canoas" in _sem_acento(texto):
+        return "canoas"
+    for linha in [linha.strip() for linha in (texto or "").splitlines() if linha.strip()][:LINHAS_DO_TIMBRE]:
+        achado = _UNIDADE_NOMEADA.search(_sem_acento(linha))
+        if not achado:
+            continue
+        so_o_campus = re.fullmatch(r"campus\s+(?:avancado\s+)?" + re.escape(achado.group(1)) + r"[\s.,;:()\-]*",
+                                   _sem_acento(linha))
+        if so_o_campus or not re.search(r"[a-zà-ÿ]", linha):
+            return achado.group(1)
     return None
 
 def sem_outros_campi(text):
