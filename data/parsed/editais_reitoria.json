@@ -16,6 +16,49 @@
   "falhas": 0,
   "tentativas": 0
  },
+ "https://ifrs.edu.br/editais/concorrencia-no-404-2026-contratacao-de-empresas-para-realizacao-de-obras-nos-campi-do-ifrs-farroupilha-feliz-osorio-e-veranopolis/": {
+  "titulo": "CONCORRÊNCIA Nº 404/2026: Contratação de empresas para realização de obras nos campi do IFRS: Farroupilha, Feliz, Osório e Veranópolis",
+  "data": "29/10/2026",
+  "categorias": [
+   "Concorrência",
+   "Licitação"
+  ],
+  "atualizacao": "29/10/2026 12:25",
+  "hash": "5cb3bc717424832d538797062b0a9eff169aae8436cf3d8b443b0f7d2f1f35e8",
+  "veredito": {
+   "categoria": "canoas",
+   "publico": "empresas",
+   "evidencia": "Rua Maria Zélia Carneiro de Figueiredo, 870-A - Igarra III - Canoas - RS Instituto Federal de Educação, Ciência e Tecnologia do Rio Grande do Sul Campus Canoas - CNPJ 10.637.926/0006-50",
+   "motivo": "O anexo do projeto executivo contém conteúdo próprio e identificação do Campus Canoas.",
+   "cobertura": 1.0
+  },
+  "entra": true,
+  "motivo": "canoas",
+  "ids": [
+   "https://ifrs.edu.br/editais/concorrencia-no-404-2026-contratacao-de-empresas-para-realizacao-de-obras-nos-campi-do-ifrs-farroupilha-feliz-osorio-e-veranopolis/#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAL-SITE.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/PROJEXECUTIVO-FARROUPILHA.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/PROJEXECUTIVO-FELIZ.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/PROJETO-EXECUTIVO-OSORIO-PARTE-1.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/PROJETO-EXECUTIVO-OSORIO-PARTE-1.pdf#1",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/PROJETO-EXECUTIVO-OSORIO-PARTE-2.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/PROJETO-EXECUTIVO-OSORIO-PARTE-3.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/PROJETO-EXECUTIVO-OSORIO-PARTE-4.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/PROJEXECUTIVO-VERANOPOLIS.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAVEL-ITEM-1-SALAS-DE-AULA-FARROUPILHA.xlsx#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAVEL-ITEM-1-SALAS-DE-AULA-FARROUPILHA.xlsx#1",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAVEL-ITEM-2-PORTICO-FELIZ-1.xlsx#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAVEL-ITEM-2-PORTICO-FELIZ-1.xlsx#1",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAVEL-ITEM-3-SALAS-DE-AULA-OSORIO.xlsx#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAVEL-ITEM-4-COMPLEXO-VERANOPOLIS.xlsx#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAVEL-ANEXO-III-modelo-de-proposta-comercial.docx#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAVEL-ANEXO-IV-modelo-de-vistoria.docx#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAVEL-ANEXO-V-CARTA-DE-ANUENCIA-PROFISSIONAL.docx#0"
+  ],
+  "objeto": "concorrência nº 404/2026: contratação de empresas para realização de obras nos campi do ifrs: farroupilha, feliz, osório e veranópolis",
+  "falhas": 0,
+  "tentativas": 0
+ },
  "https://ifrs.edu.br/editais/dispensa-de-licitacao-no-414-2026-contratacao-de-servicos-de-pabx-virtual-telefonia-ip-em-nuvem/": {
   "titulo": "Dispensa de Licitação nº 414/2026 – Contratação de serviços de PABX Virtual (Telefonia IP em Nuvem)",
   "data": "06/10/2026",
@@ -2996,8 +3039,8 @@
    "Extensão",
    "Internos"
   ],
-  "atualizacao": "28/10/2026 16:29",
-  "hash": "1ab62c16b3eadb7cc490fae1bdfc58df8cf4076a703b78d7087782b060afa11e",
+  "atualizacao": "29/10/2026 10:42",
+  "hash": "909afe8d136c03ef1010cfb6c741ebfa005857e3cb435bab123ff1376a43499d",
   "veredito": {
    "categoria": "canoas",
    "publico": "servidores",
@@ -3016,7 +3059,8 @@
    "https://ifrs.edu.br/wp-content/uploads/2026/09/Anexo-III.pdf#2",
    "https://ifrs.edu.br/wp-content/uploads/2026/09/Anexo-III.pdf#3",
    "https://ifrs.edu.br/wp-content/uploads/2026/09/Anexo-III.pdf#4",
-   "https://ifrs.edu.br/wp-content/uploads/2026/09/Homologacao-Preliminar_Edital-35_2026_Auxilio-Institucional-a-Extensao-2027-assinado.pdf#0"
+   "https://ifrs.edu.br/wp-content/uploads/2026/09/Homologacao-Preliminar_Edital-35_2026_Auxilio-Institucional-a-Extensao-2027-assinado.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/09/Homologao_Final_Edital_35_2026_Auxlio_Institucional__Extenso_2027.pdf#0"
   ],
   "objeto": null,
   "falhas": 0,
@@ -3160,8 +3204,8 @@
    "Extensão",
    "Internos"
   ],
-  "atualizacao": "15/10/2026 16:51",
-  "hash": "d19bb7cb444b6f51b27d371095d4c71a772a2882d5b4c0c7c967465ef6372369",
+  "atualizacao": "30/10/2026 08:48",
+  "hash": "eca388f95a84cff4e5cf2cb263efe1258f5d10e70b2d40f1a3794ab4a1fcb9e5",
   "veredito": {
    "categoria": "canoas",
    "publico": "estudantes",
@@ -4012,8 +4056,8 @@
    "Internos",
    "Pesquisa"
   ],
-  "atualizacao": "23/10/2026 17:04",
-  "hash": "e4771f0b6c9c6906da8f5a1af1ed0b0c630264aed5b7d7ecc8407895eca02606",
+  "atualizacao": "29/10/2026 16:02",
+  "hash": "a599b1500940507f8aa876bbb9a59f375943536eba5aee34c3bec90fe974f7e2",
   "veredito": {
    "categoria": "rede",
    "publico": "estudantes",
@@ -4025,10 +4069,12 @@
   "motivo": "rede",
   "ids": [
    "https://ifrs.edu.br/editais/edital-proppi-no-22-2026-exame-de-proficiencia-em-linguas-estrangeiras/#0",
-   "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAL-PROPPI-No-xx_2026-EXAME-DE-PROFICIENCIA-EM-LINGUA-ESTRANGEIRAS.docx.pdf#0",
-   "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAL-PROPPI-No-xx_2026-EXAME-DE-PROFICIENCIA-EM-LINGUA-ESTRANGEIRAS.docx.pdf#1",
-   "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAL-PROPPI-No-xx_2026-EXAME-DE-PROFICIENCIA-EM-LINGUA-ESTRANGEIRAS.docx.pdf#2",
-   "https://ifrs.edu.br/wp-content/uploads/2026/10/Divulgacao_preliminar_inscricoes_homologadas_publicacao_22_2026.pdf#0"
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/Retificado-em-29_10_2026-EDITAL-PROPPI-No-xx_2026-EXAME-DE-PROFICIENCIA-EM-LINGUA-ESTRANGEIRAS.docx-1.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/Retificado-em-29_10_2026-EDITAL-PROPPI-No-xx_2026-EXAME-DE-PROFICIENCIA-EM-LINGUA-ESTRANGEIRAS.docx-1.pdf#1",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/Retificado-em-29_10_2026-EDITAL-PROPPI-No-xx_2026-EXAME-DE-PROFICIENCIA-EM-LINGUA-ESTRANGEIRAS.docx-1.pdf#2",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/Retificao_N_01_-_Edital_22.2026.docx_Vf-ass.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/Divulgacao_preliminar_inscricoes_homologadas_publicacao_22_2026.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/Divulgacao_final_inscricoes_homologadas_publicacao.docx_3ass.pdf#0"
   ],
   "objeto": null,
   "falhas": 0,
@@ -4041,8 +4087,8 @@
    "Internos",
    "Pesquisa"
   ],
-  "atualizacao": "29/10/2026 09:33",
-  "hash": "b7fec1ce700dc1aebf9c6787bfc8347d4f7df767e63a541b1a598e44732ecbe1",
+  "atualizacao": "29/10/2026 16:35",
+  "hash": "33e322dd5f2443b781539276ea1e11f2520b8c5a7a3589ba1e8ce8f7d7d77fc3",
   "veredito": {
    "categoria": "canoas",
    "publico": "estudantes_e_servidores",
@@ -4056,7 +4102,8 @@
    "https://ifrs.edu.br/editais/edital-proppi-no-23-2026-chamada-publica-para-colaboracao-no-espaco-kids-do-11o-salao-de-pesquisa-extensao-e-ensino/#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/Retificado-em-29_10-EDITAL-IFRS-No-23_2026-CHAMADA-PUBLICA-PARA-COLABORACAO-NO-ESPACO-KIDS-DO-11o-SALAO-DE-PESQUISA-EXTENSAO-E-ENSINO.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/Retificado-em-29_10-EDITAL-IFRS-No-23_2026-CHAMADA-PUBLICA-PARA-COLABORACAO-NO-ESPACO-KIDS-DO-11o-SALAO-DE-PESQUISA-EXTENSAO-E-ENSINO.pdf#1",
-   "https://ifrs.edu.br/wp-content/uploads/2026/10/DIVULGACAO-PRELIMINAR-DAS-INSCRICOES-HOMOLOGADAS-3.pdf#0"
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/DIVULGACAO-PRELIMINAR-DAS-INSCRICOES-HOMOLOGADAS-3.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/DIVULGACAO-FINAL-DAS-INSCRICOES-HOMOLOGADAS-3.pdf#0"
   ],
   "objeto": null,
   "falhas": 0,
