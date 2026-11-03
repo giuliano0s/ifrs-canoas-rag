@@ -2264,8 +2264,8 @@
   "categorias": [
    "Ensino"
   ],
-  "atualizacao": "21/10/2026 15:57",
-  "hash": "a8a040a01bdd9ffb22643c002da8f0cc63e4669ba36afab027ba8bf5c07b34f2",
+  "atualizacao": "03/11/2026 10:47",
+  "hash": "b93d0cd34bae10500e7e603dd48e289ef00e162d48fac72e2c40d003cbcaf37b",
   "veredito": {
    "categoria": "rede",
    "publico": "servidores",
@@ -2289,7 +2289,8 @@
    "https://ifrs.edu.br/wp-content/uploads/2026/10/ANEXO-I-–-FORMULARIO-SOMATORIO-DE-PONTUACAO.docx#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/ANEXO-II-FORMULARIO-DE-INTERPOSICAO-DE-RECURSO.docx#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/ANEXO-III-DECLARACAO-DE-DISPONIBILIDADE-DE-EXERCER-ATIVIDADE-COMO-BOLSISTA.docx#0",
-   "https://ifrs.edu.br/wp-content/uploads/2026/10/ANEXO-IV-–-DECLARACAO-DE-NAO-ACUMULO-DE-BOLSAS.docx#0"
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/ANEXO-IV-–-DECLARACAO-DE-NAO-ACUMULO-DE-BOLSAS.docx#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/Partiu_IF.pdf#0"
   ],
   "objeto": null,
   "falhas": 0,
@@ -3039,8 +3040,8 @@
    "Extensão",
    "Internos"
   ],
-  "atualizacao": "29/10/2026 10:42",
-  "hash": "909afe8d136c03ef1010cfb6c741ebfa005857e3cb435bab123ff1376a43499d",
+  "atualizacao": "03/11/2026 11:04",
+  "hash": "6594f30fef4f96dc53d5395bd313c97eaf2eb96047b1989c4b58208f4303cc4c",
   "veredito": {
    "categoria": "canoas",
    "publico": "servidores",
@@ -3052,15 +3053,16 @@
   "motivo": "canoas",
   "ids": [
    "https://ifrs.edu.br/editais/edital-proex-no-35-2026-auxilio-institucional-a-extensao-2027/#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/09/Retificao_02__Edital_N_35_2026_-_AUXLIO_INSTITUCIONAL__EXTENSO_2027.docx.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/09/Retificao_02__Edital_N_35_2026_-_AUXLIO_INSTITUCIONAL__EXTENSO_2027.docx.pdf#1",
    "https://ifrs.edu.br/wp-content/uploads/2026/09/Anexo-I.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/09/Anexo-II.pdf#0",
-   "https://ifrs.edu.br/wp-content/uploads/2026/09/Anexo-III.pdf#0",
-   "https://ifrs.edu.br/wp-content/uploads/2026/09/Anexo-III.pdf#1",
-   "https://ifrs.edu.br/wp-content/uploads/2026/09/Anexo-III.pdf#2",
-   "https://ifrs.edu.br/wp-content/uploads/2026/09/Anexo-III.pdf#3",
-   "https://ifrs.edu.br/wp-content/uploads/2026/09/Anexo-III.pdf#4",
+   "https://ifrs.edu.br/wp-content/uploads/2026/09/Anexo-III__Retificado_Edital-No-35_2026-AUXILIO-INSTITUCIONAL-A-EXTENSAO-2027-1.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/09/Anexo-III__Retificado_Edital-No-35_2026-AUXILIO-INSTITUCIONAL-A-EXTENSAO-2027-1.pdf#1",
+   "https://ifrs.edu.br/wp-content/uploads/2026/09/Anexo-III__Retificado_Edital-No-35_2026-AUXILIO-INSTITUCIONAL-A-EXTENSAO-2027-1.pdf#2",
+   "https://ifrs.edu.br/wp-content/uploads/2026/09/Anexo-III__Retificado_Edital-No-35_2026-AUXILIO-INSTITUCIONAL-A-EXTENSAO-2027-1.pdf#3",
    "https://ifrs.edu.br/wp-content/uploads/2026/09/Homologacao-Preliminar_Edital-35_2026_Auxilio-Institucional-a-Extensao-2027-assinado.pdf#0",
-   "https://ifrs.edu.br/wp-content/uploads/2026/09/Homologao_Final_Edital_35_2026_Auxlio_Institucional__Extenso_2027.pdf#0"
+   "https://ifrs.edu.br/wp-content/uploads/2026/09/Homologacao-Final_Retificacao-02_Edital-35_2026_Auxilio-Institucional-a-Extensao-2027.docx.pdf#0"
   ],
   "objeto": null,
   "falhas": 0,
@@ -4636,6 +4638,23 @@
   "motivo": "outro",
   "ids": [],
   "objeto": "contratação de serviço de limpeza, asseio, conservação e higienização para o campus sertão do ifrs, e contratação de serviços de cozinheiro e de jardineiro para o campus bento gonçalves do ifrs, com o fornecimento de materiais, equipamentos e demais insumos, a serem executados em regime de dedicação exclusiva de mão de obra",
+  "falhas": 0,
+  "tentativas": 0
+ },
+ "https://ifrs.edu.br/editais/pregao-no-365-2026-contratacao-de-empresa-para-a-realizacao-da-reforma-do-espaco-da-quadra-poliesportiva-campus-porto-alegre/": {
+  "titulo": "PREGÃO nº 365/2026 – Contratação de empresa para a realização da reforma do espaço da Quadra Poliesportiva – Campus Porto Alegre",
+  "data": "03/11/2026",
+  "categorias": [
+   "Licitação",
+   "Pregão Eletrônico"
+  ],
+  "atualizacao": "03/11/2026 09:32",
+  "hash": "6e0298e650c431818233053e72f6475b693e8af73742970c58868be98ab3e2d6",
+  "veredito": null,
+  "entra": false,
+  "motivo": "compra_sem_canoas",
+  "ids": [],
+  "objeto": "contratação de empresa para a realização da reforma do espaço da quadra poliesportiva – campus porto alegre",
   "falhas": 0,
   "tentativas": 0
  },
