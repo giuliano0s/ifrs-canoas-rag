@@ -1913,28 +1913,6 @@
   "falhas": 0,
   "tentativas": 0
  },
- "https://ifrs.edu.br/editais/edital-proen-no-34-2025-processo-seletivo-simplificado-de-contratacao-de-professor-formador-para-o-parfor/": {
-  "titulo": "EDITAL PROEN Nº 34/2025 – PROCESSO SELETIVO SIMPLIFICADO DE CONTRATAÇÃO DE PROFESSOR FORMADOR PARA O PARFOR",
-  "data": "05/11/2025",
-  "categorias": [
-   "Ensino"
-  ],
-  "atualizacao": "26/11/2025 09:44",
-  "hash": "937fea38e8166cf7aa654a80bf3174ed0dc9ad6572c447b42e6f9694c62791a1",
-  "veredito": {
-   "categoria": "outro",
-   "publico": "servidores",
-   "evidencia": "O presente Processo Seletivo tem por objetivo selecionar docentes para atuar no curso de Licenciatura em Pedagogia/Parfor - Campus Bento Gonçalves.",
-   "motivo": "O edital é restrito à seleção de docentes para atuação no Campus Bento Gonçalves.",
-   "cobertura": 1.0
-  },
-  "entra": false,
-  "motivo": "outro",
-  "ids": [],
-  "objeto": null,
-  "falhas": 0,
-  "tentativas": 0
- },
  "https://ifrs.edu.br/editais/edital-proen-no-35-2025-selecao-complementar-para-concessao-de-auxilio-financeiro-a-participacao-no-seminario-presencial-do-pibid-ifrs-edicao-2024-2026/": {
   "titulo": "EDITAL PROEN Nº 35/2025 – SELEÇÃO COMPLEMENTAR PARA CONCESSÃO DE AUXÍLIO FINANCEIRO À PARTICIPAÇÃO NO SEMINÁRIO PRESENCIAL DO PIBID IFRS – EDIÇÃO 2024-2026",
   "data": "18/11/2025",
@@ -2313,8 +2291,8 @@
   "categorias": [
    "Ensino"
   ],
-  "atualizacao": "23/10/2026 10:33",
-  "hash": "c24bc32f3578e8be3ca708db66659bdbfb1e050f49e17d6c7170973d344ac6b4",
+  "atualizacao": "06/11/2026 09:16",
+  "hash": "35d5a60da8f4af8deca9891ff5f4b71bd369a38ca8c0a287da31f5108d97c9a9",
   "veredito": {
    "categoria": "canoas",
    "publico": "estudantes_e_servidores",
@@ -2330,9 +2308,16 @@
    "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAL-no32-PROEN-DE-SELECAO-COMP-DE-MEMBROS-PARA-AS-COMISSOES.pdf#1",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAL-no32-PROEN-DE-SELECAO-COMP-DE-MEMBROS-PARA-AS-COMISSOES.pdf#2",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAL-no32-PROEN-DE-SELECAO-COMP-DE-MEMBROS-PARA-AS-COMISSOES.pdf#3",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/Retificacao-Completa-do-Edital-Complementar-Comissoes-Heteroidentificacao-2026.docx.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/Retificacao-Completa-do-Edital-Complementar-Comissoes-Heteroidentificacao-2026.docx.pdf#1",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/Retificacao-Completa-do-Edital-Complementar-Comissoes-Heteroidentificacao-2026.docx.pdf#2",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/Retificacao-Completa-do-Edital-Complementar-Comissoes-Heteroidentificacao-2026.docx.pdf#3",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/Retificacao-Completa-do-Edital-Complementar-Comissoes-Heteroidentificacao-2026.docx.pdf#4",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/RETIFICACAO-No-01pdf.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/ANEXO-I-REQUERIMENTO-DE-INSCRICAO.docx#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/ANEXO-II-–-FICHA-DE-AVALIACAO-DE-TITULOS.docx#0",
-   "https://ifrs.edu.br/wp-content/uploads/2026/10/ANEXO-III-CURRICULO-RESUMIDO.docx#0"
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/ANEXO-III-CURRICULO-RESUMIDO.docx#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/RESULTADO-PRELIMINAR-DE-INSCRICOES-HOMOLOGADAS.pdf#0"
   ],
   "objeto": null,
   "falhas": 0,
