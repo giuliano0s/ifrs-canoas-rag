@@ -50,10 +50,12 @@ CANDIDATOS_K = 300  # candidatos pedidos ao Upstash so com id e score, antes de 
                     # FETCH_K melhores: a busca do indice e aproximada, e pedindo so 60 ela explora menos
                     # e perde vizinhos (recall@60 de 96%, minimo 82%; com 300, 99,4%, minimo 97%; +150 ms)
 Hit = namedtuple("Hit", "id score metadata")
-CURSO_PENALTY = 0.20  # penalidade no rerank para chunk de curso DIFERENTE do citado na pergunta
-                      # (metadata curso_escopo). SUAVE (0.20 < CAMPUS_PENALTY 0.35) e SEM cap: doc de
-                      # outro curso pode ser pertinente, entao so desce, nao e expulso. fecha o erro de
-                      # aplicar regra de um curso a outro (ex: regulamento de TCC da GPI dado como TADS).
+CURSO_PENALTY = 0.35  # penalidade no rerank para chunk de curso DIFERENTE do citado na pergunta
+                      # (metadata curso_escopo), SEM cap: doc de outro curso pode ser pertinente, entao
+                      # so desce, nao e expulso. medido em 07/11/2026 nas 130 buscas reais do golden e do
+                      # controle com as etiquetas de pipelines/cursos.py: documento do gabarito no
+                      # contexto igual a 0.20 (20/20 com curso, 84/87 sem), trechos do proprio curso
+                      # 223 -> 227 e de outro curso rotulado 4 -> 0
 # modelo de GERAÇÃO do atendimento (tabela PERFIS em rag/llm.py). Exposto aqui porque o eval e a
 # telemetria carimbam cada registro com o modelo que o gerou.
 MODEL = llm.modelo_ativo()
@@ -165,13 +167,23 @@ def build_context(hits, min_score=MIN_SCORE, top_n=CONTEXT_K):
         published_at = h.metadata.get("published_at") or "data desconhecida"
         # rotula o curso do doc (quando curso-especifico) no MESMO cabecalho do trecho, junto do
         # Data:, para o agente atribuir a regra ao curso certo (ex: nao apresentar regra de TCC da
-        # GPI como se fosse do TADS). doc neutro (sem curso_escopo) nao ganha rotulo.
-        curso = h.metadata.get("curso_escopo")
-        rotulo_curso = f" | Curso: {nome_curso(curso)}" if curso else ""
+        # GPI como se fosse do TADS). trecho de varios cursos (metadata cursos) leva a lista; doc neutro,
+        # nenhum rotulo.
+        rotulo_curso = rotulo_de_curso(h.metadata)
         context += f"[{source_num}] Fonte: {url} | Data: {published_at}{rotulo_curso}\n"
         context += h.metadata["text"] + "\n\n"
 
     return context, filtered, sources, source_years
+
+
+def rotulo_de_curso(metadata):
+    # rotulo do curso no cabecalho do trecho: " | Curso: X" (um curso), " | Cursos: X, Y" (varios), "" (generico)
+    curso, cursos = metadata.get("curso_escopo"), metadata.get("cursos")
+    if curso:
+        return f" | Curso: {nome_curso(curso)}"
+    if cursos:
+        return " | Cursos: " + ", ".join(nome_curso(slug) for slug in cursos)
+    return ""
 
 
 def _date_score(hit):
@@ -254,6 +266,7 @@ def _executar_busca(search_query, trace=None):
             "contexto_urls": [h.metadata.get("source_url") for h in filtered],
             "contexto_ids": [h.id for h in filtered],
             "chunks_textos": [h.metadata.get("text", "") for h in filtered],
+            "contexto_rotulos": [rotulo_de_curso(h.metadata).removeprefix(" | ") for h in filtered],
             "sources": dict(sources),
             "source_years": dict(source_years),
             "marcas": marcas,

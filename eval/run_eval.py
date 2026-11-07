@@ -349,7 +349,10 @@ def _tarefas_juiz(regs, casos):
         # atendimento tem ~4000 chars, alfabetica: as linhas de "Igor" caem apos o offset 2000),
         # gerando falso "sem apoio no contexto". Fidelidade so e confiavel se o juiz ve o mesmo
         # contexto que o agente viu.
-        ctx = [t for b in r.get("buscas", []) for t in b.get("chunks_textos", [])]
+        # com o rotulo de curso que o agente viu no cabecalho do trecho, quando a coleta o registrou
+        ctx = [f"[{rotulo}]
+{texto}" if rotulo else texto for b in r.get("buscas", [])
+               for texto, rotulo in zip(b.get("chunks_textos", []), b.get("contexto_rotulos") or [""] * len(b.get("chunks_textos", [])))]
         # o "hoje" do agente naquela execucao: a data fixa do caso temporal, ou o dia da coleta.
         # sem ela o juiz mede "proxima ocorrencia"/"ja passou" contra a data real do julgamento
         data_atual = caso.get("data_referencia")

@@ -2,7 +2,8 @@
 
 Grades de horário viram UM chunk por linha (um professor por chunk), preservando a
 granularidade que o retrieval por professor precisa. Também atribui aqui o campus_scope
-doc-nível, consumido pelo rerank/cap do serving.
+doc-nível, consumido pelo rerank/cap do serving. O curso de cada trecho é atribuído depois do ingest, em
+pipelines/cursos.py, sobre a base inteira.
 """
 
 import json
@@ -14,7 +15,6 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from pipelines.config import CAMPI_IFRS, CHUNK_SIZE, CHUNKS_DIR, CHUNKS_PATH, INGRESSO_URL, OUTRAS_UNIDADES
 from pipelines.urls import to_drive_view_url
-from rag.cursos_escopo import classify_curso_escopo  # fonte unica do escopo de curso (ingestao + serving)
 
 _CAMPI_IFRS = ("Alvorada", "Bento Gon", "Caxias", "Erechim", "Farroupilha", "Feliz", "Ibirub",
                "Osório", "Osorio", "Porto Alegre", "Restinga", "Rio Grande", "Rolante", "Sertão",
@@ -299,9 +299,7 @@ def chunks_de_pdf(pdf):
     # outro campus nao entra. o campus esta EXPLICITO em cada linha e cada chunk e um curso atomico
     if pdf.get("is_vagas"):
         return [{**base_meta, "text": ln.strip()} for ln in pdf["text"].split("\n") if "canoas" in ln.lower()]
-    metadata = {**base_meta,
-                "campus_scope": classify_campus_scope(pdf["title"], pdf["text"], url),
-                "curso_escopo": classify_curso_escopo(pdf["title"], pdf["text"], url)}
+    metadata = {**base_meta, "campus_scope": classify_campus_scope(pdf["title"], pdf["text"], url)}
     # grade de horario: leva os marcadores para o metadata (persistidos no upsert). nao e so o
     # switch de parse: na base, is_schedule permite auditar/filtrar as grades e schedule_source
     # (visao/visao_parcial/fallback_texto) sinaliza grade incompleta ou degradada, o que o texto
@@ -348,7 +346,6 @@ def chunks_de_planilha(sheet):
         "published_at": sheet.get("published_at"),
         "source_hash":  sheet.get("source_hash"),
         "campus_scope": classify_campus_scope(sheet.get("title", ""), sheet["text"], sheet["source_url"]),
-        "curso_escopo": classify_curso_escopo(sheet.get("title", ""), sheet["text"], sheet["source_url"]),
     }
     return chunk_document(sheet["text"], metadata, por_linha=True)
 
@@ -369,7 +366,6 @@ def run_chunker(pages_parsed, pdfs_parsed, sheets_parsed):
             "published_at": page.get("published_at"),
             "source_hash":  page.get("source_hash"),
             "campus_scope": classify_campus_scope(page["title"], page["text"], page["source_url"]),
-            "curso_escopo": classify_curso_escopo(page["title"], page["text"], page["source_url"]),
         }
         # lista de pessoas: um chunk so, o aviso sem nomes, marcado
         if page.get("lista_nomes"):

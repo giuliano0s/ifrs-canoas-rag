@@ -51,6 +51,9 @@ PERFIS = {
     "atendimento_raciocinio": Perfil("openai", "gpt-6-luna", "none"),
     # estruturadores, inferencia de data e visao das grades da ingestao
     "ingestao": Perfil("openai", "gpt-5.6-luna", "none"),
+    # curso de cada documento (pipelines/cursos.py): medido em 07/11/2026 sobre 341 documentos rotulados,
+    # precisao 0,98 e cobertura 0,96, contra 0,91/0,95 do gpt-5.4-nano, que custou 1,4 vez mais
+    "ingestao_curso": Perfil("openai", "gpt-6-luna", "none"),
 }
 # modelo do Gemini para as chamadas leves (leve=True) quando um perfil usa o Gemini
 GEMINI_MODEL_LEVE = "gemini-2.5-flash-lite"

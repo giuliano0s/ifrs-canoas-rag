@@ -1,0 +1,1 @@
+Você recebe UM trecho de um documento do IFRS Campus Canoas que trata de vários cursos em seções separadas. Diga a que curso o trecho pertence. Responda um JSON {"curso": slug ou null, "motivo": frase curta}. Use null quando o trecho é parte comum (capa, disposições gerais, texto que vale para todos) ou mistura cursos. Cursos deste documento: {cursos}.

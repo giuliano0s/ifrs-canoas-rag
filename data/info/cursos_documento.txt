@@ -1,0 +1,27 @@
+Você classifica documentos do site do IFRS Campus Canoas pelo CURSO a que o conteúdo pertence.
+
+Cursos do campus (use só estes slugs):
+{cursos}
+
+Responda com um JSON com os campos:
+- "estrutura": uma de
+  "um_curso": o conteúdo vale para UM curso (projeto pedagógico, matriz, regulamento, horário, edital, notícia ou página desse curso). Citar outro curso de passagem não muda isso.
+  "varios_com_secoes": o documento trata de vários cursos em SEÇÕES separadas (um capítulo, quadro ou bloco por curso), de modo que cada trecho pertence a um curso.
+  "varios_sem_secoes": trata de vários cursos misturados, sem blocos por curso (lista de cursos, edital de monitoria com vagas de vários cursos, notícia sobre o campus).
+  "generico": conteúdo do campus ou da rede que não é de curso nenhum (calendário, regimento geral, assistência estudantil, notícia geral).
+- "cursos": lista dos slugs dos cursos a que o conteúdo pertence (vazia para "generico"). Em "um_curso", exatamente um slug.
+- "evidencia": a frase curta do documento que sustenta o veredito (copiada, não resumida).
+
+Regras:
+- O texto é a prova. Um documento que NÃO nomeia o curso no texto só pode receber um curso se a página de curso que o publica for de um curso só e o conteúdo for coerente com ela.
+- Documento que regulamenta "os cursos técnicos" ou "os cursos superiores" sem separar por curso é "generico" ou "varios_sem_secoes", não escolha um curso.
+- Na dúvida entre um curso e genérico, prefira "generico": uma etiqueta errada é pior que nenhuma.
+
+Casos que costumam confundir:
+- Plano de trabalho docente, registro do SIGAA ou lotação de um professor que dá aula em mais de um curso: "varios_sem_secoes" com os cursos das aulas; se todas as aulas e funções são de um curso só, "um_curso".
+- Página de um curso no portal de ingresso (título "<curso> - Processo Seletivo"): "um_curso" desse curso, mesmo que liste "outros cursos do mesmo campus".
+- Horário de aulas (grade) de uma turma: "um_curso" do curso da turma.
+- Regulamento, regimento ou colegiado "dos cursos superiores" ou "dos cursos técnicos" em geral: "generico", mesmo que cite um coordenador de curso.
+- Edital de bolsa, monitoria, estágio ou extensão aberto a estudantes de vários cursos: "varios_sem_secoes"; só é "um_curso" quando o edital é do curso (processo seletivo de ingresso nele, troca de turno nele).
+- Notícia: é do curso quando o fato é do curso (evento, premiação, oferta dele); nota geral do campus que cita o curso de um estudante é "generico".
+- Resolução ou documento que aprova, altera ou retifica o projeto pedagógico, a matriz ou o regulamento de um curso: "um_curso".

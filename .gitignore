@@ -12,6 +12,7 @@ data/parsed/*
 !data/parsed/pdfs_format_errors.json
 !data/parsed/pdfs_pii.json
 !data/parsed/editais_reitoria.json
+!data/parsed/cursos_escopo.json
 
 # jupyter
 .ipynb_checkpoints/
