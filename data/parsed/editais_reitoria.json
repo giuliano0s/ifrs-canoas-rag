@@ -1393,8 +1393,8 @@
    "Externos",
    "Internos"
   ],
-  "atualizacao": "04/11/2026 12:35",
-  "hash": "ab341c0adab26d689c12e774665e0710e6da1afe02061fb7de003400b3fd77b7",
+  "atualizacao": "06/11/2026 13:01",
+  "hash": "5cdf9fae8ccea3f90691c84e7d9567843ad2e4d0a9b7541104288c8c4b4f77a3",
   "veredito": {
    "categoria": "rede",
    "publico": "estudantes_e_servidores",
@@ -1429,7 +1429,9 @@
    "https://ifrs.edu.br/wp-content/uploads/2025/05/Anexo-II-Termo-de-ciencia.docx#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/Edital-Aprenda-Mais-no-XXX_2026-Anexo-III-A.docx#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/Edital-Aprenda-Mais-no-XXX_2026-Anexo-III-B.docx#0",
-   "https://ifrs.edu.br/wp-content/uploads/2026/10/Edital-Proen-28_2026-Resultado-Parcial-analise-tecnica-e-documental.pdf#0"
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/Edital-Proen-28_2026-Resultado-Parcial-analise-tecnica-e-documental.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/Edital-Proen-28_2026-Resultado-final-analise-tecnica-e-documental.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/Edital-28_2026-Cronograma_Entrevistas.pdf#0"
   ],
   "objeto": null,
   "falhas": 0,
@@ -3257,34 +3259,6 @@
    "https://ifrs.edu.br/wp-content/uploads/2026/04/Divulgacao-da-Lista-de-Inscricoes-Homologadas-TURMA-2.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/04/NOTA-SOBRE-AS-VAGAS-DOS-ESTUDANTES-DO-PROGRAMA-PE-NO-FUTURO.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/04/Divulgacao-Lista-Final-Selecao-de-Estudantes-TURMA-2-.pdf#0"
-  ],
-  "objeto": null,
-  "falhas": 0,
-  "tentativas": 0
- },
- "https://ifrs.edu.br/editais/edital-proex-no40-2025-concessao-de-auxilio-financeiro-a-participacao-de-estudantes-nos-jogos-dos-institutos-federais-etapa-nacional/": {
-  "titulo": "EDITAL PROEX Nº40/2025 CONCESSÃO DE AUXÍLIO FINANCEIRO À PARTICIPAÇÃO DE ESTUDANTES NOS  JOGOS DOS INSTITUTOS FEDERAIS – ETAPA NACIONAL",
-  "data": "06/11/2025",
-  "categorias": [
-   "Extensão",
-   "Internos"
-  ],
-  "atualizacao": "08/12/2025 15:59",
-  "hash": "f0de1d6fa27a0a7e0bd21c97c873f2185f98305df7ffb00a117d359b24e11de1",
-  "veredito": {
-   "categoria": "canoas",
-   "publico": "estudantes",
-   "evidencia": "Gabriel Rauber Hardt CANOAS Contemplado com auxílio",
-   "motivo": "O edital concede auxílio a estudantes e inclui estudantes contemplados do Campus Canoas.",
-   "cobertura": 1.0
-  },
-  "entra": true,
-  "motivo": "canoas",
-  "ids": [
-   "https://ifrs.edu.br/editais/edital-proex-no40-2025-concessao-de-auxilio-financeiro-a-participacao-de-estudantes-nos-jogos-dos-institutos-federais-etapa-nacional/#0",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/EDITAL-IFRS-No-40_2025-CONCESSAO-DE-AUXILIO-FINANCEIRO-A-PARTICIPACAO-DOS-JOGOS-NACIONAIS-2025.docx-2.pdf#0",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/Retificacao-no-1-alteracao-de-cronograma-edital.docx.pdf#0",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/Divulgacao-Estudantes-contemplados-com-Auxilio-para-jogos-Nacionais-pdf.pdf#0"
   ],
   "objeto": null,
   "falhas": 0,
