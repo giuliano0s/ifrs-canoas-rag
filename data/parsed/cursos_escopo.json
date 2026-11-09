@@ -9026,7 +9026,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/licenciatura-em-matematica-2/": {
-   "chave": "73f442bcd9c5394e",
+   "chave": "4eb6c3c404f81a91",
    "cursos": [
     "matematica"
    ],
@@ -9044,7 +9044,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnico-em-administracao/": {
-   "chave": "3da46ad0734fd608",
+   "chave": "6ffdbacb7a665b45",
    "cursos": [
     "tec-admin"
    ],
@@ -9053,7 +9053,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnico-em-comercio/": {
-   "chave": "951832020de803f4",
+   "chave": "c31b17a6a03fed4d",
    "cursos": [
     "tec-comercio"
    ],
@@ -9265,6 +9265,22 @@
   },
   "https://ingresso.ifrs.edu.br/2027/wp-content/uploads/sites/39/2026/09/EDITAL-No-15-2026-EDITAL-DE-INGRESSO-DE-ESTUDANTES-NO-PRIMEIRO-SEMESTRE-DE-2027-3.pdf": {
    "chave": "cec33de9ba008e8a",
+   "cursos": [
+    "tec-desenv-sistemas",
+    "tec-admin",
+    "tec-eletronica",
+    "tec-comercio",
+    "logistica",
+    "matematica",
+    "eng-eletronica",
+    "eng-mecanica"
+   ],
+   "estrutura": "varios_sem_secoes",
+   "so_ligacao": false,
+   "trechos": {}
+  },
+  "https://ingresso.ifrs.edu.br/2027/wp-content/uploads/sites/39/2026/09/EDITAL-No-15-2026-EDITAL-DE-INGRESSO-DE-ESTUDANTES-NO-PRIMEIRO-SEMESTRE-DE-2027-4.pdf": {
+   "chave": "7db130957da05c1d",
    "cursos": [
     "tec-desenv-sistemas",
     "tec-admin",
