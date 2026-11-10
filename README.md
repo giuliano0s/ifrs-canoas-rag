@@ -12,8 +12,10 @@ O projeto realiza:
 - Geração de embeddings
 - Indexação vetorial no Upstash
 - Recuperação semântica de contexto
-- Geração de respostas com Gemini
-- Proteção contra abuso: rate limit por IP (resistente a spoof), tetos de tamanho de entrada e teto global de uso diário
+- Geração de respostas com a OpenAI (GPT-6 Luna no atendimento, GPT-5.6 Luna na ingestão), com a resposta transmitida enquanto é escrita
+- Etiqueta de curso em cada trecho (regras objetivas e um classificador por LLM), para a informação de um curso não ser dada como de outro
+- Checagens determinísticas na saída (vazamento do prompt, ressalva de ano, soma inventada, nível da data, "hoje" e prazo contra a data do pedido)
+- Proteção contra abuso: rate limit por dispositivo com teto por IP, tetos de tamanho de entrada e teto global de uso diário
 - Telemetria opcional de produção com Langfuse (perguntas reais viram novos casos de teste)
 - Backend stateless pronto para deploy serverless no Vercel
 
@@ -29,7 +31,8 @@ O projeto realiza:
 - langchain-text-splitters (chunker)
 - Upstash Vector
 - Upstash Redis
-- Google Gemini API
+- OpenAI API (geração)
+- Google Gemini API (embedding)
 - Langfuse (telemetria de produção)
 - BeautifulSoup
 - PyMuPDF
@@ -41,11 +44,11 @@ O projeto realiza:
 
 ```txt
 .
-├── .github/workflows/    # CI: ingest semanal (GitHub Actions)
+├── .github/workflows/    # CI: ingest diário (GitHub Actions)
 ├── api/                  # Entrypoint serverless (Vercel)
 ├── data/                 # Dados brutos e processados
 ├── eval/                 # Bateria de testes (golden set + validador)
-├── pipelines/            # Ingestão modular (config, crawler, parsers, chunker, ingest + orquestrador)
+├── pipelines/            # Ingestão modular (crawler, parsers, chunker, ingest, editais, cursos + orquestrador)
 ├── rag/                  # Lógica RAG
 ├── ui/                   # Interface web
 ├── requirements.txt
@@ -58,19 +61,23 @@ O projeto realiza:
 
 ## 1. Crawling
 
-O sistema percorre páginas do IFRS Canoas automaticamente e coleta:
+O sistema percorre o site do IFRS Canoas e o portal de ingresso (`ingresso.ifrs.edu.br`) e coleta:
 
 - Conteúdo HTML
 - Links internos
 - Arquivos PDF
+- Planilhas Google publicadas
+
+Cada recurso é hasheado antes do parse: só o que é novo ou mudou segue para o LLM e o embedding. Conteúdo de outro campus e listas com nomes de pessoas ficam fora da base. Os editais da Reitoria que dizem respeito a Canoas entram por uma fase própria.
 
 ## 2. Extração de texto
 
 O conteúdo coletado é convertido em texto estruturado.
 
 PDFs são processados utilizando PyMuPDF.
-Tabelas de horário (grades) são lidas por visão multimodal (a imagem de cada página), porque a extração de texto embaralha a tabela 2D; o conteúdo é reorganizado por professor.
-Extração de datas como metadados com gemini-2.5-flash-lite usando cabeçalhos e rodapés de documentos.
+Tabelas de horário (grades) são lidas pelas coordenadas do PDF, porque a extração de texto embaralha a tabela 2D; o conteúdo é reorganizado por professor, e a visão multimodal fica como reserva quando o layout muda.
+Calendários, quadros de vagas e planilhas são estruturados por LLM, com conferência contra o texto original.
+A data de publicação de cada documento é inferida por LLM a partir do início e do fim do próprio documento.
 
 ## 3. Chunking
 
@@ -80,9 +87,15 @@ Os textos são divididos em partes menores para melhorar:
 - precisão das respostas
 - eficiência do embedding
 
+Listas de registros (planilhas, grades) viram um trecho por registro; o calendário e o cronograma do ingresso viram um trecho por evento, entregue com o mês ou o cronograma inteiro.
+
+## Curso de cada trecho
+
+No fim de cada ingestão, uma fase etiqueta o curso de cada trecho da base: primeiro por regras objetivas (página do curso, sigla da turma na grade, linha do quadro de vagas, título de PPC ou regulamento), depois por um classificador LLM nos documentos que citam algum curso, e trecho a trecho nos documentos com uma seção por curso. O contexto mostra o curso de cada trecho, e a busca rebaixa trechos de outro curso quando a pergunta nomeia um.
+
 ## 4. Embeddings
 
-Os chunks são transformados em vetores utilizando modelos da API Gemini.
+Os chunks são transformados em vetores com o `gemini-embedding-001` (3072 dimensões).
 
 ## 5. Banco vetorial
 
@@ -92,11 +105,11 @@ Os embeddings são armazenados no Upstash Vector para busca vetorial.
 
 Quando o usuário faz uma pergunta:
 
-1. O rate limit por IP é verificado antes de qualquer chamada à LLM
-2. O sistema busca os chunks mais relevantes
-3. Monta um contexto
-4. Envia o contexto ao modelo Gemini
-5. Retorna uma resposta baseada nos documentos recuperados
+1. O rate limit por dispositivo é verificado antes de qualquer chamada à LLM
+2. Um agente decide entre buscar nos documentos (escrevendo a consulta) ou pedir esclarecimento
+3. A busca traz os candidatos do Upstash e os reordena por similaridade, data, campus e curso
+4. O modelo responde a partir dos trechos recuperados, citando as fontes
+5. As checagens de saída corrigem a resposta antes de ela chegar ao aluno
 
 Se nenhum chunk atinge o score mínimo, o modelo é informado disso e responde honestamente que não encontrou, sem inventar e sem buscar na internet.
 
@@ -104,7 +117,7 @@ Se nenhum chunk atinge o score mínimo, o modelo é informado disso e responde h
 
 O backend é stateless: não guarda histórico nem sessão. O histórico da conversa vive no cliente e é enviado em cada requisição, o que torna o serviço compatível com o ambiente serverless do Vercel.
 
-O rate limit usa Upstash Redis (20 requisições por minuto por IP) para proteger contra abuso de chamadas à LLM.
+O rate limit usa Upstash Redis (20 requisições por minuto por dispositivo, com teto de 120 por minuto por IP, porque o wifi do campus compartilha IP) para proteger contra abuso de chamadas à LLM.
 
 A página servida ao usuário é um snapshot estático do site do IFRS, gerado offline (e commitado) com o widget de chat e uma faixa de aviso já injetados, não buscado ao vivo a cada requisição. Assim a página só muda quando a base muda, e o filesystem read-only do Vercel não é um problema. A faixa avisa que é um ambiente de teste não oficial.
 
@@ -154,6 +167,7 @@ Crie um arquivo `.env` na raiz do projeto.
 Exemplo:
 
 ```env
+OPENAI_API_KEY=sua_chave
 GEMINI_API_KEY_T1=sua_chave
 UPSTASH_ENDPOINT=https://SEU_INDEX.upstash.io
 UPSTASH_API_KEY=token_read_only
@@ -186,14 +200,16 @@ Execute o script responsável por:
 3. Chunking
 4. Embeddings
 5. Indexação no Upstash
+6. Editais da Reitoria e curso de cada trecho
+7. Snapshot da página
 
-O script de pipeline está na pasta:
+O orquestrador é `pipelines/ingest_pipeline.py`:
 
-```txt
-pipelines/
+```bash
+python pipelines/ingest_pipeline.py
 ```
 
-A ingestão também roda **automaticamente toda semana** via GitHub Actions (`.github/workflows/ingest.yml`, incremental): atualiza a base no Upstash e commita o snapshot da página de volta, o que dispara o redeploy no Vercel. Roda o mesmo `pipelines/ingest_pipeline.py`; dá pra disparar na mão pela aba Actions ("Run workflow").
+A ingestão também roda **automaticamente todo dia** via GitHub Actions (`.github/workflows/ingest.yml`, incremental): atualiza a base no Upstash e commita o snapshot da página de volta, o que dispara o redeploy no Vercel. Roda o mesmo `pipelines/ingest_pipeline.py`; dá pra disparar na mão pela aba Actions ("Run workflow").
 
 ---
 
@@ -245,6 +261,8 @@ python -m eval.run_eval validar
 O `validar` gera automaticamente `eval/runs/relatorio.md`: um placar por fase, o que o assistente acertou e o que errou (com o motivo de cada falha). O juiz das fases 5-6 tem dois modos, via a variável `EVAL_JUDGE`:
 
 - **`claude`** (padrão): não usa API paga; o próprio Claude Code avalia as respostas.
+
+Um conjunto de controle (`EVAL_CONJUNTO=controle`), que nunca ajusta prompt nem código, serve de régua de não-regressão.
 - **`gemini`**: avalia chamando a API do Gemini, num comando só (`EVAL_JUDGE=gemini python -m eval.run_eval validar`).
 
 ---
@@ -259,7 +277,8 @@ Cadastre no painel do Vercel as variáveis de ambiente, usando o token read-only
 - `UPSTASH_ENDPOINT`
 - `UPSTASH_REDIS_API_KEY`
 - `UPSTASH_REDIS_ENDPOINT`
-- `GEMINI_API_KEY_T1`
+- `GEMINI_API_KEY_T1` (embedding da pergunta)
+- `OPENAI_API_KEY` (geração; o modelo vem da tabela `PERFIS` em `rag/llm.py`)
 - `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST` (opcionais; ligam a telemetria em produção)
 - `GLOBAL_DAILY_MAX` (opcional; teto de requisições por dia, default 2000)
 
@@ -274,15 +293,17 @@ Usuário
    ↓
 Pergunta (com histórico do cliente)
    ↓
-Rate limit por IP (Upstash Redis)
+Rate limit por dispositivo (Upstash Redis)
    ↓
-Busca vetorial no Upstash
+Agente decide: buscar ou pedir esclarecimento
    ↓
-Recuperação de chunks relevantes
+Busca vetorial no Upstash + reordenação (data, campus, curso)
    ↓
-Construção do contexto
+Construção do contexto (com data e curso de cada trecho)
    ↓
-Gemini gera resposta (ou informa que não encontrou)
+GPT-6 Luna gera a resposta em streaming (ou informa que não encontrou)
+   ↓
+Checagens de saída e fontes
    ↓
 Resposta final
 ```
