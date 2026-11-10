@@ -2211,8 +2211,8 @@
   "categorias": [
    "Ensino"
   ],
-  "atualizacao": "04/11/2026 09:54",
-  "hash": "31df686d430baf6624967a0ab401955c6b15a5891aab830f5fa0850768ce03ee",
+  "atualizacao": "10/11/2026 12:04",
+  "hash": "cd5eb315a3a3b6b36835404e0afca49f4107ef1da0a5ad67a3c4d6c70479cbde",
   "veredito": {
    "categoria": "outro",
    "publico": "externo",
@@ -2233,8 +2233,8 @@
   "categorias": [
    "Ensino"
   ],
-  "atualizacao": "04/11/2026 09:55",
-  "hash": "6205a696e746782a9a649b34127d91d7bdfee649507f411818ea7014775e15b9",
+  "atualizacao": "10/11/2026 12:05",
+  "hash": "92cfbba457fcf40356f0f45fd3373655f88290bcb1aa2f2602fed48ae42a1423",
   "veredito": {
    "categoria": "outro",
    "publico": "estudantes",
@@ -4088,6 +4088,49 @@
    "https://ifrs.edu.br/editais/edital-proppi-no-24-2026-selecao-interna-para-inscricao-no-programa-deep-techs-rs/#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAL-PROPPI-No-24.2026.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/DIVULGACAO-DAS-INSCRICOES-ACEITAS-2.pdf#0"
+  ],
+  "objeto": null,
+  "falhas": 0,
+  "tentativas": 0
+ },
+ "https://ifrs.edu.br/editais/edital-proppi-no-25-2026-de-oferta-tecnologica-para-licenciamento-nao-exclusivo-do-programa-de-computador-portal-integra/": {
+  "titulo": "EDITAL PROPPI Nº 25/2026 DE OFERTA TECNOLÓGICA PARA LICENCIAMENTO NÃO EXCLUSIVO DO PROGRAMA DE COMPUTADOR “PORTAL INTEGRA”",
+  "data": "09/11/2026",
+  "categorias": [
+   "Internos",
+   "Pesquisa"
+  ],
+  "atualizacao": "09/11/2026 16:32",
+  "hash": "dd8032d07e5350dc3aeeaf94e4bed14a33e3301e6a181df748af470555ce128b",
+  "veredito": {
+   "categoria": "externo",
+   "publico": "empresas",
+   "evidencia": "Poderão participar deste processo de oferta tecnológica pessoas jurídicas de direito público ou privado, com ou sem fins lucrativos, desde que demonstrem compatibilidade entre sua atuação institucional e a finalidade da tecnologia ofertada.",
+   "motivo": "O edital oferece o licenciamento do software a pessoas jurídicas interessadas, sem restringir a participação ao Campus Canoas ou à rede do IFRS.",
+   "cobertura": 1.0
+  },
+  "entra": true,
+  "motivo": "externo",
+  "ids": [
+   "https://ifrs.edu.br/editais/edital-proppi-no-25-2026-de-oferta-tecnologica-para-licenciamento-nao-exclusivo-do-programa-de-computador-portal-integra/#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-PROPPI-No-25.2026.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-PROPPI-No-25.2026.pdf#1",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-PROPPI-No-25.2026.pdf#2",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-PROPPI-No-25.2026.pdf#3",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-PROPPI-No-25.2026.pdf#4",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-PROPPI-No-25.2026.pdf#5",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-PROPPI-No-25.2026.pdf#6",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-PROPPI-No-25.2026.pdf#7",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/ANEXO-I-OFICIO-DE-SOLICITACAO-DE-LICENCIAMENTO.docx#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/ANEXO-II-TERMO-DE-COMPROMISSO-RESPONSABILIDADES.docx#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/ANEXO-III-REQUISITOS-TECNICOS-MINIMOS-PARA-IMPLANTACAO.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/ANEXO-IV-MINUTA-DE-CONTRATO-DE-LICENCA-PARA-USO-DE-PROGRAMA-DE-COMPUTADOR.docx#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/ANEXO-IV-MINUTA-DE-CONTRATO-DE-LICENCA-PARA-USO-DE-PROGRAMA-DE-COMPUTADOR.docx#1",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/ANEXO-IV-MINUTA-DE-CONTRATO-DE-LICENCA-PARA-USO-DE-PROGRAMA-DE-COMPUTADOR.docx#2",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/ANEXO-IV-MINUTA-DE-CONTRATO-DE-LICENCA-PARA-USO-DE-PROGRAMA-DE-COMPUTADOR.docx#3",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/ANEXO-IV-MINUTA-DE-CONTRATO-DE-LICENCA-PARA-USO-DE-PROGRAMA-DE-COMPUTADOR.docx#4",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/ANEXO-IV-MINUTA-DE-CONTRATO-DE-LICENCA-PARA-USO-DE-PROGRAMA-DE-COMPUTADOR.docx#5",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/ANEXO-V-TABELA-DE-REFERENCIA-DE-PRECOS-DE-CONTRATACOES-ADICIONAIS.pdf#0"
   ],
   "objeto": null,
   "falhas": 0,

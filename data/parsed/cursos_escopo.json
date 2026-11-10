@@ -359,7 +359,7 @@
    "trechos": {}
   },
   "https://ifrs.edu.br/canoas/": {
-   "chave": "6e7645ec970dde42",
+   "chave": "797b27e1aac0d83c",
    "cursos": [],
    "estrutura": "generico",
    "so_ligacao": false,
@@ -3756,7 +3756,7 @@
    "trechos": {}
   },
   "https://ifrs.edu.br/canoas/todas-as-noticias/": {
-   "chave": "9340381fdb6f8ae9",
+   "chave": "6b312f5484779c1b",
    "cursos": [],
    "estrutura": "generico",
    "so_ligacao": false,
@@ -9017,7 +9017,7 @@
    }
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/bacharelado-em-engenharia-eletronica/": {
-   "chave": "7d13ef02b3aebc33",
+   "chave": "702b2524729bb639",
    "cursos": [
     "eng-eletronica"
    ],
@@ -9053,7 +9053,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnico-em-comercio/": {
-   "chave": "c31b17a6a03fed4d",
+   "chave": "901dca99f70defcc",
    "cursos": [
     "tec-comercio"
    ],
@@ -9071,7 +9071,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnico-em-desenvolvimento-de-sistemas/": {
-   "chave": "6f7bc73f499035dc",
+   "chave": "bed9d583ee4a7397",
    "cursos": [
     "tec-desenv-sistemas"
    ],
