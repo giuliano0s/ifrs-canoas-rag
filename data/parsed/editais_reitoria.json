@@ -2294,8 +2294,8 @@
   "categorias": [
    "Ensino"
   ],
-  "atualizacao": "09/11/2026 10:17",
-  "hash": "2dc9b7dc6d5166993e8ee135ade6a33d8dc686570219839aabe1d867ad266aff",
+  "atualizacao": "10/11/2026 14:41",
+  "hash": "904c0268e88ef4b2b5549ad6ff5ca7c19490fa854e54ce18376dd3a68acdc3a4",
   "veredito": {
    "categoria": "canoas",
    "publico": "estudantes_e_servidores",
@@ -2321,7 +2321,8 @@
    "https://ifrs.edu.br/wp-content/uploads/2026/10/ANEXO-II-–-FICHA-DE-AVALIACAO-DE-TITULOS.docx#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/ANEXO-III-CURRICULO-RESUMIDO.docx#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/RESULTADO-PRELIMINAR-DE-INSCRICOES-HOMOLOGADAS.pdf#0",
-   "https://ifrs.edu.br/wp-content/uploads/2026/10/RESULTADO-FINAL-DE-INSCRICOES-HOMOLOGADAS.pdf#0"
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/RESULTADO-FINAL-DE-INSCRICOES-HOMOLOGADAS.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/RESULTADO-PRELIMINAR-DE-CLASSIFICACAO.pdf#0"
   ],
   "objeto": null,
   "falhas": 0,
@@ -2333,8 +2334,8 @@
   "categorias": [
    "Ensino"
   ],
-  "atualizacao": "03/11/2026 17:04",
-  "hash": "be74e0b623846337aa42d1f440090b3ee0a2bec75b222b30e818363c8de864f8",
+  "atualizacao": "11/11/2026 10:38",
+  "hash": "f668ed03de8d4f524dc5391a992580659ae9c7c4a19599e49e7bfa55ce2b7049",
   "veredito": {
    "categoria": "outro",
    "publico": "externo",
@@ -2345,6 +2346,32 @@
   "entra": false,
   "motivo": "outro",
   "ids": [],
+  "objeto": null,
+  "falhas": 0,
+  "tentativas": 0
+ },
+ "https://ifrs.edu.br/editais/edital-proen-no34-2026-concessao-de-auxilio-financeiro-a-participacao-do-xxxii-encontro-cultural-tradicionalista-das-instituicoes-publicas-federais-da-regiao-sul-do-brasil/": {
+  "titulo": "EDITAL PROEN Nº34/ 2026 – CONCESSÃO DE AUXÍLIO FINANCEIRO À PARTICIPAÇÃO DO XXXII ENCONTRO CULTURAL TRADICIONALISTA DAS INSTITUIÇÕES PÚBLICAS FEDERAIS DA REGIÃO SUL DO BRASIL",
+  "data": "11/11/2026",
+  "categorias": [
+   "Ensino"
+  ],
+  "atualizacao": "11/11/2026 10:38",
+  "hash": "d948c44cf49b5f976db875a792ab4c4d1057dc7861d5b24166f6975be35a5a98",
+  "veredito": {
+   "categoria": "rede",
+   "publico": "estudantes",
+   "evidencia": "Poderão solicitar o auxílio financeiro os estudantes regularmente matriculados em cursos técnicos de nível médio ou superior de graduação do IFRS.",
+   "motivo": "O edital é destinado a estudantes regularmente matriculados no IFRS, incluindo os do Campus Canoas.",
+   "cobertura": 1.0
+  },
+  "entra": true,
+  "motivo": "rede",
+  "ids": [
+   "https://ifrs.edu.br/editais/edital-proen-no34-2026-concessao-de-auxilio-financeiro-a-participacao-do-xxxii-encontro-cultural-tradicionalista-das-instituicoes-publicas-federais-da-regiao-sul-do-brasil/#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-34-PROEN-DE-CONCESSAO-DE-AUXILIO-FINANCEIRO-A-PARTICIPACAO-DO-XXXII.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-34-PROEN-DE-CONCESSAO-DE-AUXILIO-FINANCEIRO-A-PARTICIPACAO-DO-XXXII.pdf#1"
+  ],
   "objeto": null,
   "falhas": 0,
   "tentativas": 0
@@ -3909,8 +3936,8 @@
    "Internos",
    "Pesquisa"
   ],
-  "atualizacao": "03/11/2026 16:27",
-  "hash": "b764e64d1837ef3c4141b22f89dbe6d58e65b253942f39296592582cb9fe2b76",
+  "atualizacao": "10/11/2026 15:49",
+  "hash": "85ed34651bba0829e3a7d157e41d3c1f920621dedf5d0f15c34c22e745808af5",
   "veredito": {
    "categoria": "canoas",
    "publico": "estudantes_e_servidores",
@@ -3931,19 +3958,12 @@
    "https://ifrs.edu.br/wp-content/uploads/2026/09/Edital-Interno.docx-4.pdf#6",
    "https://ifrs.edu.br/wp-content/uploads/2026/09/Edital-Interno.docx-4.pdf#7",
    "https://ifrs.edu.br/wp-content/uploads/2026/09/RETIFICACAO-2-ASS.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/09/Retificacao_03.docx-2Ass.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/09/Anexo-I-Retificado-em-15.09.26.pdf#0",
-   "https://ifrs.edu.br/wp-content/uploads/2026/09/DIVULGAO_PRELIMINAR_DAS_PROPOSTAS_HOMOLOGADAS_EDITAL_PROPPI_19.2026_VF.docx.pdf#0",
-   "https://ifrs.edu.br/wp-content/uploads/2026/09/DIVULGAO_PRELIMINAR_DAS_PROPOSTAS_HOMOLOGADAS_EDITAL_PROPPI_19.2026_VF.docx.pdf#1",
-   "https://ifrs.edu.br/wp-content/uploads/2026/09/DIVULGAO_PRELIMINAR_DAS_PROPOSTAS_HOMOLOGADAS_EDITAL_PROPPI_19.2026_VF.docx.pdf#2",
-   "https://ifrs.edu.br/wp-content/uploads/2026/09/DIVULGAO_PRELIMINAR_DAS_PROPOSTAS_HOMOLOGADAS_EDITAL_PROPPI_19.2026_VF.docx.pdf#3",
-   "https://ifrs.edu.br/wp-content/uploads/2026/09/DIVULGAO_PRELIMINAR_DAS_PROPOSTAS_HOMOLOGADAS_EDITAL_PROPPI_19.2026_VF.docx.pdf#4",
-   "https://ifrs.edu.br/wp-content/uploads/2026/09/DIVULGAO_PRELIMINAR_DAS_PROPOSTAS_HOMOLOGADAS_EDITAL_PROPPI_19.2026_VF.docx.pdf#5",
-   "https://ifrs.edu.br/wp-content/uploads/2026/09/DIVULGAO_FINAL_DAS_PROPOSTAS_HOMOLOGADAS_EDITAL_PROPPI_19.2026_VF.docxASS.pdf#0",
-   "https://ifrs.edu.br/wp-content/uploads/2026/09/DIVULGAO_FINAL_DAS_PROPOSTAS_HOMOLOGADAS_EDITAL_PROPPI_19.2026_VF.docxASS.pdf#1",
-   "https://ifrs.edu.br/wp-content/uploads/2026/09/DIVULGAO_FINAL_DAS_PROPOSTAS_HOMOLOGADAS_EDITAL_PROPPI_19.2026_VF.docxASS.pdf#2",
-   "https://ifrs.edu.br/wp-content/uploads/2026/09/DIVULGAO_FINAL_DAS_PROPOSTAS_HOMOLOGADAS_EDITAL_PROPPI_19.2026_VF.docxASS.pdf#3",
-   "https://ifrs.edu.br/wp-content/uploads/2026/09/DIVULGAO_FINAL_DAS_PROPOSTAS_HOMOLOGADAS_EDITAL_PROPPI_19.2026_VF.docxASS.pdf#4",
-   "https://ifrs.edu.br/wp-content/uploads/2026/09/DIVULGAO_FINAL_DAS_PROPOSTAS_HOMOLOGADAS_EDITAL_PROPPI_19.2026_VF.docxASS.pdf#5"
+   "https://ifrs.edu.br/wp-content/uploads/2026/09/DIVULGACAO-FINAL-DAS-PROPOSTAS-HOMOLOGADAS-EDITAL-PROPPI-19.2026-VF-Retificado-em-10_11_2026.docx-1.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/09/DIVULGACAO-FINAL-DAS-PROPOSTAS-HOMOLOGADAS-EDITAL-PROPPI-19.2026-VF-Retificado-em-10_11_2026.docx-1.pdf#1",
+   "https://ifrs.edu.br/wp-content/uploads/2026/09/DIVULGACAO-FINAL-DAS-PROPOSTAS-HOMOLOGADAS-EDITAL-PROPPI-19.2026-VF-Retificado-em-10_11_2026.docx-1.pdf#2",
+   "https://ifrs.edu.br/wp-content/uploads/2026/09/DIVULGACAO-FINAL-DAS-PROPOSTAS-HOMOLOGADAS-EDITAL-PROPPI-19.2026-VF-Retificado-em-10_11_2026.docx-1.pdf#3"
   ],
   "objeto": null,
   "falhas": 0,
