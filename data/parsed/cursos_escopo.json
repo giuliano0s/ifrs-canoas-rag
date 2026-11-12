@@ -5,7 +5,7 @@
   "eng-eletronica": 258,
   "esp-educacao": 59,
   "esp-linguagens": 94,
-  "gpi": 198,
+  "gpi": 200,
   "logistica": 176,
   "matematica": 220,
   "operador-computador": 8,
@@ -359,7 +359,7 @@
    "trechos": {}
   },
   "https://ifrs.edu.br/canoas/": {
-   "chave": "83e4810ac23d4001",
+   "chave": "243e5873c6ed54ea",
    "cursos": [],
    "estrutura": "generico",
    "so_ligacao": false,
@@ -1694,9 +1694,16 @@
    "trechos": {}
   },
   "https://ifrs.edu.br/canoas/editais/": {
-   "chave": "4d8ac5e667197fa7",
-   "cursos": [],
-   "estrutura": "generico",
+   "chave": "fef842ef7ec0ad55",
+   "cursos": [
+    "gpi",
+    "esp-educacao",
+    "esp-linguagens",
+    "tads",
+    "logistica",
+    "matematica"
+   ],
+   "estrutura": "varios_sem_secoes",
    "so_ligacao": false,
    "trechos": {}
   },
@@ -1714,13 +1721,9 @@
    "trechos": {}
   },
   "https://ifrs.edu.br/canoas/editais/categorias/pesquisa/": {
-   "chave": "13cbcbc9b908ff1d",
-   "cursos": [
-    "gpi",
-    "esp-educacao",
-    "esp-linguagens"
-   ],
-   "estrutura": "varios_sem_secoes",
+   "chave": "e40fc4a5f33b5079",
+   "cursos": [],
+   "estrutura": "generico",
    "so_ligacao": false,
    "trechos": {}
   },
@@ -1822,7 +1825,7 @@
    "trechos": {}
   },
   "https://ifrs.edu.br/canoas/editais/edital-no-49-2026-gab-can-processo-seletivo-para-o-curso-de-pos-graduacao-lato-sensu-em-gestao-de-projetos-e-inovacao/": {
-   "chave": "a9ec55f518541233",
+   "chave": "85cd8cf034129f7c",
    "cursos": [
     "gpi"
    ],
@@ -8452,6 +8455,15 @@
    "so_ligacao": false,
    "trechos": {}
   },
+  "https://ifrs.edu.br/canoas/wp-content/uploads/sites/6/2026/10/RETIFICACAO-02-ANEXO-I-CRONOGRAMA-DA-SELECAO.pdf": {
+   "chave": "d2dcaa119bb23ecc",
+   "cursos": [
+    "gpi"
+   ],
+   "estrutura": "um_curso",
+   "so_ligacao": false,
+   "trechos": {}
+  },
   "https://ifrs.edu.br/canoas/wp-content/uploads/sites/6/2026/11/Plano-de-Acao-2027_campus-Canoas.pdf": {
    "chave": "8008cd6523332c00",
    "cursos": [],
@@ -9035,7 +9047,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnico-em-administracao-12/": {
-   "chave": "9e86ca622db2cfe5",
+   "chave": "e1acaca6c0ba6eee",
    "cursos": [
     "tec-admin"
    ],
@@ -9107,7 +9119,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnologia-em-logistica-2/": {
-   "chave": "3e0a7bd082ea7082",
+   "chave": "b1b309fac4744f1b",
    "cursos": [
     "logistica"
    ],
