@@ -1121,6 +1121,41 @@
   "falhas": 0,
   "tentativas": 0
  },
+ "https://ifrs.edu.br/editais/edital-no-44-2026-processo-seletivo-simplificado-para-selecao-de-bolsistas-para-atuar-no-projeto-envelhecer-nos-territorios-sos-rs/": {
+  "titulo": "EDITAL Nº 44/2026 – PROCESSO SELETIVO SIMPLIFICADO DE BOLSISTAS PARA ATUAR NO  PROJETO ENVELHECER NOS TERRITÓRIOS – SOS RS",
+  "data": "13/11/2026",
+  "categorias": [
+   "Extensão",
+   "Internos"
+  ],
+  "atualizacao": "13/11/2026 11:52",
+  "hash": "a3210081aa6a764d9353d6d1154096997b06ea72338bfb8da07170b5a2791420",
+  "veredito": {
+   "categoria": "rede",
+   "publico": "servidores",
+   "evidencia": "Poderão inscrever-se para atuar como bolsistas, desde que atendidos os critérios deste Edital, servidores efetivos ou temporários (técnicos-administrativos e docentes) do quadro do IFRS.",
+   "motivo": "O processo seletivo é destinado a servidores de todo o IFRS, incluindo os do Campus Canoas.",
+   "cobertura": 1.0
+  },
+  "entra": true,
+  "motivo": "rede",
+  "ids": [
+   "https://ifrs.edu.br/editais/edital-no-44-2026-processo-seletivo-simplificado-para-selecao-de-bolsistas-para-atuar-no-projeto-envelhecer-nos-territorios-sos-rs/#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-No-44_2026_PROEX_REI.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-No-44_2026_PROEX_REI.pdf#1",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-No-44_2026_PROEX_REI.pdf#2",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-No-44_2026_PROEX_REI.pdf#3",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-No-44_2026_PROEX_REI.pdf#4",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-No-44_2026_PROEX_REI.pdf#5",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Anexo_I_.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Anexo_II.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Anexo_II.pdf#1",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Anexo_III.pdf#0"
+  ],
+  "objeto": null,
+  "falhas": 0,
+  "tentativas": 0
+ },
  "https://ifrs.edu.br/editais/edital-proen-16-2026-selecao-de-bolsistas-para-o-projeto-mec-idiomas-designer-de-ambientes-audiovisuais/": {
   "titulo": "EDITAL PROEN 16/2026 – SELEÇÃO DE BOLSISTAS PARA O PROJETO MEC IDIOMAS – Designer de Ambientes Audiovisuais",
   "data": "30/04/2026",
@@ -1884,8 +1919,8 @@
   "categorias": [
    "Ensino"
   ],
-  "atualizacao": "05/11/2026 09:59",
-  "hash": "e64641fd02356cd454083987477aa1703188806671af578b90608e3dc475d312",
+  "atualizacao": "13/11/2026 09:18",
+  "hash": "ca594652be1078caf609161ada671f5cb6d67b45b54de6919efcae7568b0c1a8",
   "veredito": {
    "categoria": "canoas",
    "publico": "estudantes_e_servidores",
@@ -1911,7 +1946,8 @@
    "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAL-27_2026-RETIFICADO2.pdf#5",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/RETIFICACAO-09.10.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/COPPID-__-IFRS-resultado-preliminar-Fiscais.pdf#0",
-   "https://ifrs.edu.br/wp-content/uploads/2026/10/Resultado-Final-Selecao-Fiscais.pdf#0"
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/Resultado-Final-Selecao-Fiscais.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/Edital_PROEN_n_27_2026_esultado_final_edital_fiscais-ASSINADO.pdf#0"
   ],
   "objeto": null,
   "falhas": 0,
@@ -2208,13 +2244,13 @@
   "tentativas": 0
  },
  "https://ifrs.edu.br/editais/edital-proen-no29-20226-de-abertura-das-inscricoes-para-credenciamento-de-associacoes-agricultores-familiares-produtores-rurais-e-empreendimentos-gauchos-para-participacao-na-feira-de-sabores-e/": {
-  "titulo": "EDITAL PROEN Nº29/20226 – ABERTURA DAS INSCRIÇÕES PARA  CREDENCIAMENTO DE ASSOCIAÇÕES, AGRICULTORES FAMILIARES,  PRODUTORES RURAIS E EMPREENDIMENTOS GAÚCHOS PARA PARTICIPAÇÃO  NA FEIRA DE SABORES E SABERES DO IFRS",
+  "titulo": "EDITAL PROEN Nº29/2026 – ABERTURA DAS INSCRIÇÕES PARA  CREDENCIAMENTO DE ASSOCIAÇÕES, AGRICULTORES FAMILIARES,  PRODUTORES RURAIS E EMPREENDIMENTOS GAÚCHOS PARA PARTICIPAÇÃO  NA FEIRA DE SABORES E SABERES DO IFRS",
   "data": "19/10/2026",
   "categorias": [
    "Ensino"
   ],
-  "atualizacao": "10/11/2026 12:04",
-  "hash": "cd5eb315a3a3b6b36835404e0afca49f4107ef1da0a5ad67a3c4d6c70479cbde",
+  "atualizacao": "13/11/2026 10:32",
+  "hash": "c60aedd6f4370294aa6ad042fce3796919dab7792e0a99a3a2b381523d0d4810",
   "veredito": {
    "categoria": "outro",
    "publico": "externo",
@@ -2235,8 +2271,8 @@
   "categorias": [
    "Ensino"
   ],
-  "atualizacao": "10/11/2026 12:05",
-  "hash": "92cfbba457fcf40356f0f45fd3373655f88290bcb1aa2f2602fed48ae42a1423",
+  "atualizacao": "13/11/2026 10:34",
+  "hash": "a73cc80a321f0e2327f5e7de079ecd98c786e054c3e01371205d0d91465ae225",
   "veredito": {
    "categoria": "outro",
    "publico": "estudantes",

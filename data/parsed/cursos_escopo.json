@@ -7,7 +7,7 @@
   "esp-linguagens": 94,
   "gpi": 200,
   "logistica": 176,
-  "matematica": 220,
+  "matematica": 219,
   "operador-computador": 8,
   "tads": 298,
   "tec-admin": 293,
@@ -9056,7 +9056,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnico-em-administracao/": {
-   "chave": "6ffdbacb7a665b45",
+   "chave": "3da46ad0734fd608",
    "cursos": [
     "tec-admin"
    ],
@@ -9110,7 +9110,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnologia-em-analise-e-desenvolvimento-de-sistemas-11/": {
-   "chave": "0c5ec721ba660eb3",
+   "chave": "13a94f061709b732",
    "cursos": [
     "tads"
    ],
