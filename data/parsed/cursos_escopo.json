@@ -359,7 +359,7 @@
    "trechos": {}
   },
   "https://ifrs.edu.br/canoas/": {
-   "chave": "243e5873c6ed54ea",
+   "chave": "44894c48ab9f49dc",
    "cursos": [],
    "estrutura": "generico",
    "so_ligacao": false,
@@ -3759,7 +3759,7 @@
    "trechos": {}
   },
   "https://ifrs.edu.br/canoas/todas-as-noticias/": {
-   "chave": "6effb2a13a87597a",
+   "chave": "a02cbe382bb18f60",
    "cursos": [],
    "estrutura": "generico",
    "so_ligacao": false,
@@ -9029,7 +9029,7 @@
    }
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/bacharelado-em-engenharia-eletronica/": {
-   "chave": "7d13ef02b3aebc33",
+   "chave": "6d783bf0d5e888ad",
    "cursos": [
     "eng-eletronica"
    ],
@@ -9047,7 +9047,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnico-em-administracao-12/": {
-   "chave": "e1acaca6c0ba6eee",
+   "chave": "c21f7e7e134d8bc3",
    "cursos": [
     "tec-admin"
    ],
@@ -9056,7 +9056,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnico-em-administracao/": {
-   "chave": "3da46ad0734fd608",
+   "chave": "6ffdbacb7a665b45",
    "cursos": [
     "tec-admin"
    ],
@@ -9065,7 +9065,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnico-em-comercio/": {
-   "chave": "c31b17a6a03fed4d",
+   "chave": "325e36e88294ad0e",
    "cursos": [
     "tec-comercio"
    ],
@@ -9101,7 +9101,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnico-em-eletronica/": {
-   "chave": "aab3c7d53c18cab4",
+   "chave": "d20eee15f985f795",
    "cursos": [
     "tec-eletronica"
    ],
@@ -9110,7 +9110,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnologia-em-analise-e-desenvolvimento-de-sistemas-11/": {
-   "chave": "13a94f061709b732",
+   "chave": "1f803ccdc55d60c8",
    "cursos": [
     "tads"
    ],
@@ -9119,7 +9119,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnologia-em-logistica-2/": {
-   "chave": "b1b309fac4744f1b",
+   "chave": "4ffa1bb9ff6f676d",
    "cursos": [
     "logistica"
    ],

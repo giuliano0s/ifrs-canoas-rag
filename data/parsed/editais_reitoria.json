@@ -1128,8 +1128,8 @@
    "Extensão",
    "Internos"
   ],
-  "atualizacao": "13/11/2026 11:52",
-  "hash": "a3210081aa6a764d9353d6d1154096997b06ea72338bfb8da07170b5a2791420",
+  "atualizacao": "13/11/2026 14:49",
+  "hash": "83646c3c1f61dc70030cb09251b3b662e2233f68c9e66253556aa2ef925064c7",
   "veredito": {
    "categoria": "rede",
    "publico": "servidores",
@@ -1141,12 +1141,12 @@
   "motivo": "rede",
   "ids": [
    "https://ifrs.edu.br/editais/edital-no-44-2026-processo-seletivo-simplificado-para-selecao-de-bolsistas-para-atuar-no-projeto-envelhecer-nos-territorios-sos-rs/#0",
-   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-No-44_2026_PROEX_REI.pdf#0",
-   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-No-44_2026_PROEX_REI.pdf#1",
-   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-No-44_2026_PROEX_REI.pdf#2",
-   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-No-44_2026_PROEX_REI.pdf#3",
-   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-No-44_2026_PROEX_REI.pdf#4",
-   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-No-44_2026_PROEX_REI.pdf#5",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-No-44_2026_PROEX-REI.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-No-44_2026_PROEX-REI.pdf#1",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-No-44_2026_PROEX-REI.pdf#2",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-No-44_2026_PROEX-REI.pdf#3",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-No-44_2026_PROEX-REI.pdf#4",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-No-44_2026_PROEX-REI.pdf#5",
    "https://ifrs.edu.br/wp-content/uploads/2026/11/Anexo_I_.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/11/Anexo_II.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/11/Anexo_II.pdf#1",
@@ -4196,40 +4196,6 @@
   "falhas": 0,
   "tentativas": 0
  },
- "https://ifrs.edu.br/editais/edital-proppi-no-28-2025-selecao-de-bolsistas-para-o-projeto-tecnoparque-rede-integrada-de-inovacao-e-tecnologia-fomento-edital-fapergs-04-2025-programa-de-apoio-aos-ecossistemas-de-ino/": {
-  "titulo": "Edital PROPPI nº 28/2025 – Seleção de  Bolsistas para o projeto TecnoParque: Rede Integrada de Inovação e Tecnologia  (FOMENTO EDITAL FAPERGS 04/2025 – PROGRAMA DE APOIO AOS ECOSSISTEMAS DE  INOVAÇÃO)",
-  "data": "13/11/2025",
-  "categorias": [
-   "Internos",
-   "Pesquisa"
-  ],
-  "atualizacao": "28/11/2025 16:27",
-  "hash": "6347f6eedadbb12fd9d713cd49073952ecf5e83aa43245bc18e2556762327ca2",
-  "veredito": {
-   "categoria": "rede",
-   "publico": "estudantes_e_servidores",
-   "evidencia": "Serão disponibilizadas vagas de bolsistas para discentes matriculados em cursos regulares do IFRS e demais profissionais que não tenham qualquer vínculo empregatício, conforme qualificações descritas no Quadro I.",
-   "motivo": "É uma chamada interna do IFRS com vagas para discentes da instituição e profissionais sem vínculo, sem restrição ao Campus Canoas.",
-   "cobertura": 1.0
-  },
-  "entra": true,
-  "motivo": "rede",
-  "ids": [
-   "https://ifrs.edu.br/editais/edital-proppi-no-28-2025-selecao-de-bolsistas-para-o-projeto-tecnoparque-rede-integrada-de-inovacao-e-tecnologia-fomento-edital-fapergs-04-2025-programa-de-apoio-aos-ecossistemas-de-ino/#0",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/Retificado-em-24-de-novembro-de-2025-EDITAL-PROPPI-No-28_2025-Selecao-de-bolsistas-Fapergs-1.pdf#0",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/Retificado-em-24-de-novembro-de-2025-EDITAL-PROPPI-No-28_2025-Selecao-de-bolsistas-Fapergs-1.pdf#1",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/Retificado-em-24-de-novembro-de-2025-EDITAL-PROPPI-No-28_2025-Selecao-de-bolsistas-Fapergs-1.pdf#2",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/Retificado-em-24-de-novembro-de-2025-EDITAL-PROPPI-No-28_2025-Selecao-de-bolsistas-Fapergs-1.pdf#3",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/Retificado-em-24-de-novembro-de-2025-EDITAL-PROPPI-No-28_2025-Selecao-de-bolsistas-Fapergs-1.pdf#4",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/Retificacao-No-01.pdf#0",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/DIVULGACAO-DAS-INSCRICOES-HOMOLOGADAS.pdf#0",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/DIVULGACAO-FINAL-DA-HOMOLOGACAO.pdf#0",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/DIVULGACAO-DO-RESULTADO-FINAL-DA-SELECAO.pdf#0"
-  ],
-  "objeto": null,
-  "falhas": 0,
-  "tentativas": 0
- },
  "https://ifrs.edu.br/editais/edital-proppi-no-29-2025-mulheres-e-meninas-na-ciencia/": {
   "titulo": "EDITAL PROPPI Nº 29/2025 – MULHERES E MENINAS NA CIÊNCIA",
   "data": "21/11/2025",
@@ -4634,29 +4600,6 @@
    "https://ifrs.edu.br/wp-content/uploads/2026/10/6.-Anexo-V_-Modelo-Proposta.docx#0"
   ],
   "objeto": "aquisição de equipamentos e mobiliários para os refeitórios do ifrs",
-  "falhas": 0,
-  "tentativas": 0
- },
- "https://ifrs.edu.br/editais/pregao-n-90027-2025-contratacao-de-empresa-especializada-na-prestacao-de-servicos-terceirizados-com-dedicacao-exclusiva-de-mao-de-obra-para-atender-as-necessidades-dos-campi-e-reitori/": {
-  "titulo": "PREGÃO n° 90027/2025 – Contratação de empresa especializada na prestação de serviços terceirizados com dedicação exclusiva de mão de obra, para atender às necessidades dos campi e Reitoria do IFRS.",
-  "data": "13/11/2025",
-  "categorias": [
-   "Licitação",
-   "Pregão Eletrônico"
-  ],
-  "atualizacao": "28/11/2025 15:44",
-  "hash": "c1f950106a01fa7aa0d097058aa4cbb021d6396540879c72df19e225a6c7663f",
-  "veredito": {
-   "categoria": "canoas",
-   "publico": "empresas",
-   "evidencia": "Contratação de empresa especializada na prestação de serviços terceirizados com dedicação exclusiva de mão de obra, para atender às necessidades dos campi e Reitoria do IFRS.",
-   "motivo": "A contratação atende aos campi e a planilha de custos inclui especificamente o Campus Canoas.",
-   "cobertura": 1.0
-  },
-  "entra": false,
-  "motivo": "canoas_contradito",
-  "ids": [],
-  "objeto": "contratação de empresa especializada na prestação de serviços terceirizados com dedicação exclusiva de mão de obra, para atender às necessidades dos campi e reitoria do ifrs.",
   "falhas": 0,
   "tentativas": 0
  },
