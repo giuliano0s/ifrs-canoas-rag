@@ -1128,8 +1128,8 @@
    "Extensão",
    "Internos"
   ],
-  "atualizacao": "13/11/2026 14:49",
-  "hash": "83646c3c1f61dc70030cb09251b3b662e2233f68c9e66253556aa2ef925064c7",
+  "atualizacao": "17/11/2026 08:57",
+  "hash": "4ee820d86eb9f236bd152b614057cd644bf980d1680bdb1f087e38015b04eb58",
   "veredito": {
    "categoria": "rede",
    "publico": "servidores",
@@ -1147,6 +1147,7 @@
    "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-No-44_2026_PROEX-REI.pdf#3",
    "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-No-44_2026_PROEX-REI.pdf#4",
    "https://ifrs.edu.br/wp-content/uploads/2026/11/EDITAL-No-44_2026_PROEX-REI.pdf#5",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Retificacao-no01.docx.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/11/Anexo_I_.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/11/Anexo_II.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/11/Anexo_II.pdf#1",
@@ -4600,6 +4601,58 @@
    "https://ifrs.edu.br/wp-content/uploads/2026/10/6.-Anexo-V_-Modelo-Proposta.docx#0"
   ],
   "objeto": "aquisição de equipamentos e mobiliários para os refeitórios do ifrs",
+  "falhas": 0,
+  "tentativas": 0
+ },
+ "https://ifrs.edu.br/editais/pregao-n-474-2026-srp-aquisicao-de-recursos-para-atendimento-educacional-especializado-e-equipamentos-maker-para-o-ifrs/": {
+  "titulo": "Pregão n° 474/2026 – SRP – Aquisição de Recursos para Atendimento Educacional Especializado e Equipamentos Maker para o IFRS",
+  "data": "17/11/2026",
+  "categorias": [
+   "Licitação",
+   "Pregão Eletrônico"
+  ],
+  "atualizacao": "17/11/2026 11:19",
+  "hash": "189cad5bf2e64d531051996422fdfe23ad95ddd861d49cf7c5848edfcad51485",
+  "veredito": {
+   "categoria": "rede",
+   "publico": "empresas",
+   "evidencia": "OBJETO\nregistro de preços",
+   "motivo": "É uma licitação do IFRS para aquisição de bens, com participação aberta a empresas, sem restrição a outro campus.",
+   "cobertura": 1.0
+  },
+  "entra": true,
+  "motivo": "rede",
+  "ids": [
+   "https://ifrs.edu.br/editais/pregao-n-474-2026-srp-aquisicao-de-recursos-para-atendimento-educacional-especializado-e-equipamentos-maker-para-o-ifrs/#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Edital-AEE-e-Maker.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Edital-AEE-e-Maker.pdf#1",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Edital-AEE-e-Maker.pdf#2",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Edital-AEE-e-Maker.pdf#3",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Edital-AEE-e-Maker.pdf#4",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Edital-AEE-e-Maker.pdf#5",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Edital-AEE-e-Maker.pdf#6",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Edital-AEE-e-Maker.pdf#7",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Edital-AEE-e-Maker.pdf#8",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Edital-AEE-e-Maker.pdf#9",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Edital-AEE-e-Maker.pdf#10",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Edital-AEE-e-Maker.pdf#11",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Edital-AEE-e-Maker.pdf#12",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Edital-AEE-e-Maker.pdf#13",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Edital-AEE-e-Maker.pdf#14",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Edital-AEE-e-Maker.pdf#15",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Edital-AEE-e-Maker.pdf#16",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Edital-AEE-e-Maker.pdf#17",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Edital-AEE-e-Maker.pdf#18",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Edital-AEE-e-Maker.pdf#19",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Edital-AEE-e-Maker.pdf#20",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Edital-AEE-e-Maker.pdf#21",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Edital-AEE-e-Maker.pdf#22",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Edital-AEE-e-Maker.pdf#23",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Edital-AEE-e-Maker.pdf#24",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Edital-AEE-e-Maker.pdf#25",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Edital-AEE-e-Maker.pdf#26"
+  ],
+  "objeto": "srp – aquisição de recursos para atendimento educacional especializado e equipamentos maker para o ifrs",
   "falhas": 0,
   "tentativas": 0
  },

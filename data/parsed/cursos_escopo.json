@@ -4,7 +4,7 @@
   "automacao": 63,
   "eng-eletronica": 258,
   "esp-educacao": 59,
-  "esp-linguagens": 94,
+  "esp-linguagens": 102,
   "gpi": 200,
   "logistica": 176,
   "matematica": 219,
@@ -307,6 +307,15 @@
    "so_ligacao": false,
    "trechos": {}
   },
+  "https://drive.google.com/file/d/1YYDLpFKCLE3SKfQ9cXzqiIw9c6gPHbOf/view": {
+   "chave": "6e76970e87e43389",
+   "cursos": [
+    "esp-linguagens"
+   ],
+   "estrutura": "um_curso",
+   "so_ligacao": false,
+   "trechos": {}
+  },
   "https://drive.google.com/file/d/1_BM6zQywOF1XtAiU45MmOcAh9_2PgRoI/view": {
    "chave": "489e1d496e79aaf6",
    "cursos": [],
@@ -359,7 +368,7 @@
    "trechos": {}
   },
   "https://ifrs.edu.br/canoas/": {
-   "chave": "44894c48ab9f49dc",
+   "chave": "e7ad6a878cca04a3",
    "cursos": [],
    "estrutura": "generico",
    "so_ligacao": false,
@@ -1694,7 +1703,7 @@
    "trechos": {}
   },
   "https://ifrs.edu.br/canoas/editais/": {
-   "chave": "fef842ef7ec0ad55",
+   "chave": "1c733088000ca0ea",
    "cursos": [
     "gpi",
     "esp-educacao",
@@ -1721,9 +1730,13 @@
    "trechos": {}
   },
   "https://ifrs.edu.br/canoas/editais/categorias/pesquisa/": {
-   "chave": "e40fc4a5f33b5079",
-   "cursos": [],
-   "estrutura": "generico",
+   "chave": "8e8cf6f094c874e4",
+   "cursos": [
+    "gpi",
+    "esp-educacao",
+    "esp-linguagens"
+   ],
+   "estrutura": "varios_sem_secoes",
    "so_ligacao": false,
    "trechos": {}
   },
@@ -1825,7 +1838,7 @@
    "trechos": {}
   },
   "https://ifrs.edu.br/canoas/editais/edital-no-49-2026-gab-can-processo-seletivo-para-o-curso-de-pos-graduacao-lato-sensu-em-gestao-de-projetos-e-inovacao/": {
-   "chave": "85cd8cf034129f7c",
+   "chave": "90763214930e2d89",
    "cursos": [
     "gpi"
    ],
@@ -2113,6 +2126,13 @@
   },
   "https://ifrs.edu.br/canoas/estudante-premiada-na-olimpiada-brasileira-de-astronomia-e-astronautica/": {
    "chave": "243328068c3d79b5",
+   "cursos": [],
+   "estrutura": "generico",
+   "so_ligacao": false,
+   "trechos": {}
+  },
+  "https://ifrs.edu.br/canoas/estudante-premiada-no-4o-festival-de-cinema-de-canoas/": {
+   "chave": "a3820aad8f70ea5d",
    "cursos": [],
    "estrutura": "generico",
    "so_ligacao": false,
@@ -3759,7 +3779,7 @@
    "trechos": {}
   },
   "https://ifrs.edu.br/canoas/todas-as-noticias/": {
-   "chave": "a02cbe382bb18f60",
+   "chave": "6a20c0acc1b7d20d",
    "cursos": [],
    "estrutura": "generico",
    "so_ligacao": false,
@@ -9029,7 +9049,7 @@
    }
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/bacharelado-em-engenharia-eletronica/": {
-   "chave": "702b2524729bb639",
+   "chave": "7d13ef02b3aebc33",
    "cursos": [
     "eng-eletronica"
    ],
@@ -9038,7 +9058,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/licenciatura-em-matematica-2/": {
-   "chave": "4eb6c3c404f81a91",
+   "chave": "b1ce7f852657777c",
    "cursos": [
     "matematica"
    ],
@@ -9047,7 +9067,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnico-em-administracao-12/": {
-   "chave": "b1d83f2094953b33",
+   "chave": "e1acaca6c0ba6eee",
    "cursos": [
     "tec-admin"
    ],
@@ -9056,7 +9076,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnico-em-administracao/": {
-   "chave": "b6c12190fbb1916d",
+   "chave": "03336cce9af10e41",
    "cursos": [
     "tec-admin"
    ],
@@ -9065,7 +9085,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnico-em-comercio/": {
-   "chave": "325e36e88294ad0e",
+   "chave": "940650ce74e8b6e1",
    "cursos": [
     "tec-comercio"
    ],
@@ -9092,7 +9112,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnico-em-eletronica-3/": {
-   "chave": "dd13ca8f5b9db187",
+   "chave": "39487010615f1fa7",
    "cursos": [
     "tec-eletronica"
    ],
@@ -9101,7 +9121,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnico-em-eletronica/": {
-   "chave": "aab3c7d53c18cab4",
+   "chave": "261cdf933efe8518",
    "cursos": [
     "tec-eletronica"
    ],
@@ -9119,7 +9139,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnologia-em-logistica-2/": {
-   "chave": "3e0a7bd082ea7082",
+   "chave": "b1b309fac4744f1b",
    "cursos": [
     "logistica"
    ],
@@ -9345,6 +9365,38 @@
    "cursos": [
     "tec-admin",
     "tec-comercio"
+   ],
+   "estrutura": "varios_sem_secoes",
+   "so_ligacao": false,
+   "trechos": {}
+  },
+  "https://ingresso.ifrs.edu.br/2027/wp-content/uploads/sites/39/2026/11/ANEXO-I-QUADROS-DE-VAGAS.pdf": {
+   "chave": "4ab1816770a8c10d",
+   "cursos": [
+    "tec-desenv-sistemas",
+    "tec-admin",
+    "tec-eletronica",
+    "tec-comercio",
+    "logistica",
+    "matematica",
+    "eng-eletronica"
+   ],
+   "estrutura": "varios_sem_secoes",
+   "so_ligacao": false,
+   "trechos": {}
+  },
+  "https://ingresso.ifrs.edu.br/2027/wp-content/uploads/sites/39/2026/11/EDITAL-No-16-2026-EDITAL-DE-INGRESSO-DE-ESTUDANTES-INDIGENAS-NO-PRIMEIRO-SEMESTRE-DE-2027.pdf": {
+   "chave": "9345824243d95105",
+   "cursos": [
+    "tec-desenv-sistemas",
+    "tec-admin",
+    "tec-eletronica",
+    "tec-comercio",
+    "logistica",
+    "automacao",
+    "matematica",
+    "eng-eletronica",
+    "eng-mecanica"
    ],
    "estrutura": "varios_sem_secoes",
    "so_ligacao": false,
@@ -9621,11 +9673,15 @@
    "https://boletim.sigepe.gov.br/publicacao/detalhar/333156",
    "https://boletim.sigepe.gov.br/publicacao/detalhar/434717",
    "https://drive.google.com/file/d/1-YbPmbvqHTCpduXyQEvA2tVfNeYAwsyH/view",
+   "https://drive.google.com/file/d/1BOvet9AsgH5rcAZtO9cA3aBnsQS4i6J9/view",
+   "https://drive.google.com/file/d/1YYDLpFKCLE3SKfQ9cXzqiIw9c6gPHbOf/view",
+   "https://drive.google.com/file/d/1q7yT6sqh1IUeudqQse7Obbzw9_xLAHp8/view",
    "https://drive.google.com/file/d/1x6fCxo22KA-4xw4K1QACpS8jY2L_QTSE/view",
    "https://drive.google.com/file/d/1yeKQmjRqPO2mCobgxjzyI44isSQOvs0y/view",
    "https://ifrs.edu.br/canoas/ensino/registros-academicos",
    "https://ifrs.edu.br/canoas/no-campus/cursos/lce",
    "https://ifrs.edu.br/canoas/wp-content/uploads/sites/6/2022/04/uso_lab_informatica.pdf",
+   "https://ifrs.edu.br/documentos/resolucao-no-54-2026-consup-rei-aprova-a-reformulacao-do-curso-de-pos-graduacao-lato-sensu-especializacao-em-linguagens-contemporaneas-e-ensino-campus-canoas-do-ifrs",
    "https://pinterest.com/pin/create/button/?url=https%3A%2F%2Fifrs.edu.br%2Fcanoas%2Fno-campus%2Fcursos%2Flce%2F&media=&description=Especialização%20em%20Linguagens%20Contemporâneas%20e%20Ensino",
    "https://twitter.com/intent/tweet?text=Especialização%20em%20Linguagens%20Contemporâneas%20e%20Ensino&url=https%3A%2F%2Fifrs.edu.br%2Fcanoas%2Fno-campus%2Fcursos%2Flce%2F",
    "https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fifrs.edu.br%2Fcanoas%2Fno-campus%2Fcursos%2Flce%2F",
