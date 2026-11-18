@@ -368,9 +368,12 @@
    "trechos": {}
   },
   "https://ifrs.edu.br/canoas/": {
-   "chave": "e7ad6a878cca04a3",
-   "cursos": [],
-   "estrutura": "generico",
+   "chave": "b11eb1e10438d1e3",
+   "cursos": [
+    "gpi",
+    "tec-desenv-sistemas"
+   ],
+   "estrutura": "varios_sem_secoes",
    "so_ligacao": false,
    "trechos": {}
   },
@@ -3779,9 +3782,12 @@
    "trechos": {}
   },
   "https://ifrs.edu.br/canoas/todas-as-noticias/": {
-   "chave": "6a20c0acc1b7d20d",
-   "cursos": [],
-   "estrutura": "generico",
+   "chave": "022e0898bf9a743a",
+   "cursos": [
+    "gpi",
+    "tec-desenv-sistemas"
+   ],
+   "estrutura": "varios_sem_secoes",
    "so_ligacao": false,
    "trechos": {}
   },
@@ -9058,7 +9064,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/licenciatura-em-matematica-2/": {
-   "chave": "b1ce7f852657777c",
+   "chave": "4eb6c3c404f81a91",
    "cursos": [
     "matematica"
    ],
@@ -9085,7 +9091,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnico-em-comercio/": {
-   "chave": "940650ce74e8b6e1",
+   "chave": "c31b17a6a03fed4d",
    "cursos": [
     "tec-comercio"
    ],
@@ -9112,7 +9118,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnico-em-eletronica-3/": {
-   "chave": "39487010615f1fa7",
+   "chave": "8b28f833d668aa21",
    "cursos": [
     "tec-eletronica"
    ],
@@ -9121,7 +9127,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnico-em-eletronica/": {
-   "chave": "261cdf933efe8518",
+   "chave": "7e1796e792f0de95",
    "cursos": [
     "tec-eletronica"
    ],
