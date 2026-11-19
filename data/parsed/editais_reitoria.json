@@ -23,8 +23,8 @@
    "Concorrência",
    "Licitação"
   ],
-  "atualizacao": "29/10/2026 12:25",
-  "hash": "5cb3bc717424832d538797062b0a9eff169aae8436cf3d8b443b0f7d2f1f35e8",
+  "atualizacao": "18/11/2026 15:14",
+  "hash": "366bd33876875f6dec2e616288f5df244aa35d5c54ceaf9ca424c303f1381f77",
   "veredito": {
    "categoria": "canoas",
    "publico": "empresas",
@@ -36,7 +36,7 @@
   "motivo": "canoas",
   "ids": [
    "https://ifrs.edu.br/editais/concorrencia-no-404-2026-contratacao-de-empresas-para-realizacao-de-obras-nos-campi-do-ifrs-farroupilha-feliz-osorio-e-veranopolis/#0",
-   "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAL-SITE.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/edital-comanexos.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/PROJEXECUTIVO-FARROUPILHA.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/PROJEXECUTIVO-FELIZ.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/PROJETO-EXECUTIVO-OSORIO-PARTE-1.pdf#0",
@@ -46,11 +46,12 @@
    "https://ifrs.edu.br/wp-content/uploads/2026/10/PROJETO-EXECUTIVO-OSORIO-PARTE-4.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/PROJEXECUTIVO-VERANOPOLIS.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAVEL-ITEM-1-SALAS-DE-AULA-FARROUPILHA.xlsx#0",
-   "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAVEL-ITEM-1-SALAS-DE-AULA-FARROUPILHA.xlsx#1",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAVEL-ITEM-2-PORTICO-FELIZ-1.xlsx#0",
-   "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAVEL-ITEM-2-PORTICO-FELIZ-1.xlsx#1",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAVEL-ITEM-3-SALAS-DE-AULA-OSORIO.xlsx#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAVEL-ITEM-3-SALAS-DE-AULA-OSORIO.xlsx#1",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAVEL-ITEM-4-COMPLEXO-VERANOPOLIS.xlsx#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAVEL-ITEM-4-COMPLEXO-VERANOPOLIS.xlsx#1",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAVEL-ITEM-4-COMPLEXO-VERANOPOLIS.xlsx#2",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAVEL-ANEXO-III-modelo-de-proposta-comercial.docx#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAVEL-ANEXO-IV-modelo-de-vistoria.docx#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAVEL-ANEXO-V-CARTA-DE-ANUENCIA-PROFISSIONAL.docx#0"
@@ -567,8 +568,8 @@
    "Capacitação",
    "Gestão de Pessoas"
   ],
-  "atualizacao": "12/11/2026 10:46",
-  "hash": "14fe11b95c0a94d8280429fa791734f01b5a9c8a252ccefe8fc0dcd4e0bf40d0",
+  "atualizacao": "19/11/2026 10:44",
+  "hash": "1a41bb10fff189571316cefbb74124dc9226fb2142522e8a6e7775f8740ae644",
   "veredito": {
    "categoria": "canoas",
    "publico": "servidores",
@@ -593,7 +594,8 @@
    "https://ifrs.edu.br/wp-content/uploads/2026/08/Div-Final-Etapa-2-Edital-10_2026-1.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/08/Retificacao-do-cronograma-Edital-DGP-no-10-2026.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/08/Retificacao-do-cronograma-Edital-DGP-no-10-2026.pdf#1",
-   "https://ifrs.edu.br/wp-content/uploads/2026/08/Divulgacao-Final-Etapa-2-Pos-Recurso-Colegiado-CPPD.pdf#0"
+   "https://ifrs.edu.br/wp-content/uploads/2026/08/Divulgacao-Final-Etapa-2-Pos-Recurso-Colegiado-CPPD.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/08/Homologacao-Edital-10_2026.pdf#0"
   ],
   "objeto": null,
   "falhas": 0,
@@ -1954,35 +1956,6 @@
   "falhas": 0,
   "tentativas": 0
  },
- "https://ifrs.edu.br/editais/edital-proen-no-35-2025-selecao-complementar-para-concessao-de-auxilio-financeiro-a-participacao-no-seminario-presencial-do-pibid-ifrs-edicao-2024-2026/": {
-  "titulo": "EDITAL PROEN Nº 35/2025 – SELEÇÃO COMPLEMENTAR PARA CONCESSÃO DE AUXÍLIO FINANCEIRO À PARTICIPAÇÃO NO SEMINÁRIO PRESENCIAL DO PIBID IFRS – EDIÇÃO 2024-2026",
-  "data": "18/11/2025",
-  "categorias": [
-   "Ensino"
-  ],
-  "atualizacao": "28/11/2025 14:11",
-  "hash": "e8a68424d0d16584cd1bca7a3aeb96238f4156075a7e2954df348f4ed534ee26",
-  "veredito": {
-   "categoria": "rede",
-   "publico": "estudantes_e_servidores",
-   "evidencia": "Conceder auxílio financeiro aos estudantes e servidores dos campi do IFRS inscritos no Seminário Presencial do Pibid IFRS - Edição 2024-2026.",
-   "motivo": "O edital atende estudantes e servidores de todos os campi do IFRS, incluindo Canoas.",
-   "cobertura": 1.0
-  },
-  "entra": true,
-  "motivo": "rede",
-  "ids": [
-   "https://ifrs.edu.br/editais/edital-proen-no-35-2025-selecao-complementar-para-concessao-de-auxilio-financeiro-a-participacao-no-seminario-presencial-do-pibid-ifrs-edicao-2024-2026/#0",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/EDITAL-PROEN-No-35-2025.pdf#0",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/EDITAL-PROEN-No-35-2025.pdf#1",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/EDITAL-PROEN-No-35-2025.pdf#2",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/DIVULGACAO-PRELIMINAR-DOS-INSCRITOS.pdf#0",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/DIVULGACAO-DOS-PARTICIPANTES-CONTEMPLADOS-COM-AUXILIO-FINANCEIRO.pdf#0"
-  ],
-  "objeto": null,
-  "falhas": 0,
-  "tentativas": 0
- },
  "https://ifrs.edu.br/editais/edital-proen-no-36-2025-processo-seletivo-simplificado-de-contratacao-de-professor-formador-para-o-plano-nacional-de-formacao-de-professores-da-educacao-basica-parfor/": {
   "titulo": "EDITAL PROEN Nº 36/2025 – PROCESSO SELETIVO SIMPLIFICADO DE CONTRATAÇÃO DE PROFESSOR FORMADOR PARA O PLANO NACIONAL DE FORMAÇÃO DE PROFESSORES DA EDUCAÇÃO BÁSICA – PARFOR",
   "data": "24/11/2025",
@@ -2374,8 +2347,8 @@
   "categorias": [
    "Ensino"
   ],
-  "atualizacao": "11/11/2026 10:38",
-  "hash": "f668ed03de8d4f524dc5391a992580659ae9c7c4a19599e49e7bfa55ce2b7049",
+  "atualizacao": "18/11/2026 14:46",
+  "hash": "09cb69b412ab97c2b9153d3aa059b60ba5703c120653c78f60c02927676ee9dd",
   "veredito": {
    "categoria": "outro",
    "publico": "externo",
@@ -4068,8 +4041,8 @@
    "Internos",
    "Pesquisa"
   ],
-  "atualizacao": "19/10/2026 21:49",
-  "hash": "8564010213f84830b0adb73bf6320cc07350109d428403aae2da4e9b137a9acc",
+  "atualizacao": "18/11/2026 19:47",
+  "hash": "d7834cdf046a78e8bd3eaad3dde24e1a79cd0529399fde2dfc227c0f9fd9c363",
   "veredito": {
    "categoria": "rede",
    "publico": "servidores",
@@ -4081,10 +4054,12 @@
   "motivo": "rede",
   "ids": [
    "https://ifrs.edu.br/editais/edital-proppi-no-21-2026-selecao-de-projetos-para-composicao-de-proposta-institucional-a-ser-submetida-a-chamada-publica-mcti-finep-fndct-cooperamais-tecnologia-ict-2026/#0",
-   "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAL-PROPPI-No-21_2026-SELECAO-DE-PROJETOS-PARA-COMPOSICAO-DE-PROPOSTA-INSTITUCIONAL-A-SER-SUBMETIDA-A-CHAMADA-PUBLICA-MCTI_FINEP_FNDCT-–-COOPERAMAIS-TECNOLOGIA-–-ICT-_-2026.docx-1.pdf#0",
-   "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAL-PROPPI-No-21_2026-SELECAO-DE-PROJETOS-PARA-COMPOSICAO-DE-PROPOSTA-INSTITUCIONAL-A-SER-SUBMETIDA-A-CHAMADA-PUBLICA-MCTI_FINEP_FNDCT-–-COOPERAMAIS-TECNOLOGIA-–-ICT-_-2026.docx-1.pdf#1",
-   "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAL-PROPPI-No-21_2026-SELECAO-DE-PROJETOS-PARA-COMPOSICAO-DE-PROPOSTA-INSTITUCIONAL-A-SER-SUBMETIDA-A-CHAMADA-PUBLICA-MCTI_FINEP_FNDCT-–-COOPERAMAIS-TECNOLOGIA-–-ICT-_-2026.docx-1.pdf#2",
-   "https://ifrs.edu.br/wp-content/uploads/2026/10/Retificacao_01-1.pdf#0"
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAL-PROPPI-No-21_2026-SELECAO-DE-PROJETOS-PARA-COMPOSICAO-DE-PROPOSTA-INSTITUCIONAL-A-SER-SUBMETIDA-A-CHAMADA-PUBLICA-MCTI_FINEP_FNDCT-–-COOPERAMAIS-TECNOLOGIA-–-ICT-_-2026.docx-2.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAL-PROPPI-No-21_2026-SELECAO-DE-PROJETOS-PARA-COMPOSICAO-DE-PROPOSTA-INSTITUCIONAL-A-SER-SUBMETIDA-A-CHAMADA-PUBLICA-MCTI_FINEP_FNDCT-–-COOPERAMAIS-TECNOLOGIA-–-ICT-_-2026.docx-2.pdf#1",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/EDITAL-PROPPI-No-21_2026-SELECAO-DE-PROJETOS-PARA-COMPOSICAO-DE-PROPOSTA-INSTITUCIONAL-A-SER-SUBMETIDA-A-CHAMADA-PUBLICA-MCTI_FINEP_FNDCT-–-COOPERAMAIS-TECNOLOGIA-–-ICT-_-2026.docx-2.pdf#2",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/Retificacao_01-1.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/Retificacao_02.docx2-2ASS.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/10/DIVULGAO_PRELIMINAR_DAS_PROPOSTAS_HOMOLOGADAS.docx_aSS.pdf#0"
   ],
   "objeto": null,
   "falhas": 0,

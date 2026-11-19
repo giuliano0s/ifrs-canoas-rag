@@ -368,7 +368,7 @@
    "trechos": {}
   },
   "https://ifrs.edu.br/canoas/": {
-   "chave": "b11eb1e10438d1e3",
+   "chave": "87e1713d3cb5d4dd",
    "cursos": [
     "gpi",
     "tec-desenv-sistemas"
@@ -1706,7 +1706,7 @@
    "trechos": {}
   },
   "https://ifrs.edu.br/canoas/editais/": {
-   "chave": "1c733088000ca0ea",
+   "chave": "2e2c43d3a4f9db92",
    "cursos": [
     "gpi",
     "esp-educacao",
@@ -1733,13 +1733,9 @@
    "trechos": {}
   },
   "https://ifrs.edu.br/canoas/editais/categorias/pesquisa/": {
-   "chave": "8e8cf6f094c874e4",
-   "cursos": [
-    "gpi",
-    "esp-educacao",
-    "esp-linguagens"
-   ],
-   "estrutura": "varios_sem_secoes",
+   "chave": "2f566b889c3fafe6",
+   "cursos": [],
+   "estrutura": "generico",
    "so_ligacao": false,
    "trechos": {}
   },
@@ -1841,7 +1837,7 @@
    "trechos": {}
   },
   "https://ifrs.edu.br/canoas/editais/edital-no-49-2026-gab-can-processo-seletivo-para-o-curso-de-pos-graduacao-lato-sensu-em-gestao-de-projetos-e-inovacao/": {
-   "chave": "90763214930e2d89",
+   "chave": "6e2af4388093519b",
    "cursos": [
     "gpi"
    ],
@@ -9082,7 +9078,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnico-em-administracao/": {
-   "chave": "03336cce9af10e41",
+   "chave": "6ffdbacb7a665b45",
    "cursos": [
     "tec-admin"
    ],
@@ -9109,7 +9105,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnico-em-desenvolvimento-de-sistemas/": {
-   "chave": "6f7bc73f499035dc",
+   "chave": "38eba29f8745f5e2",
    "cursos": [
     "tec-desenv-sistemas"
    ],
@@ -9127,7 +9123,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnico-em-eletronica/": {
-   "chave": "7e1796e792f0de95",
+   "chave": "aab3c7d53c18cab4",
    "cursos": [
     "tec-eletronica"
    ],
