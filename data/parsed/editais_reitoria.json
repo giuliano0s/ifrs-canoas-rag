@@ -4205,47 +4205,6 @@
   "falhas": 0,
   "tentativas": 0
  },
- "https://ifrs.edu.br/editais/edital-proppi-no-29-2025-mulheres-e-meninas-na-ciencia/": {
-  "titulo": "EDITAL PROPPI Nº 29/2025 – MULHERES E MENINAS NA CIÊNCIA",
-  "data": "21/11/2025",
-  "categorias": [
-   "Internos",
-   "Pesquisa"
-  ],
-  "atualizacao": "04/03/2026 16:12",
-  "hash": "e5dad5d7917737b7730b79b2633bc0412e3b29194543b8ba2e0cb965c0c29243",
-  "veredito": {
-   "categoria": "canoas",
-   "publico": "estudantes_e_servidores",
-   "evidencia": "CANOAS PVC4651-2025 Literatura brasileira contemporânea e ecocrítica: decolonizando o cânone",
-   "motivo": "O resultado do edital apresenta uma proposta vinculada ao Campus Canoas, envolvendo bolsa para estudante e servidora orientadora.",
-   "cobertura": 1.0
-  },
-  "entra": true,
-  "motivo": "canoas",
-  "ids": [
-   "https://ifrs.edu.br/editais/edital-proppi-no-29-2025-mulheres-e-meninas-na-ciencia/#0",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/EDITAL-PROPPI-N-29.2025.pdf#0",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/EDITAL-PROPPI-N-29.2025.pdf#1",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/EDITAL-PROPPI-N-29.2025.pdf#2",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/EDITAL-PROPPI-N-29.2025.pdf#3",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/EDITAL-PROPPI-N-29.2025.pdf#4",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/EDITAL-PROPPI-N-29.2025.pdf#5",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/EDITAL-PROPPI-N-29.2025.pdf#6",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/RETIFICACAO-No-01-4.pdf#0",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/RETIFICACAO-No-01-4.pdf#1",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/RETIFICACAO-No-01-4.pdf#2",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/RETIFICACAO-No-01-4.pdf#3",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/DIVULGACAO-PRELIMINAR-DAS-PROPOSTAS-HOMOLOGADAS-2-4.pdf#0",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/DDIVULGAO_FINAL_DAS_PROPOSTAS_HOMOLOGADAS-2.pdf#0",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/DIVULGACAO-DA-CLASSIFICACAO-FINAL-DAS-PROPOSTAS-Retificado-em-04-03-2026.pdf#0",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/DIVULGACAO-DA-CLASSIFICACAO-FINAL-DAS-PROPOSTAS-Retificado-em-04-03-2026.pdf#1",
-   "https://ifrs.edu.br/wp-content/uploads/2025/11/DIVULGACAO-DA-CLASSIFICACAO-FINAL-DAS-PROPOSTAS-Retificado-em-04-03-2026.pdf#2"
-  ],
-  "objeto": null,
-  "falhas": 0,
-  "tentativas": 0
- },
  "https://ifrs.edu.br/editais/edital-proppi-no-30-2025-selecao-interna-para-inscricao-em-evento-da-anprotec/": {
   "titulo": "EDITAL PROPPI Nº 30/2025 – SELEÇÃO INTERNA PARA INSCRIÇÃO EM EVENTO DA ANPROTEC",
   "data": "27/11/2025",
@@ -4688,23 +4647,6 @@
    "https://ifrs.edu.br/wp-content/uploads/2026/11/modelo_de_proposta_comercial.docx#0"
   ],
   "objeto": "srp – aquisição de recursos para atendimento educacional especializado e equipamentos maker para o ifrs",
-  "falhas": 0,
-  "tentativas": 0
- },
- "https://ifrs.edu.br/editais/pregao-n-90029-2025-contratacao-de-empresa-para-a-reforma-dos-ambientes-da-incubadora-tecnologica-do-campus-vacaria/": {
-  "titulo": "PREGÃO n° 90029/2025 – Contratação de empresa para a Reforma dos ambientes da incubadora tecnológica do campus Vacaria.",
-  "data": "21/11/2025",
-  "categorias": [
-   "Licitação",
-   "Pregão Eletrônico"
-  ],
-  "atualizacao": "21/11/2025 08:14",
-  "hash": "3daf9ab96398465f2f431f9bd87597fc569bd2e44ace6e5148250a5f3aec5cf2",
-  "veredito": null,
-  "entra": false,
-  "motivo": "compra_sem_canoas",
-  "ids": [],
-  "objeto": "contratação de empresa para a reforma dos ambientes da incubadora tecnológica do campus vacaria.",
   "falhas": 0,
   "tentativas": 0
  },
