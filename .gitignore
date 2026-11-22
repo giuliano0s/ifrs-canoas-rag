@@ -46,3 +46,6 @@ eval/runs/coleta_producao.jsonl
 eval/runs/coleta_controle*.jsonl
 eval/runs/juiz_tarefas.jsonl
 eval/runs/juiz_tarefas_controle*.jsonl
+# medicoes avulsas (A/B, conferencias) com as coletas brutas e os scripts da rodada, so na maquina que rodou
+eval/runs/medicoes_*/
+eval/runs/ancoragem_candidatos.jsonl
