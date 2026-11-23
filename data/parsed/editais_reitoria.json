@@ -1568,8 +1568,8 @@
    "Ensino",
    "Internos"
   ],
-  "atualizacao": "19/11/2026 23:06",
-  "hash": "028e9fe69904263be4765197c9f500bab9ecd7606db62786abdaf5c5f46137fa",
+  "atualizacao": "23/11/2026 14:36",
+  "hash": "db9a65b783546dbd47e5b53baec858ee4f099be6a967b0bb1d496a698816978c",
   "veredito": {
    "categoria": "canoas",
    "publico": "estudantes",
@@ -1587,6 +1587,7 @@
    "https://ifrs.edu.br/wp-content/uploads/2026/01/RETIFICADO-EDITAL-3-COMPLETO.docx.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/01/RETIFICADO-EDITAL-3-COMPLETO.docx.pdf#1",
    "https://ifrs.edu.br/wp-content/uploads/2026/01/RETIFICADO-EDITAL-3-COMPLETO.docx.pdf#2",
+   "https://ifrs.edu.br/wp-content/uploads/2026/01/Retificacao-do-Edital-03.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/01/ANEXO-I-AUTORIZACAO-DOS-PAIS-OU-RESPONSAVEIS.docx#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/01/RESULTADO-DE-INSCRITOS-PARA-APOIO-AOS-ESTUDANTES-PARA-PARTICIPACAO-EM-EVENTOS-DE-FORMACAO-ESTUDANTIL-PERIODO-DE-26-01-a-29-01-2026.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/01/RESULTADO-DE-INSCRITOS-PARA-APOIO-AOS-ESTUDANTES-PARA-PARTICIPACAO-EM-EVENTOS-DE-FORMACAO-ESTUDANTIL-PERIODO-DE-30_01-a-23_02.pdf#0",
@@ -1665,8 +1666,8 @@
    "Ensino",
    "Internos"
   ],
-  "atualizacao": "19/11/2026 23:09",
-  "hash": "4117db7d59458cfd587f7d3e6e4b12fc4e0092be9ea5fd02721c53145a2c8aff",
+  "atualizacao": "23/11/2026 14:38",
+  "hash": "08bd0b5275a0db93bdbb3844f9db5b57cd7e29e353d8c2ce4b05d196ad5319db",
   "veredito": {
    "categoria": "rede",
    "publico": "estudantes",
@@ -1684,6 +1685,7 @@
    "https://ifrs.edu.br/wp-content/uploads/2026/03/RETIFICADO-EDITAL-12-COMPLETO.docx.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/03/RETIFICADO-EDITAL-12-COMPLETO.docx.pdf#1",
    "https://ifrs.edu.br/wp-content/uploads/2026/03/RETIFICADO-EDITAL-12-COMPLETO.docx.pdf#2",
+   "https://ifrs.edu.br/wp-content/uploads/2026/03/Retificacao-do-Edital-12_2026.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/03/ANEXO-I-AUTORIZACAO-DOS-PAIS-OU-RESPONSAVEIS.docx#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/03/RESULTADO-DE-INSCRITOS-EDITAL-DE-APOIO-AOS-ESTUDANTES-PARA-PARTICIPACAO-EM-OLIMPIADAS-DO-CONHECIMENTO-PERIODO-DE-12.03.2026-a-04.05.2026.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/03/RESULTADO-DE-INSCRITOS-EDITAL-DE-APOIO-AOS-ESTUDANTES-PARA-PARTICIPACAO-EM-OLIMPIADAS-DO-CONHECIMENTO-PERIODO-DE-05.05.2026-a-02.06.2026.pdf#0",
@@ -1704,8 +1706,8 @@
    "Ensino",
    "Internos"
   ],
-  "atualizacao": "19/11/2026 23:14",
-  "hash": "c9d5fcab2575b8bf6ff66eca423fe8846077180c5421036a93272101ad6bebd5",
+  "atualizacao": "23/11/2026 14:40",
+  "hash": "62a6438ffa78e2f05dfe37cba93e3af5cf6f2b5785b3b07def0d789c3a36d72e",
   "veredito": {
    "categoria": "canoas",
    "publico": "estudantes",
@@ -1723,6 +1725,7 @@
    "https://ifrs.edu.br/wp-content/uploads/2026/03/RETIFICADO-EDITAL-13-COMPLETO.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/03/RETIFICADO-EDITAL-13-COMPLETO.pdf#1",
    "https://ifrs.edu.br/wp-content/uploads/2026/03/RETIFICADO-EDITAL-13-COMPLETO.pdf#2",
+   "https://ifrs.edu.br/wp-content/uploads/2026/03/RETIFICACAO-eDITAL-13_2026.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/03/ANEXO-I-AUTORIZACAO-DOS-PAIS-OU-RESPONSAVEIS-Edital-13.docx#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/03/RESULTADO-DE-INSCRITOS-PARA-APOIO-AOS-ESTUDANTES-PARA-APRESENTACAO-DE-TRABALHOS-EM-EVENTOS-ACADEMICOS-PERIODO-DE-20-03-2026-a-07-04-2026.pdf#0",
    "https://ifrs.edu.br/wp-content/uploads/2026/03/RESULTADO-APOS-RECURSOS-DE-INSCRITOS-PARA-APOIO-AOS-ESTUDANTES-PARA-APRESENTACAO-DE-TRABALHOS-EM-EVENTOS-ACADEMICOS-PERIODO-DE-20.03.2026-a-07.04.2026.pdf#0",
@@ -4419,6 +4422,41 @@
    "https://ifrs.edu.br/wp-content/uploads/2026/11/Ato-de-Autorizacao-Contratacao-Direta.pdf#0"
   ],
   "objeto": "contratação dos serviços de água tratada e esgotamento sanitário para o ifrs",
+  "falhas": 0,
+  "tentativas": 0
+ },
+ "https://ifrs.edu.br/editais/pregao-eletronico-srp-no-386-2026-aquisicao-de-generos-alimenticios-prontos-para-o-consumo-destinado-ao-atendimento-do-programa-nacional-de-alimentacao-escolar-pnae-no-ambito-do-ifrs/": {
+  "titulo": "Pregão Eletrônico (SRP) nº 386/2026 – Aquisição de gêneros alimentícios prontos para o consumo, destinado ao atendimento do Programa Nacional de Alimentação Escolar (PNAE), no âmbito do IFRS",
+  "data": "23/11/2026",
+  "categorias": [
+   "Licitação",
+   "Pregão Eletrônico"
+  ],
+  "atualizacao": "23/11/2026 11:33",
+  "hash": "d1866ffbdb6ce67623405118b32101b75abc408c56c84343ce69dcc85fc63d0d",
+  "veredito": {
+   "categoria": "rede",
+   "publico": "empresas",
+   "evidencia": "Aquisição de gêneros alimentícios prontos para o consumo, destinados ao atendimento do Programa Nacional de Alimentação Escolar (PNAE), no âmbito do IFRS",
+   "motivo": "A licitação atende ao IFRS como um todo e é destinada à participação de empresas fornecedoras.",
+   "cobertura": 1.0
+  },
+  "entra": true,
+  "motivo": "rede",
+  "ids": [
+   "https://ifrs.edu.br/editais/pregao-eletronico-srp-no-386-2026-aquisicao-de-generos-alimenticios-prontos-para-o-consumo-destinado-ao-atendimento-do-programa-nacional-de-alimentacao-escolar-pnae-no-ambito-do-ifrs/#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Pregao-386_2026-IFRS.pdf#0",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Pregao-386_2026-IFRS.pdf#1",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Pregao-386_2026-IFRS.pdf#2",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Pregao-386_2026-IFRS.pdf#3",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Pregao-386_2026-IFRS.pdf#4",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Pregao-386_2026-IFRS.pdf#5",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Pregao-386_2026-IFRS.pdf#6",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Pregao-386_2026-IFRS.pdf#7",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/Pregao-386_2026-IFRS.pdf#8",
+   "https://ifrs.edu.br/wp-content/uploads/2026/11/ANEXO-IV-Modelo-de-proposta-comercial.docx#0"
+  ],
+  "objeto": "aquisição de gêneros alimentícios prontos para o consumo, destinado ao atendimento do programa nacional de alimentação escolar (pnae), no âmbito do ifrs",
   "falhas": 0,
   "tentativas": 0
  },
