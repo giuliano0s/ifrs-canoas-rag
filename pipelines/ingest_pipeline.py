@@ -58,8 +58,9 @@ def main():
 
     chunks        = run_chunker(pages_parsed, pdfs_parsed, sheets_parsed)
 
-    # fontes curadas (data/info/fontes_curadas.json) entram no mesmo ingest, com o mesmo replace por hash
-    curadas, curadas_mudadas = run_fontes_curadas(estado)
+    # fontes curadas (data/info/fontes_curadas.json) entram no mesmo ingest, com o mesmo replace por hash; os
+    # campos derivados delas leem os cronogramas da base, na versao desta execucao quando a pagina mudou
+    curadas, curadas_mudadas = run_fontes_curadas(estado, chunks)
     run_ingest(chunks + curadas, estado, urls_mudadas | curadas_mudadas)
 
     # editais da Reitoria que dizem respeito a Canoas; o que ja esta na base por outro caminho, inclusive o

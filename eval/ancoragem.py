@@ -17,81 +17,15 @@ import json
 import re
 import sys
 from collections import Counter, defaultdict
-from datetime import date, datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 from eval.run_eval import _wilson
+from rag.agenda import trechos_como_lidos
+from rag.ancoragem import MES_RX, ancorada, datas, normalizar, trechos_de_data
 
-MESES = {"janeiro": 1, "fevereiro": 2, "março": 3, "marco": 3, "abril": 4, "maio": 5, "junho": 6, "julho": 7,
-         "agosto": 8, "setembro": 9, "outubro": 10, "novembro": 11, "dezembro": 12}
-MES_RX = "|".join(MESES)
-FAIXA_MAXIMA_DIAS = 120
 CURSOS = Path("data/info/cursos_atuais.json")
 SAIDA_PADRAO = Path("eval/runs/ancoragem_candidatos.jsonl")
-
-
-def _ano(texto):
-    """Ano de quatro dígitos a partir do texto capturado, ou None."""
-    if not texto:
-        return None
-    ano = int(texto)
-    return ano + 2000 if ano < 100 else ano
-
-
-def _faixa(inicio, fim, ano, expandir):
-    """Datas de uma faixa (dia, mês) a (dia, mês): só as pontas, ou dia a dia atravessando o mês e o ano."""
-    if not expandir:
-        return {(*inicio, ano), (*fim, ano)}
-    try:
-        primeiro = date(ano or 2026, inicio[1], inicio[0])
-        ultimo = date(ano or 2026, fim[1], fim[0])
-    except ValueError:
-        return {(*inicio, ano), (*fim, ano)}
-    if ultimo < primeiro:
-        primeiro = primeiro.replace(year=primeiro.year - 1)
-    if (ultimo - primeiro).days > FAIXA_MAXIMA_DIAS:
-        return {(*inicio, ano), (*fim, ano)}
-    dias = (primeiro + timedelta(days=passo) for passo in range((ultimo - primeiro).days + 1))
-    return {(dia.day, dia.month, ano) for dia in dias}
-
-
-def datas(texto, expandir):
-    """Conjunto de (dia, mês, ano ou None) citados no texto.
-
-    Args:
-        texto: texto livre (resposta ou contexto).
-        expandir: True expande as faixas dia a dia; False guarda só as pontas.
-
-    Returns:
-        Conjunto de tuplas (dia, mês, ano), com ano None quando o texto não o traz.
-    """
-    achados = set()
-
-    # faixas com o mês por extenso: "12 a 14 de janeiro de 2026" e "28 de dezembro a 05 de janeiro"
-    for dia_inicio, mes_inicio, dia_fim, mes_fim, ano in re.findall(
-            rf"\b(\d{{1,2}})(?:º)? de ({MES_RX}) (?:a|até) (\d{{1,2}}) de ({MES_RX})(?: de (\d{{4}}))?", texto, re.I):
-        achados |= _faixa((int(dia_inicio), MESES[mes_inicio.lower()]), (int(dia_fim), MESES[mes_fim.lower()]),
-                          _ano(ano), expandir)
-    for dia_inicio, dia_fim, mes, ano in re.findall(
-            rf"\b(\d{{1,2}})(?:º)? (?:a|e|até) (\d{{1,2}}) de ({MES_RX})(?: de (\d{{4}}))?", texto, re.I):
-        achados |= _faixa((int(dia_inicio), MESES[mes.lower()]), (int(dia_fim), MESES[mes.lower()]), _ano(ano), expandir)
-
-    # faixas numéricas: "05 a 07/01/2026" e "02/08 a 13/08/2027"
-    for dia_inicio, mes_inicio, dia_fim, mes_fim, ano in re.findall(
-            r"\b(\d{1,2})/(\d{1,2}) (?:a|até) (\d{1,2})/(\d{1,2})(?:/(\d{2,4}))?", texto):
-        if 1 <= int(mes_inicio) <= 12 and 1 <= int(mes_fim) <= 12:
-            achados |= _faixa((int(dia_inicio), int(mes_inicio)), (int(dia_fim), int(mes_fim)), _ano(ano), expandir)
-    for dia_inicio, dia_fim, mes, ano in re.findall(r"\b(\d{1,2}) (?:a|e|até) (\d{1,2})/(\d{1,2})(?:/(\d{2,4}))?", texto):
-        if 1 <= int(mes) <= 12:
-            achados |= _faixa((int(dia_inicio), int(mes)), (int(dia_fim), int(mes)), _ano(ano), expandir)
-
-    # datas soltas
-    for dia, mes, ano in re.findall(rf"\b(\d{{1,2}})(?:º)? de ({MES_RX})(?: de (\d{{4}}))?", texto, re.I):
-        achados.add((int(dia), MESES[mes.lower()], _ano(ano)))
-    for dia, mes, ano in re.findall(r"\b(\d{1,2})/(\d{1,2})(?:/(\d{2,4}))?\b", texto):
-        if 1 <= int(mes) <= 12 and 1 <= int(dia) <= 31:
-            achados.add((int(dia), int(mes), _ano(ano)))
-    return achados
 
 
 def horas(texto):
@@ -116,7 +50,8 @@ def numeros(texto):
 
 def atomos(corpo):
     """Dados verificáveis do corpo da resposta, como pares (tipo, valor)."""
-    lista = [("data", data) for data in datas(corpo, expandir=False)]
+    lista = [("data", data) for data in sorted({data for _, _, citadas in trechos_de_data(corpo) for data in citadas},
+                                                key=str)]
 
     # horários, fora das datas
     sem_datas = re.sub(rf"\b\d{{1,2}}(?:º)? (?:(?:a|e|até) \d{{1,2}} )?de ({MES_RX})(?: de \d{{4}})?"
@@ -146,9 +81,7 @@ def atomos(corpo):
 def ancorado(tipo, valor, lido):
     """Diz se o dado aparece no que o agente leu (dicionário montado por `_o_que_leu`)."""
     if tipo == "data":
-        dia, mes, ano = valor
-        return any(dia_lido == dia and mes_lido == mes and (ano is None or ano_lido is None or ano_lido == ano)
-                   for dia_lido, mes_lido, ano_lido in lido["datas"])
+        return ancorada(valor, lido["datas"])
     if tipo == "hora":
         return valor in lido["horas"]
     if tipo in ("email", "sala"):
@@ -181,11 +114,17 @@ def _data_atual(registro, referencias):
 def _o_que_leu(registro, fixo, data_atual):
     """Texto e dados extraídos de tudo que o agente leu numa execução, inclusive a data atual do prompt."""
     buscas = registro.get("buscas") or []
-    trechos = " ".join(" ".join(busca.get("chunks_textos") or []) for busca in buscas)
+    # o agente lê cada evento datado com a situação dele em relação à data do pedido ("[daqui a 6 dias]"),
+    # que a coleta não guarda: é refeita aqui, pela mesma função do atendimento
+    try:
+        hoje = datetime.strptime(data_atual, "%d/%m/%Y").date()
+    except ValueError:
+        hoje = None
+    trechos = " ".join(trecho for busca in buscas for trecho in trechos_como_lidos(busca, hoje))
     urls = {re.sub(r"^https?://", "", url or "").rstrip("/").lower()
             for busca in buscas for url in (busca.get("contexto_urls") or [])}
     texto = " ".join([trechos, fixo, data_atual, registro.get("input") or "", " ".join(urls)])
-    return {"texto": texto.lower(), "urls": urls, "datas": datas(texto, expandir=True),
+    return {"texto": texto.lower(), "urls": urls, "datas": datas(normalizar(texto), expandir=True),
             "horas": horas(texto), "numeros": numeros(texto)}
 
 

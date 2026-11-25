@@ -33,6 +33,13 @@ def testar_prazo():
     frase = "O período da Etapa 2 de 2026, de 26 de janeiro a 16 de fevereiro, já passou."
     assert _guard_prazo(frase, date(2026, 10, 21)) == frase
 
+    # dois anos na frase: vale o ultimo citado antes da data (a cerimonia de 2025 ja passou, mesmo com 2026 depois)
+    frase = ("O registro mais recente que encontrei é de 2025: a cerimônia do curso ocorreu em 18 de dezembro, mas essa data "
+             "já passou e não confirma a data de 2026.")
+    assert _guard_prazo(frase, date(2026, 11, 23)) == frase
+    assert _guard_prazo("Em 2025 as inscrições foram até 30 de novembro; em 2026 vão até 28 de novembro e já encerraram.",
+                        date(2026, 11, 23)).endswith("e ainda não encerraram.")
+
     # passam sem mudar: data atual citada pelo modelo, data passada com "ja passou", data de hoje e frase sem data
     for texto in ("Como a data atual é 24 de outubro de 2026, os prazos de inscrição já passaram.",
                   "Como hoje é 24/10/2026, essa edição já passou.",

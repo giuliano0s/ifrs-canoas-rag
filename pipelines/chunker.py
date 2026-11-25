@@ -127,6 +127,11 @@ def _unidade_nomeada(trecho, inteiro):
     achado = _UNIDADE_NOMEADA.search(_sem_acento(trecho))
     return achado.group(1) if achado else None
 
+def outra_unidade_nomeada(texto):
+    # unidade do IFRS que o texto nomeia como "Campus X" sem citar Canoas ("PS CAMPUS VIAMÃO - Publicação..."); None caso contrario
+    unidade = _unidade_nomeada(texto or "", texto or "")
+    return None if unidade == "canoas" else unidade
+
 def campus_da_pagina(url, titulo, texto):
     """Campus a que uma pagina do portal de ingresso pertence, pela estrutura do portal.
 
@@ -253,6 +258,41 @@ def eventos_de_cronograma(text):
             eventos[-1][1].append(linha)
     return eventos
 
+# linhas do comeco de um evento em que se procura rotulo de trilha, e repeticoes que fazem de uma linha um rotulo
+LINHAS_DE_ROTULO = 3
+MIN_REPETICOES_DE_ROTULO = 3
+
+def rotulos_de_trilha(eventos):
+    """Linhas que se repetem no comeco de varios eventos de um cronograma ("PS Regular", "PS Indígena").
+
+    Args:
+        eventos: saida de eventos_de_cronograma.
+
+    Returns:
+        Conjunto das linhas que aparecem entre as LINHAS_DE_ROTULO primeiras de ao menos MIN_REPETICOES_DE_ROTULO
+        eventos: sao rotulo de trilha ou pedaco solto de descricao, nunca o nome de um evento.
+    """
+    contagem = Counter(linha for _, linhas in eventos for linha in linhas[:LINHAS_DE_ROTULO])
+    return {linha for linha, repeticoes in contagem.items() if repeticoes >= MIN_REPETICOES_DE_ROTULO}
+
+def nome_do_evento(linhas, rotulos):
+    """Nome de um evento de cronograma, com os rotulos de trilha que o antecedem.
+
+    Args:
+        linhas: linhas de texto do evento, na ordem da pagina.
+        rotulos: saida de rotulos_de_trilha.
+
+    Returns:
+        (rotulos que abrem o evento, nome): o nome e a primeira linha que nao e rotulo; evento so de rotulos
+        devolve a primeira linha como nome.
+    """
+    abertura = []
+    for linha in linhas:
+        if linha not in rotulos:
+            return abertura, linha
+        abertura.append(linha)
+    return [], linhas[0]
+
 def chunks_de_cronograma(text, title, metadata):
     """Fatia um cronograma em um chunk por evento.
 
@@ -272,14 +312,13 @@ def chunks_de_cronograma(text, title, metadata):
     if len(eventos) < MIN_EVENTOS_CRONOGRAMA:
         return []
 
-    # linha que abre varios eventos e rotulo de trilha ("PS Regular"), e o nome do evento vem na seguinte
-    aberturas = Counter(linhas[0] for _, linhas in eventos)
-    rotulos = {linha for linha, n in aberturas.items() if n >= 3}
+    # a frase de busca leva os rotulos de trilha que abrem o evento ("PS Regular") e o nome dele
+    rotulos = rotulos_de_trilha(eventos)
     cronograma = f"{title}\n{text}"
     chunks = []
     for datas, linhas in eventos:
-        nome = " ".join(linhas[:2]) if linhas[0] in rotulos and len(linhas) > 1 else linhas[0]
-        chunks.append({**metadata, "text": cronograma, "texto_busca": f"{title}: {datas} {nome}"})
+        abertura, nome = nome_do_evento(linhas, rotulos)
+        chunks.append({**metadata, "text": cronograma, "texto_busca": f"{title}: {datas} {' '.join(abertura + [nome])}"})
     return chunks
 
 def chunks_de_pdf(pdf):

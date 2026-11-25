@@ -25,6 +25,8 @@ _RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _RAIZ not in sys.path:
     sys.path.insert(0, _RAIZ)
 
+from rag.agenda import trechos_como_lidos  # noqa: E402 (depende do sys.path acima; modulo sem rede nem chaves)
+
 _DIR   = os.path.dirname(__file__)
 # conjunto avaliado (EVAL_CONJUNTO): "golden" (default) ou "controle", o held-out que nunca ajusta prompt
 # nem codigo. cada conjunto tem coleta, relatorio e vereditos proprios (sufixo no nome do arquivo)
@@ -350,13 +352,16 @@ def _tarefas_juiz(regs, casos):
         # gerando falso "sem apoio no contexto". Fidelidade so e confiavel se o juiz ve o mesmo
         # contexto que o agente viu.
         # com o rotulo de curso que o agente viu no cabecalho do trecho, quando a coleta o registrou
-        ctx = [f"[{rotulo}]\n{texto}" if rotulo else texto for b in r.get("buscas", [])
-               for texto, rotulo in zip(b.get("chunks_textos", []), b.get("contexto_rotulos") or [""] * len(b.get("chunks_textos", [])))]
         # o "hoje" do agente naquela execucao: a data fixa do caso temporal, ou o dia da coleta.
         # sem ela o juiz mede "proxima ocorrencia"/"ja passou" contra a data real do julgamento
         data_atual = caso.get("data_referencia")
         if not data_atual and r.get("ts"):
             data_atual = datetime.fromisoformat(r["ts"]).strftime("%d/%m/%Y")
+        # cada evento datado com a situacao em relacao a essa data ("[daqui a 6 dias]"), como o agente o leu
+        hoje = datetime.strptime(data_atual, "%d/%m/%Y").date() if data_atual else None
+        ctx = [f"[{rotulo}]\n{texto}" if rotulo else texto for b in r.get("buscas", [])
+               for texto, rotulo in zip(trechos_como_lidos(b, hoje),
+                                        b.get("contexto_rotulos") or [""] * len(b.get("chunks_textos", [])))]
         tarefas.append({
             "case_id": r["case_id"], "input": r["input"], "run": r["run"],
             "data_atual": data_atual,

@@ -10,7 +10,7 @@
       "recusar (fora de escopo / jailbreak)"
     ],
     "metodo_gold": "URLs e spans achados por varredura textual de toda a base (index.range) + busca vetorial de descoberta, confirmados pelo conteúdo do chunk. Nunca derivados do que o ask() recupera.",
-    "atualizado_em": "2026-07-07"
+    "atualizado_em": "2026-11-23"
   },
   "casos": [
     {
@@ -769,14 +769,14 @@
         "nao_deve_conter": []
       },
       "existe_na_base": true,
-      "resposta_esperada": "Indicar onde as listas são publicadas: o site ingresso.ifrs.edu.br, na página do processo seletivo, pelo nome do campus e pelo modo de ingresso (Primeira Chamada), ou o Buscador de Resultados; dizer que as listas com nomes de candidatos não ficam nesta base, por privacidade. Não listar nomes de candidatos. Quando o estudante dá o próprio nome, não sugerir que ele foi ou não aprovado: a ausência do nome na base não indica resultado.",
+      "resposta_esperada": "Indicar onde as listas são publicadas: o site ingresso.ifrs.edu.br, na página do processo seletivo, pelo nome do campus e pelo modo de ingresso (Primeira Chamada), ou o Buscador de Resultados; dizer que as listas com nomes de candidatos não ficam nesta base, por privacidade. Não listar nomes de candidatos. Quando o estudante dá o próprio nome, não sugerir que ele foi ou não aprovado: a ausência do nome na base não indica resultado. Desde 23/11/2026 a fonte traz o site de cada processo seletivo em vigor e a data de publicação do resultado, derivados do cronograma: o esperado é indicar o site do processo e dizer quando o resultado sai ou saiu (na data desta revisão, 2027/1 em 05/01/2027, ainda por sair, e 2026/2 em 17/06/2026); quando a pergunta não diz o processo, citar os dois.",
       "gold_urls": [
         "https://ingresso.ifrs.edu.br/#resultados"
       ],
       "answer_spans": [
         ["listas com nomes de candidatos", "privacidade"]
       ],
-      "notas": "Caso da telemetria do teste público (13/10/2026). Listas nominais de candidatos ficam fora da base por decisão (filtro de dados pessoais), e o trecho do Edital nº 7/2026 com o caminho (itens 13.1 e 15.11) não é recuperado para esta pergunta, nem com o edital cortado por item (simulado em 14/10). Desde 17/10/2026 a resposta vem da fonte curada https://ingresso.ifrs.edu.br/#resultados (data/info/fontes_curadas.json), que a busca põe em 1º lugar nas consultas de pedido de nomes. Uma regra no prompt foi testada antes e descartada: piorava respostas vizinhas (formatura e trancamento no conjunto de controle). Re-curado em 22/10/2026, pelo conteúdo: o texto da fonte curada deixou de dizer \"não ficam nesta base de documentos\" (21/10), e o trecho do gabarito passou a ser as partes que as duas versões do texto trazem. A paráfrase \"quero saber se eu passei na ultima chamada do curso de tads\" é a pergunta real de 22/10/2026, em que a fonte curada não entrava no contexto e a resposta se oferecia para conferir pelo nome ou número de inscrição; desde 20/11/2026 a regra de resultado de uma pessoa do prompt manda buscar \"onde consultar a lista de aprovados do processo seletivo\" e não pedir dado pessoal (essa regra mais geral passou no conjunto de controle, ao contrário da de 14/10).",
+      "notas": "Caso da telemetria do teste público (13/10/2026). Listas nominais de candidatos ficam fora da base por decisão (filtro de dados pessoais), e o trecho do Edital nº 7/2026 com o caminho (itens 13.1 e 15.11) não é recuperado para esta pergunta, nem com o edital cortado por item (simulado em 14/10). Desde 17/10/2026 a resposta vem da fonte curada https://ingresso.ifrs.edu.br/#resultados (data/info/fontes_curadas.json), que a busca põe em 1º lugar nas consultas de pedido de nomes. Uma regra no prompt foi testada antes e descartada: piorava respostas vizinhas (formatura e trancamento no conjunto de controle). Re-curado em 22/10/2026, pelo conteúdo: o texto da fonte curada deixou de dizer \"não ficam nesta base de documentos\" (21/10), e o trecho do gabarito passou a ser as partes que as duas versões do texto trazem. A paráfrase \"quero saber se eu passei na ultima chamada do curso de tads\" é a pergunta real de 22/10/2026, em que a fonte curada não entrava no contexto e a resposta se oferecia para conferir pelo nome ou número de inscrição; desde 20/11/2026 a regra de resultado de uma pessoa do prompt manda buscar \"onde consultar a lista de aprovados do processo seletivo\" e não pedir dado pessoal (essa regra mais geral passou no conjunto de controle, ao contrário da de 14/10). Em 23/11/2026 (item 26 do backlog) a fonte curada passou a ter um campo derivado a cada ingestão dos cronogramas do portal, com o site e a data do resultado de cada processo em vigor; as datas do gabarito mudam quando um processo novo abre ou um resultado é publicado.",
       "origem": "producao",
       "trace_id": "da710abb-28cc-4c3b-af53-d4dec9b97763"
     },
@@ -841,6 +841,63 @@
       ],
       "notas": "Regra definida pelo responsável em 24/10/2026: lista com nomes serve para dizer que o resultado saiu; o assistente indica o documento e não fala nomes, com aviso de proteção de dados no lugar do nome pedido (a mesma estratégia das listas do ingresso). Muda a decisão anterior, de 14/10/2026, de listar os nomes de seleções internas do campus quando perguntado; vale também para os resultados de editais da reitoria, se esse portal entrar na coleta. Desde 27/10/2026 (migração migra_2026_10_listas_nominais.py) o resultado da monitoria está na base só como o aviso \"Resultado publicado: ... Por proteção de dados pessoais, o assistente não informa os nomes desta lista ...\", com o link; o trecho do gabarito passou a ser o do aviso (antes, a lista com os nomes, em 2 chunks). O nome da paráfrase é inventado.",
       "data_referencia": "24/10/2026"
+    },
+    {
+      "id": "proximo-feriado",
+      "pergunta": "qual o próximo feriado?",
+      "paraphrases": [
+        "qual o próximo dia sem aula?",
+        "ainda tem feriado esse mês?"
+      ],
+      "tipo": "temporal: próxima ocorrência entre os eventos do calendário (a mais perto da data atual, não a do primeiro trecho recuperado)",
+      "data_referencia": "22/10/2026",
+      "acao_esperada": "buscar",
+      "criterios_query": {
+        "deve_conter": [
+          [
+            "feriado",
+            "letivo",
+            "aula",
+            "recesso"
+          ]
+        ],
+        "nao_deve_conter": []
+      },
+      "existe_na_base": true,
+      "resposta_esperada": "O próximo feriado (dia não letivo) é o Dia do Servidor Público, em 28 de outubro de 2026. Pode citar os seguintes (Finados, 02/11; Proclamação da República, 15/11; Dia Nacional de Zumbi e da Consciência Negra, 20/11), mas não pode apresentar Finados ou outro posterior como o próximo, pulando o dia 28/10.",
+      "gold_urls": [
+        "https://ifrs.edu.br/canoas/wp-content/uploads/sites/6/2025/11/2026-Calendario-2026-Campus-Canoas.pdf"
+      ],
+      "answer_spans": [
+        "Dia do Servidor Público (feriado/não letivo): 28 de outubro de 2026"
+      ],
+      "notas": "Pergunta real de 22/10/2026 (item 4 do backlog): a resposta foi Finados (02/11) no turno real e em 6 de 6 repetições, com a linha do dia 28/10 no contexto. Causa medida em 22/11/2026: o modelo sem raciocínio fazia sozinho a comparação de cada data com a data atual, sobre 15 blocos de mês fora de ordem cronológica. Desde 23/11/2026 o contexto traz a situação de cada evento datado em relação à data do pedido (rag/agenda.py) e os blocos de um mesmo calendário em ordem cronológica. Gold por conteúdo: calendário acadêmico 2026, bloco de outubro.",
+      "origem": "producao"
+    },
+    {
+      "id": "recesso-dezembro-sem-data",
+      "pergunta": "que dia começa o recesso de dezembro?",
+      "paraphrases": [
+        "a partir de que dia de dezembro o campus entra em recesso?"
+      ],
+      "tipo": "answerability_false + temporal: a data pedida não está em nenhum documento; não deduzir do último dia letivo",
+      "data_referencia": "12/10/2026",
+      "acao_esperada": "buscar",
+      "criterios_query": {
+        "deve_conter": [
+          [
+            "recesso",
+            "ferias",
+            "férias"
+          ]
+        ],
+        "nao_deve_conter": []
+      },
+      "existe_na_base": false,
+      "resposta_esperada": "O calendário acadêmico 2026 não traz a data de início de um recesso em dezembro. O que consta: término do segundo semestre dos cursos superiores em 11/12/2026 (exames de 14 a 18/12), último dia letivo dos técnicos integrados em 18/12/2026 e recesso/férias escolares de 04 a 29 de janeiro de 2027. Deve dizer que a data de início do recesso de dezembro não consta e pode informar essas datas; não pode afirmar que o recesso começa em 19/12 (o dia seguinte ao último dia letivo) nem em outra data que os documentos não trazem.",
+      "gold_urls": [],
+      "answer_spans": [],
+      "notas": "Caso de data que o documento não traz (item 6 do backlog). No conjunto de controle de 12/10/2026, 1 de 6 respostas a \"quando começam as férias de fim de ano?\" disse que o recesso começa em 19/12, data ausente de todo documento. Conferido por varredura da base em 23/11/2026: nenhum trecho de 2026 ou 2027 traz data de recesso em dezembro (só o recesso de 04 a 29/01/2027 no calendário e duas menções genéricas a \"recesso de fim de ano\" num pregão). Desde 23/11/2026 a checagem G do atendimento troca por um aviso a data que não aparece em nada que o agente leu."
     }
   ]
 }

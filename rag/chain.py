@@ -1,5 +1,6 @@
 import hashlib
 from collections import namedtuple
+from functools import lru_cache
 import json
 import logging
 import os
@@ -10,10 +11,12 @@ from upstash_vector import Index
 from google import genai as google_genai
 from google.genai import errors as genai_errors
 from rag import llm
+from rag.agenda import marcar_eventos, primeiro_dia
+from rag.ancoragem import ancorada, datas, normalizar, trechos_de_data
 from rag.cursos_escopo import curso_da_query, nome_curso
 import time
 import unicodedata
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 load_dotenv()
 
@@ -123,7 +126,7 @@ def search(query, top_k):
     return []
 
 
-def build_context(hits, min_score=MIN_SCORE, top_n=CONTEXT_K):
+def _selecionar(hits, min_score=MIN_SCORE, top_n=CONTEXT_K):
     # seleciona o top_n por score (hits ja vem reordenados pelo rerank), com TETO de slots "outro":
     # a penalidade de rerank rebaixa o institucional, este cap o EXPULSA do contexto (fecha o vazamento
     # do PDI nas salas). ao pular um "outro" excedente, o proximo chunk de Canoas ocupa a vaga.
@@ -143,7 +146,29 @@ def build_context(hits, min_score=MIN_SCORE, top_n=CONTEXT_K):
         filtered.append(h)
         if len(filtered) >= top_n:
             break
+    return filtered
 
+
+def _em_ordem_cronologica(hits):
+    # os blocos de um mesmo calendario (um por mes) chegam na ordem da similaridade, com novembro antes de
+    # outubro; aqui eles trocam de lugar entre si, nas vagas que ja ocupam, para o modelo ler os meses em
+    # sequencia. os outros trechos nao saem do lugar. bloco sem evento datado fica por ultimo
+    vagas = {}
+    for posicao, h in enumerate(hits):
+        if (h.metadata or {}).get("is_calendar"):
+            vagas.setdefault(h.metadata.get("source_url"), []).append(posicao)
+    ordenados = list(hits)
+    for posicoes in vagas.values():
+        blocos = sorted((hits[posicao] for posicao in posicoes),
+                        key=lambda h: primeiro_dia(h.metadata.get("text")) or date.max)
+        for posicao, bloco in zip(posicoes, blocos):
+            ordenados[posicao] = bloco
+    return ordenados
+
+
+def _montar_contexto(filtered, hoje=None):
+    # texto dos trechos escolhidos, cada um com o cabecalho da fonte. com a data do pedido, cada linha de
+    # evento datado leva a situacao dela em relacao a hoje (rag.agenda); sem a data, o texto vai como esta na base
     context = ""
     sources = {}
     source_years = {}  # n -> ano (int) da fonte, consumido pelo guard de ressalva temporal
@@ -171,8 +196,45 @@ def build_context(hits, min_score=MIN_SCORE, top_n=CONTEXT_K):
         # nenhum rotulo.
         rotulo_curso = rotulo_de_curso(h.metadata)
         context += f"[{source_num}] Fonte: {url} | Data: {published_at}{rotulo_curso}\n"
-        context += h.metadata["text"] + "\n\n"
+        context += _texto_do_trecho(h.metadata, hoje) + "\n\n"
 
+    return context, sources, source_years
+
+
+def _datas_soltas(metadata):
+    # trecho em que a linha que e so uma data e um evento: o cronograma por evento e a fonte curada, buscados
+    # pela frase do evento. nos demais, a data sozinha na linha costuma ser a de publicacao do item de cima
+    return bool((metadata or {}).get("texto_busca"))
+
+
+def _texto_do_trecho(metadata, hoje):
+    # texto que o modelo le: com a data do pedido, cada evento datado leva a situacao dele em relacao a hoje.
+    # fail-safe: erro inesperado na marcacao deixa o texto como esta na base e vai ao log
+    texto = metadata["text"]
+    if not hoje:
+        return texto
+    try:
+        return marcar_eventos(texto, hoje, datas_soltas=_datas_soltas(metadata))
+    except Exception as e:
+        logger.warning(_safe(f"[CONTEXTO] situacao dos eventos falhou, trecho segue sem ela: {e}"))
+        return texto
+
+
+def build_context(hits, min_score=MIN_SCORE, top_n=CONTEXT_K, hoje=None):
+    """Monta o contexto que o modelo le a partir dos trechos reordenados pelo rerank.
+
+    Args:
+        hits: trechos na ordem do rerank.
+        min_score: similaridade minima para entrar.
+        top_n: teto de trechos.
+        hoje: data do pedido (date); com ela, as linhas de evento datado saem com a situacao em relacao a
+            hoje ("[ja passou]", "[daqui a 6 dias]").
+
+    Returns:
+        (contexto, trechos escolhidos na ordem em que o modelo os le, mapa {n: url}, mapa {n: ano da fonte}).
+    """
+    filtered = _em_ordem_cronologica(_selecionar(hits, min_score, top_n))
+    context, sources, source_years = _montar_contexto(filtered, hoje)
     return context, filtered, sources, source_years
 
 
@@ -239,14 +301,15 @@ def _com_sinonimos(query):
     return " ".join([query] + extras)
 
 
-def _executar_busca(search_query, trace=None):
+def _executar_busca(search_query, trace=None, hoje=None):
     # coleta um pool grande por similaridade, reordena por data e corta para o contexto. se a query
     # nomeia um curso, o rerank desprioriza doc de curso diferente (curso_da_query -> _curso_penalty).
-    # o trace guarda a query do agente; a busca leva os sinonimos dela
+    # o trace guarda a query do agente; a busca leva os sinonimos dela. hoje e a data do pedido, que
+    # situa cada evento datado do contexto (rag.agenda)
     hits = search(_com_sinonimos(search_query), top_k=FETCH_K)
     rank_sim = {h.id: i for i, h in enumerate(hits)}  # posicao por similaridade, antes do rerank
     hits = rerank_by_date(hits, curso_da_query(search_query))
-    context, filtered, sources, source_years = build_context(hits)
+    context, filtered, sources, source_years = build_context(hits, hoje=hoje)
 
     # log de depuracao: pool coletado, reordenado, e quais chunks entraram no contexto final
     filtered_ids = {h.id for h in filtered}
@@ -267,6 +330,9 @@ def _executar_busca(search_query, trace=None):
             "contexto_ids": [h.id for h in filtered],
             "chunks_textos": [h.metadata.get("text", "") for h in filtered],
             "contexto_rotulos": [rotulo_de_curso(h.metadata).removeprefix(" | ") for h in filtered],
+            # trechos em que a data sozinha na linha tambem saiu com a situacao: quem rele a coleta refaz o que
+            # o modelo leu com rag.agenda.marcar_eventos e a data do pedido
+            "contexto_datas_soltas": [_datas_soltas(h.metadata) for h in filtered],
             "sources": dict(sources),
             "source_years": dict(source_years),
             "marcas": marcas,
@@ -299,8 +365,10 @@ def _executar_busca(search_query, trace=None):
     retorno = f"{context}\nFONTES:\n{sources_text}"
     # info consumida no ask: anos das fontes (guard de data), contexto cru (guard), o mapa {n: url} das
     # fontes (backfill do bloco "Fontes:" quando o modelo cita [n] mas nao lista) e as marcas que
-    # disparam as regras de raciocinio
-    info = {"source_years": source_years, "contexto": context, "sources": dict(sources), "marcas": marcas}
+    # disparam as regras de raciocinio. as checagens leem o texto como esta na base, sem a situacao dos
+    # eventos: o numero de "daqui a 44 dias" nao pode passar por numero do documento na checagem de soma
+    info = {"source_years": source_years, "contexto": _montar_contexto(filtered)[0], "sources": dict(sources),
+            "marcas": marcas}
     return retorno, info
 
 
@@ -321,7 +389,7 @@ def registro_de_trace(trace, query, resposta, erro=None):
         "chamadas": chamadas,
         "raciocinio": resumo_raciocinio(chamadas),
         "custo_usd": round(sum(custos), 6) if custos else None,
-        # checagens pos-geracao que mudaram o texto do modelo (A, C, D, E, F)
+        # checagens pos-geracao que mudaram o texto do modelo (A, C, D, E, F, G)
         "checagens": t.get("checagens", []),
     }
 
@@ -350,7 +418,8 @@ def resumo_raciocinio(chamadas):
 
 # ── guard de saida: checagens pos-geracao, antes de entregar a resposta ──────────
 # rodam depois que o modelo produz o texto final: seguranca (vazamento do prompt, que troca
-# a resposta pela recusa), consistencia temporal (A: ressalva de dado antigo) e soma propria (C).
+# a resposta pela recusa), consistencia temporal (A: ressalva de dado antigo), soma propria (C), nivel da
+# data (D), hoje e prazo contra a data do pedido (E e F) e data que o agente nao leu (G).
 # A so ACRESCENTA uma frase no fim, porque o aluno ja leu o texto transmitido, e so age quando a
 # resposta cita fonte de ano anterior; C corta a soma tambem na previa, frase a frase.
 
@@ -623,11 +692,12 @@ def _dia_dito(palavra, hoje):
     return hoje if palavra.lower() == "hoje" else hoje + timedelta(days=1)
 
 
-def _data_completa(dia, mes, ano, hoje, frase=""):
+def _data_completa(dia, mes, ano, hoje, frase="", antes=""):
     # data citada como date. sem o ano: o ano unico citado na frase ("a Etapa 2 de 2026, de 26 de janeiro a
-    # 16 de fevereiro"); sem ele, o ano corrente, trocado pelo vizinho so na virada do ano (a data no ano
-    # corrente a mais de 6 meses e no vizinho a menos de 2: "12 a 14 de janeiro" dito em dezembro). None
-    # para data impossivel
+    # 16 de fevereiro"); com mais de um ano na frase, o ultimo citado antes da data ("o registro e de 2025: a
+    # cerimonia foi em 18 de dezembro, o que nao confirma a de 2026"); sem ele, o ano corrente, trocado pelo
+    # vizinho so na virada do ano (a data no ano corrente a mais de 6 meses e no vizinho a menos de 2: "12 a
+    # 14 de janeiro" dito em dezembro). None para data impossivel
     def montar(opcao):
         try:
             return datetime(opcao, mes, dia).date()
@@ -638,6 +708,9 @@ def _data_completa(dia, mes, ano, hoje, frase=""):
     anos_da_frase = set(re.findall(r"\b(20\d{2})\b", frase))
     if len(anos_da_frase) == 1:
         return montar(int(anos_da_frase.pop()))
+    anos_antes = re.findall(r"\b(20\d{2})\b", antes)
+    if len(anos_da_frase) > 1 and anos_antes:
+        return montar(int(anos_antes[-1]))
     data = montar(hoje.year)
     if data and abs((data - hoje).days) > 180:
         vizinhas = [vizinha for vizinha in (montar(hoje.year - 1), montar(hoje.year + 1))
@@ -723,7 +796,7 @@ def _data_antes(frase, posicao, hoje):
         inicio = frase[:posicao].rfind(trecho)
         if _DATA_ATUAL_ANTES_RX.search(frase[:inicio]):
             continue
-        data = _data_completa(dia, mes, ano, hoje, frase)
+        data = _data_completa(dia, mes, ano, hoje, frase, frase[:inicio])
         if data is None:
             continue
         if melhor is None or (inicio, data) > melhor:
@@ -765,6 +838,51 @@ def _guard_prazo(corpo, hoje):
                 frase = frase[:aberto.start()] + ("já encerraram" if plural else "já encerrou") + frase[aberto.end():]
         partes[posicao] = frase
     return "".join(partes)
+
+
+# G: data que nao aparece em nada que o agente leu (trechos recuperados, prompt, pergunta e conversa). o modelo
+# as vezes deduz uma data que o documento nao traz ("o recesso comeca em 19 de dezembro", o dia seguinte ao
+# ultimo dia letivo) ou a inventa. regra deterministica, a mesma da medicao offline das coletas (rag.ancoragem):
+# a data sai e o aviso fica no lugar dela, com o resto da frase
+DATA_SEM_ANCORA = "(data que não consta nos documentos)"
+_ENDERECO_RX = re.compile(r"(?:https?://|www\.)\S+")
+
+
+@lru_cache(maxsize=16)
+def _datas_lidas(texto):
+    # datas do que o agente leu, com as faixas expandidas dia a dia; o mesmo texto e conferido frase a frase na
+    # previa. os espacos sao reduzidos a um antes: no documento a data vem partida por quebra de linha
+    return frozenset(datas(normalizar(texto), expandir=True))
+
+
+def _guard_data_sem_ancora(corpo, lido, hoje):
+    """Troca por um aviso a data da resposta que nao aparece em nada que o agente leu.
+
+    Vale a data com o mesmo dia e mes (e o mesmo ano, quando os dois lados o trazem) em algum ponto do que foi
+    lido, dentro de um periodo de la ("de 05 a 13/01" ancora "09/01"), e a de ontem, hoje e amanha, que o
+    modelo calcula da data do pedido. Numa faixa, as duas pontas precisam valer. Data dentro de um endereco
+    de site nao e conferida.
+
+    Args:
+        corpo: texto da resposta, sem o bloco "Fontes:".
+        lido: tudo que o agente leu: os trechos recuperados, o prompt, a pergunta e a conversa.
+        hoje: data atual do pedido (date).
+
+    Returns:
+        O corpo com cada data sem ancora trocada por DATA_SEM_ANCORA; o proprio corpo quando todas valem.
+    """
+    lidas = _datas_lidas(lido)
+    vizinhas = {(dia.day, dia.month) for dia in (hoje - timedelta(days=1), hoje, hoje + timedelta(days=1))}
+    enderecos = [achado.span() for achado in _ENDERECO_RX.finditer(corpo)]
+    partes, cursor = [], 0
+    for inicio, fim, citadas in trechos_de_data(corpo):
+        if any(comeco <= inicio < termino for comeco, termino in enderecos):
+            continue
+        if all((dia, mes) in vizinhas or ancorada((dia, mes, ano), lidas) for dia, mes, ano in citadas):
+            continue
+        partes.append(corpo[cursor:inicio] + DATA_SEM_ANCORA)
+        cursor = fim
+    return "".join(partes) + corpo[cursor:] if partes else corpo
 
 
 # ── guard de seguranca: vazamento do prompt ──────────────────────────────────────
@@ -816,17 +934,19 @@ def _data_do_pedido(data_atual):
         return hoje_brasilia()
 
 
-def _checar_texto(texto, contexto, hoje, alteracoes=None):
+def _checar_texto(texto, contexto, hoje, alteracoes=None, leitura=""):
     """Aplica as checagens deterministicas de texto, na mesma ordem na resposta final e na previa.
 
-    Ordem: E (hoje no dia errado), F (prazo contra a data citada), C (soma propria) e D (nivel da data).
-    E e F precisam da data do pedido; C e D, do contexto recuperado.
+    Ordem: E (hoje no dia errado), F (prazo contra a data citada), C (soma propria), D (nivel da data) e
+    G (data sem ancora). E e F precisam da data do pedido; C e D, do contexto recuperado; G, dos dois e do
+    resto que o agente leu.
 
     Args:
         texto: corpo da resposta, ou trecho da previa.
         contexto: texto dos trechos recuperados (vazio sem busca).
         hoje: data atual do pedido (date), ou None.
         alteracoes: lista que recebe a letra de cada checagem que mudou o texto, quando dada.
+        leitura: o que o agente leu alem do contexto (prompt, pergunta e conversa); sem ela, G nao roda.
 
     Returns:
         O texto depois das checagens.
@@ -834,23 +954,29 @@ def _checar_texto(texto, contexto, hoje, alteracoes=None):
     etapas = (("E", lambda atual: _guard_hoje(atual, hoje) if hoje else atual),
               ("F", lambda atual: _guard_prazo(atual, hoje) if hoje else atual),
               ("C", lambda atual: _guard_soma_propria(atual, contexto) if contexto else atual),
-              ("D", lambda atual: _guard_nivel_da_data(atual, contexto) if contexto else atual))
+              ("D", lambda atual: _guard_nivel_da_data(atual, contexto) if contexto else atual),
+              ("G", lambda atual: _guard_data_sem_ancora(atual, contexto + "\n" + leitura, hoje) if hoje and leitura else atual))
     for letra, etapa in etapas:
-        novo = etapa(texto)
+        # fail-safe por checagem: a que falhar e pulada e vai ao log, sem derrubar a resposta nem as outras
+        try:
+            novo = etapa(texto)
+        except Exception as e:
+            logger.warning(_safe(f"[GUARD] checagem {letra} falhou, texto mantido: {e}"))
+            continue
         if novo != texto and alteracoes is not None:
             alteracoes.append(letra)
         texto = novo
     return texto
 
 
-def _aplicar_guards(corpo, fontes_anos, contexto, data_atual, gasto=None, alteracoes=None):
+def _aplicar_guards(corpo, fontes_anos, contexto, data_atual, gasto=None, alteracoes=None, leitura=""):
     # orquestra as checagens pos-geracao sobre o corpo. fail-safe: qualquer erro devolve
     # o corpo original. no-op quando nao houve busca (sem fontes nem contexto).
     if not corpo:
         return corpo
     try:
         hoje = _data_do_pedido(data_atual)
-        corpo = _checar_texto(corpo, contexto, hoje, alteracoes)
+        corpo = _checar_texto(corpo, contexto, hoje, alteracoes, leitura)
         ressalvado = _guard_ressalva_temporal(corpo, fontes_anos, hoje.year, gasto)
         if ressalvado != corpo and alteracoes is not None:
             alteracoes.append("A")
@@ -860,7 +986,7 @@ def _aplicar_guards(corpo, fontes_anos, contexto, data_atual, gasto=None, altera
     return corpo
 
 
-def _pos_processar(resposta, fontes_anos, contexto, sources_map, data_atual, gasto=None, alteracoes=None):
+def _pos_processar(resposta, fontes_anos, contexto, sources_map, data_atual, gasto=None, alteracoes=None, leitura=""):
     # pos-processamento unico da resposta final: decompoe em (corpo, fontes), aplica os
     # guards sobre o corpo, garante as fontes citadas e recompoe na borda de saida
     corpo, fontes, tinha_bloco = _decompor_resposta(resposta)
@@ -871,7 +997,7 @@ def _pos_processar(resposta, fontes_anos, contexto, sources_map, data_atual, gas
         logger.warning("[GUARD] resposta substituida pela recusa de seguranca")
         return RECUSA_SEGURANCA
 
-    corpo = _aplicar_guards(corpo, fontes_anos, contexto, data_atual, gasto, alteracoes)
+    corpo = _aplicar_guards(corpo, fontes_anos, contexto, data_atual, gasto, alteracoes, leitura)
     fontes = _backfill_fontes(corpo, fontes, tinha_bloco, sources_map)
     return _compor_resposta(corpo, fontes)
 
@@ -889,16 +1015,17 @@ class _Previa:
     """Libera ao aluno, em frases inteiras, o texto que o modelo esta gerando.
 
     Cada frase sai assim que termina, passa pelas mesmas checagens de texto da resposta final
-    (_checar_texto: E, F, C e D, nessa ordem), e a previa para no bloco
+    (_checar_texto: E, F, C, D e G, nessa ordem), e a previa para no bloco
     "Fontes:". Se o texto ja exibido somado a frase repetir LIMITE_PREVIA sequencias do prompt, a previa
     para de liberar e a resposta final decide: recusa, se vazou, ou o texto inteiro de uma vez.
     A previa tambem corta em ":", para mostrar texto mais cedo; uma frase partida ali so e corrigida
     pelas checagens E e F na resposta final, que substitui a previa.
     """
 
-    def __init__(self, contexto, hoje=None):
+    def __init__(self, contexto, hoje=None, leitura=""):
         self.contexto = contexto
         self.hoje = hoje
+        self.leitura = leitura
         self.gerado = ""
         self.liberado = 0  # caracteres do texto gerado que ja viraram previa
         self.parou = False
@@ -927,7 +1054,7 @@ class _Previa:
             return ""
         trecho = self.gerado[self.liberado:corte]
         self.liberado = corte
-        corrigido = _checar_texto(trecho, self.contexto, self.hoje)
+        corrigido = _checar_texto(trecho, self.contexto, self.hoje, leitura=self.leitura)
         if corrigido != trecho:
             trecho = corrigido.rstrip() + trecho[len(trecho.rstrip()):]
         return trecho
@@ -974,6 +1101,8 @@ def ask_stream(query, history=None, max_steps=3, trace=None, data_atual=None, ra
 
     sistema = agent_prompt.format(data_atual=data_atual, cursos=cursos_atuais)
     temperatura = float(os.getenv("AGENT_TEMP", "0.7"))
+    # o que o agente le alem dos trechos recuperados: uma data vinda daqui nao e data inventada (checagem G)
+    leitura = "\n".join([sistema, query] + [msg["content"] for msg in history])
 
     # acumuladores: anos das fontes e contexto cru (guard de data) + o mapa {n: url} da ultima
     # busca (backfill do bloco "Fontes:" via _backfill_fontes) + as marcas das regras de raciocinio
@@ -989,7 +1118,7 @@ def ask_stream(query, history=None, max_steps=3, trace=None, data_atual=None, ra
         com_raciocinio = regra is not None if raciocinio == "regra" else (raciocinio == "sempre" and passo > 0)
         perfil = "atendimento_raciocinio" if com_raciocinio else "atendimento"
 
-        previa, r = _Previa(contexto_acumulado, hoje), None
+        previa, r = _Previa(contexto_acumulado, hoje, leitura), None
         for tipo, valor in llm.gerar_fluxo(mensagens, sistema=sistema, ferramentas=ferramentas,
                                            temperatura=temperatura, perfil=perfil):
             if tipo == "fim":
@@ -1008,7 +1137,7 @@ def ask_stream(query, history=None, max_steps=3, trace=None, data_atual=None, ra
             # letras das checagens que mudaram o texto do modelo, para a telemetria e o eval
             alteracoes = []
             resposta = _pos_processar((r.texto or "").strip(), fontes_anos, contexto_acumulado,
-                                      sources_map, data_atual, gasto, alteracoes)
+                                      sources_map, data_atual, gasto, alteracoes, leitura)
             if trace is not None:
                 trace["resposta"] = resposta
                 trace["checagens"] = alteracoes
@@ -1022,7 +1151,7 @@ def ask_stream(query, history=None, max_steps=3, trace=None, data_atual=None, ra
         if trace is not None:
             trace["acao"] = "buscar"
         search_query = (r.chamada.get("args") or {}).get("query", query)
-        context, info = _executar_busca(search_query, trace=trace)
+        context, info = _executar_busca(search_query, trace=trace, hoje=hoje)
         # sem resultado na base: informa o modelo e deixa ele responder honestamente que nao
         # encontrou (o prompt manda dizer isso); nao busca na internet nem inventa
         if context is None:
