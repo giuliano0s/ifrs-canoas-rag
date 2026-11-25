@@ -1971,28 +1971,6 @@
   "falhas": 0,
   "tentativas": 0
  },
- "https://ifrs.edu.br/editais/edital-proen-no-36-2025-processo-seletivo-simplificado-de-contratacao-de-professor-formador-para-o-plano-nacional-de-formacao-de-professores-da-educacao-basica-parfor/": {
-  "titulo": "EDITAL PROEN Nº 36/2025 – PROCESSO SELETIVO SIMPLIFICADO DE CONTRATAÇÃO DE PROFESSOR FORMADOR PARA O PLANO NACIONAL DE FORMAÇÃO DE PROFESSORES DA EDUCAÇÃO BÁSICA – PARFOR",
-  "data": "24/11/2025",
-  "categorias": [
-   "Ensino"
-  ],
-  "atualizacao": "15/12/2025 13:39",
-  "hash": "da939753563e7fd2071d7b86d7e2f838c84d742ae1782005d67b0ab9f510ccd3",
-  "veredito": {
-   "categoria": "outro",
-   "publico": "servidores",
-   "evidencia": "O presente Processo Seletivo tem por objetivo selecionar docente para atuar no curso de Licenciatura em Pedagogia/Parfor - Campus Bento Gonçalves.",
-   "motivo": "O edital é restrito à seleção de docente para curso ofertado no Campus Bento Gonçalves.",
-   "cobertura": 1.0
-  },
-  "entra": false,
-  "motivo": "outro",
-  "ids": [],
-  "objeto": null,
-  "falhas": 0,
-  "tentativas": 0
- },
  "https://ifrs.edu.br/editais/edital-proen-no-37-2025-fluxo-continuo-permanente-de-projetos-de-ensino/": {
   "titulo": "EDITAL PROEN Nº 37/2025 – FLUXO CONTÍNUO PERMANENTE DE PROJETOS DE ENSINO",
   "data": "05/12/2025",

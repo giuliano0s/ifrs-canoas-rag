@@ -2,7 +2,7 @@
  "contagem": {
   "assistente-adm": 5,
   "automacao": 63,
-  "eng-eletronica": 258,
+  "eng-eletronica": 252,
   "esp-educacao": 59,
   "esp-linguagens": 102,
   "gpi": 200,
@@ -368,7 +368,7 @@
    "trechos": {}
   },
   "https://ifrs.edu.br/canoas/": {
-   "chave": "c8159b4c0d9b9574",
+   "chave": "5bc09d2dab5d1647",
    "cursos": [],
    "estrutura": "generico",
    "so_ligacao": false,
@@ -1539,9 +1539,28 @@
    "trechos": {}
   },
   "https://ifrs.edu.br/canoas/documentos/": {
-   "chave": "37fdc3fe44d4b162",
+   "chave": "b13159d36f9e9ff8",
    "cursos": [],
    "estrutura": "generico",
+   "so_ligacao": false,
+   "trechos": {}
+  },
+  "https://ifrs.edu.br/canoas/documentos/origens/concamp/": {
+   "chave": "e88832ed1f8123cc",
+   "cursos": [
+    "gpi",
+    "esp-educacao",
+    "esp-linguagens",
+    "tads",
+    "tec-desenv-sistemas",
+    "tec-admin",
+    "tec-comercio",
+    "automacao",
+    "eng-eletronica",
+    "operador-computador",
+    "assistente-adm"
+   ],
+   "estrutura": "varios_sem_secoes",
    "so_ligacao": false,
    "trechos": {}
   },
@@ -1619,9 +1638,21 @@
    "trechos": {}
   },
   "https://ifrs.edu.br/canoas/documentos/tipos/resolucao/": {
-   "chave": "35c92f1456896d83",
-   "cursos": [],
-   "estrutura": "generico",
+   "chave": "e9808f670fd22bc6",
+   "cursos": [
+    "gpi",
+    "esp-educacao",
+    "esp-linguagens",
+    "tads",
+    "tec-desenv-sistemas",
+    "tec-admin",
+    "tec-comercio",
+    "automacao",
+    "eng-eletronica",
+    "operador-computador",
+    "assistente-adm"
+   ],
+   "estrutura": "varios_sem_secoes",
    "so_ligacao": false,
    "trechos": {}
   },
@@ -3775,11 +3806,9 @@
    "trechos": {}
   },
   "https://ifrs.edu.br/canoas/todas-as-noticias/": {
-   "chave": "460f54e91402df0e",
-   "cursos": [
-    "tec-desenv-sistemas"
-   ],
-   "estrutura": "varios_sem_secoes",
+   "chave": "9e7b28261a8be159",
+   "cursos": [],
+   "estrutura": "generico",
    "so_ligacao": false,
    "trechos": {}
   },
@@ -8482,6 +8511,13 @@
    "so_ligacao": false,
    "trechos": {}
   },
+  "https://ifrs.edu.br/canoas/wp-content/uploads/sites/6/2026/11/Calendario-2027-Campus-Canoas-do-IFRS.pdf": {
+   "chave": "6a7169dc917c6405",
+   "cursos": [],
+   "estrutura": "generico",
+   "so_ligacao": false,
+   "trechos": {}
+  },
   "https://ifrs.edu.br/canoas/wp-content/uploads/sites/6/2026/11/Plano-de-Acao-2027_campus-Canoas.pdf": {
    "chave": "8008cd6523332c00",
    "cursos": [],
@@ -9047,7 +9083,7 @@
    }
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/bacharelado-em-engenharia-eletronica/": {
-   "chave": "6d783bf0d5e888ad",
+   "chave": "7d13ef02b3aebc33",
    "cursos": [
     "eng-eletronica"
    ],
@@ -9056,7 +9092,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/licenciatura-em-matematica-2/": {
-   "chave": "36098435058f6bf2",
+   "chave": "4eb6c3c404f81a91",
    "cursos": [
     "matematica"
    ],
@@ -9065,7 +9101,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnico-em-administracao-12/": {
-   "chave": "b1d83f2094953b33",
+   "chave": "9e86ca622db2cfe5",
    "cursos": [
     "tec-admin"
    ],
@@ -9110,7 +9146,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnico-em-eletronica-3/": {
-   "chave": "8b28f833d668aa21",
+   "chave": "39487010615f1fa7",
    "cursos": [
     "tec-eletronica"
    ],
