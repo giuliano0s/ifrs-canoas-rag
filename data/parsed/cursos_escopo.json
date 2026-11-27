@@ -368,7 +368,7 @@
    "trechos": {}
   },
   "https://ifrs.edu.br/canoas/": {
-   "chave": "5bc09d2dab5d1647",
+   "chave": "83d3cc20d3b1ca11",
    "cursos": [],
    "estrutura": "generico",
    "so_ligacao": false,
@@ -3806,7 +3806,7 @@
    "trechos": {}
   },
   "https://ifrs.edu.br/canoas/todas-as-noticias/": {
-   "chave": "9e7b28261a8be159",
+   "chave": "cdca63350c7e1a72",
    "cursos": [],
    "estrutura": "generico",
    "so_ligacao": false,
@@ -9083,7 +9083,7 @@
    }
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/bacharelado-em-engenharia-eletronica/": {
-   "chave": "99676389b3a54eeb",
+   "chave": "8f2db8a22f4a6753",
    "cursos": [
     "eng-eletronica"
    ],
@@ -9092,7 +9092,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/licenciatura-em-matematica-2/": {
-   "chave": "4eb6c3c404f81a91",
+   "chave": "03b861cd5a8af4a1",
    "cursos": [
     "matematica"
    ],
@@ -9101,7 +9101,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnico-em-administracao-12/": {
-   "chave": "e1acaca6c0ba6eee",
+   "chave": "b1d83f2094953b33",
    "cursos": [
     "tec-admin"
    ],
@@ -9146,7 +9146,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnico-em-eletronica-3/": {
-   "chave": "dd13ca8f5b9db187",
+   "chave": "8b28f833d668aa21",
    "cursos": [
     "tec-eletronica"
    ],
@@ -9164,7 +9164,7 @@
    "trechos": {}
   },
   "https://ingresso.ifrs.edu.br/2026/cursos/tecnologia-em-analise-e-desenvolvimento-de-sistemas-11/": {
-   "chave": "0c5ec721ba660eb3",
+   "chave": "9437dc21e3f7b156",
    "cursos": [
     "tads"
    ],
